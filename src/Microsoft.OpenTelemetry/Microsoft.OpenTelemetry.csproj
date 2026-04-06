@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Microsoft OpenTelemetry Distro - a unified OpenTelemetry distribution for .NET combining Azure Monitor, Agent365, and Microsoft Agent Framework observability.</Description>
+    <AssemblyTitle>Microsoft OpenTelemetry Distro</AssemblyTitle>
+    <RootNamespace>Microsoft.OpenTelemetry</RootNamespace>
+    <AssemblyName>Microsoft.OpenTelemetry</AssemblyName>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageTags>OpenTelemetry;Telemetry;Azure Monitor;OTLP;Agent365;AgentFramework;AI;Agents;Distro</PackageTags>
+    <NoWarn>$(NoWarn);SA1636;CS1591;NU1903;CS1574;RS0016;RS0017;RS0026;RS0041</NoWarn>
+
+    <!-- NuGet packaging -->
+    <PackageId>Microsoft.OpenTelemetry</PackageId>
+    <Version>1.0.0-beta.1</Version>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>See CHANGELOG.md for release notes.</PackageReleaseNotes>
+    <PackageProjectUrl>https://github.com/microsoft/opentelemetry-distro-dotnet</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/microsoft/opentelemetry-distro-dotnet</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+  </PropertyGroup>
+
+  <!-- Include repo-root files in NuGet package -->
+  <ItemGroup>
+    <None Include="..\..\LICENSE" Pack="true" PackagePath="\" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- Public API tracking -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Microsoft.OpenTelemetry.AzureMonitor.Tests" />
+    <InternalsVisibleTo Include="Microsoft.OpenTelemetry.Agent365.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- OpenTelemetry core -->
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.SqlClient" />
+    <PackageReference Include="OpenTelemetry.Exporter.Console" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+
+    <!-- Azure Monitor exporter -->
+    <PackageReference Include="Azure.Monitor.OpenTelemetry.Exporter" />
+
+    <!-- Agent365 extensions -->
+    <PackageReference Include="Microsoft.SemanticKernel" />
+    <PackageReference Include="Microsoft.SemanticKernel.Agents.Core" />
+    <PackageReference Include="Azure.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Agents.Builder" />
+    <PackageReference Include="Newtonsoft.Json" />
+  </ItemGroup>
+
+</Project>
