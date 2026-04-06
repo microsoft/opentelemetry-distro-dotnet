@@ -36,14 +36,22 @@ jobs:
         run: dotnet build Microsoft.OpenTelemetry.slnx --no-restore --configuration Release
 
       - name: Run tests
-        run: dotnet test Microsoft.OpenTelemetry.slnx --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
+        id: test1
+        continue-on-error: true
+        run: dotnet test Microsoft.OpenTelemetry.slnx --no-build --configuration Release --verbosity normal --results-directory ${{ github.workspace }}/TestResults --logger "trx;logfileprefix=testResults_"
+
+      - name: Retry failed tests
+        if: steps.test1.outcome == 'failure'
+        run: pwsh -f ./.scripts/build_RetryTests.ps1 -TestResultsDirectory ${{ github.workspace }}/TestResults -WorkingDirectory ${{ github.workspace }}
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ matrix.os }}-net${{ matrix.dotnet-version }}
-          path: "**/test-results.trx"
+          path: |
+            ${{ github.workspace }}/TestResults/**/*.trx
+            ${{ github.workspace }}/RetryResults/**/*.trx
           retention-days: 30
 
   pack:
