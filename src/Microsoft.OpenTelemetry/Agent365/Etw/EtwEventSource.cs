@@ -5,9 +5,20 @@ using System.Diagnostics.Tracing;
 namespace Microsoft.OpenTelemetry.Agent365.Etw
 {
     /// <summary>
-    /// ETW Event Source for Observability.
+    /// ETW Event Source for Agent365 Observability.
+    /// EventSource Guid at Runtime: {544e9fe9-9c40-549a-ebb5-6492695772f7}.
     /// </summary>
-    [EventSource(Name = "A365-O11y-EventSource")]
+    /// <remarks>
+    /// PerfView Instructions:
+    /// <list type="bullet">
+    /// <item>To collect all events: <code>PerfView.exe collect -MaxCollectSec:300 -NoGui /onlyProviders=*OpenTelemetry-Microsoft-Agent365-Etw</code></item>
+    /// </list>
+    /// Dotnet-Trace Instructions:
+    /// <list type="bullet">
+    /// <item>To collect all events: <code>dotnet-trace collect --process-id PID --providers OpenTelemetry-Microsoft-Agent365-Etw</code></item>
+    /// </list>
+    /// </remarks>
+    [EventSource(Name = "OpenTelemetry-Microsoft-Agent365-Etw")]
     public class EtwEventSource : EventSource
     {
         /// <summary>
