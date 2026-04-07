@@ -149,8 +149,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
                 .UseMicrosoftOpenTelemetry(o =>
                 {
                     o.Exporters = ExportTarget.Otlp;
-                    o.OtlpEndpoint = new Uri("http://localhost:4317");
-                });
+                    });
 
             Assert.True(services.Any(s =>
                 s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder") ||
