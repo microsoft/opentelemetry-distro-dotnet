@@ -9,7 +9,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Common
     /// <summary>
     /// Provides discovery and endpoint generation for Power Platform APIs across different cluster categories.
     /// </summary>
-    public class PowerPlatformApiDiscovery
+    internal class PowerPlatformApiDiscovery
     {
         private readonly string clusterCategory;
 

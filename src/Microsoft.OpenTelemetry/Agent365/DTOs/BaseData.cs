@@ -9,7 +9,7 @@ namespace Microsoft.OpenTelemetry.Agent365.DTOs
     /// <summary>
     /// Encapsulates all telemetry data for an operation, including attributes, timing, and span information.
     /// </summary>
-    public abstract class BaseData
+    internal abstract class BaseData
     {
         /// <summary>
         /// Initializes a new instance

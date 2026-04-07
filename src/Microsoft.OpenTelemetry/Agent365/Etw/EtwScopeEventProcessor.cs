@@ -11,7 +11,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Etw
     /// <summary>
     /// Processes spans by emitting ETW events.
     /// </summary>
-    public class EtwScopeEventProcessor: BaseProcessor<Activity>
+    internal class EtwScopeEventProcessor: BaseProcessor<Activity>
     {
         private readonly ExportFormatter _formatter;
         private readonly Resource _resource;

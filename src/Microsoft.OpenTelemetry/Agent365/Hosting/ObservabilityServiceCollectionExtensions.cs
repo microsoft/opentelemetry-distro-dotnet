@@ -9,7 +9,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Hosting
     /// <summary>
     /// Provides extension methods for configuring Microsoft Agent 365 SDK with OpenTelemetry tracing.
     /// </summary>
-    public static class ObservabilityServiceCollectionExtensions
+    internal static class ObservabilityServiceCollectionExtensions
     {
         /// <summary>
         /// Adds agentic token handling to the service collection.

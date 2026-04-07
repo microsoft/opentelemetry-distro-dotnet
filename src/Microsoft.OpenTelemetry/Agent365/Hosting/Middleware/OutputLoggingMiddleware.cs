@@ -28,7 +28,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Hosting.Middleware
     /// span attributes and exported to the configured telemetry backend.
     /// </para>
     /// </remarks>
-    public sealed class OutputLoggingMiddleware : IMiddleware
+    internal sealed class OutputLoggingMiddleware : IMiddleware
     {
         /// <summary>
         /// The <see cref="ITurnContext.StackState"/> key used to store the parent

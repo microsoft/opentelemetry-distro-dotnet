@@ -7,7 +7,7 @@ using Microsoft.SemanticKernel.Agents;
 /// <summary>
 /// Extension methods for enabling tracing on SemanticKernel agents.
 /// </summary>
-public static class ChatCompletionAgentExtensions
+internal static class ChatCompletionAgentExtensions
 {
     /// <summary>
     /// Wraps a ChatCompletionAgent with tracing capabilities.

@@ -5,7 +5,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Tracing.Exporters
     /// <summary>
     /// Represents the supported Agent365 exporter types.
     /// </summary>
-    public enum Agent365ExporterType
+    internal enum Agent365ExporterType
     {
         /// <summary>
         /// Agent365 synchronous exporter type.

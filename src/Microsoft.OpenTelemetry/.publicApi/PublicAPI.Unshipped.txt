@@ -1,19 +1,5 @@
 #nullable enable
-abstract Microsoft.OpenTelemetry.Agent365.DTOs.BaseData.Name.get -> string!
-abstract Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.BaseExporterAsync<T>.ExportAsync(System.Collections.Generic.IReadOnlyCollection<T!>! batch, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
-const Microsoft.OpenTelemetry.Agent365.DTOs.SpanKindConstants.Client = "Client" -> string!
-const Microsoft.OpenTelemetry.Agent365.DTOs.SpanKindConstants.Consumer = "Consumer" -> string!
-const Microsoft.OpenTelemetry.Agent365.DTOs.SpanKindConstants.Internal = "Internal" -> string!
-const Microsoft.OpenTelemetry.Agent365.DTOs.SpanKindConstants.Producer = "Producer" -> string!
-const Microsoft.OpenTelemetry.Agent365.DTOs.SpanKindConstants.Server = "Server" -> string!
-const Microsoft.OpenTelemetry.Agent365.Etw.Constants.EtwCategoryPrefix = "A365.Observability.Etw." -> string!
-const Microsoft.OpenTelemetry.Agent365.Extensions.AgentFramework.BuilderExtensions.AgentFrameworkAgentSource = "Experimental.Microsoft.Agents.AI.Agent" -> string!
-const Microsoft.OpenTelemetry.Agent365.Extensions.AgentFramework.BuilderExtensions.AgentFrameworkChatClientSource = "Experimental.Microsoft.Agents.AI.ChatClient" -> string!
-const Microsoft.OpenTelemetry.Agent365.Extensions.AgentFramework.BuilderExtensions.AgentFrameworkSource = "Experimental.Microsoft.Agents.AI" -> string!
-const Microsoft.OpenTelemetry.Agent365.Hosting.Middleware.OutputLoggingMiddleware.A365ParentTraceparentKey = "A365ParentTraceparent" -> string!
 const Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterOptions.DefaultEndpointHost = "agent365.svc.cloud.microsoft" -> string!
-const Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.AutoInstrumentationConstants.GenAiInvocationInputKey = "gen_ai.agent.invocation_input" -> string!
-const Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.AutoInstrumentationConstants.GenAiInvocationOutputKey = "gen_ai.agent.invocation_output" -> string!
 const Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.ExecuteToolScope.OperationName = "execute_tool" -> string!
 const Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InvokeAgentScope.OperationName = "invoke_agent" -> string!
 const Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.OpenTelemetryConstants.AgentAUIDKey = "microsoft.agent.user.id" -> string!
@@ -77,12 +63,6 @@ const Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.OpenTelemetryConstants.Use
 const Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.OpenTelemetryConstants.UserIdKey = "user.id" -> string!
 const Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.OpenTelemetryConstants.UserNameKey = "user.name" -> string!
 const Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.OutputScope.OperationName = "output_messages" -> string!
-Microsoft.OpenTelemetry.Agent365.Builder
-Microsoft.OpenTelemetry.Agent365.Builder.Build() -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-Microsoft.OpenTelemetry.Agent365.Builder.Builder(Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration? configuration, bool useOpenTelemetryBuilder = true, Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterType agent365ExporterType = Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterType.Agent365Exporter) -> void
-Microsoft.OpenTelemetry.Agent365.Builder.Configuration.get -> Microsoft.Extensions.Configuration.IConfiguration?
-Microsoft.OpenTelemetry.Agent365.Builder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-Microsoft.OpenTelemetry.Agent365.Common.ActivityExtensions
 Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder
 Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder.AgentBlueprintId(string? v) -> Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder!
 Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder.AgentDescription(string? v) -> Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder!
@@ -109,171 +89,6 @@ Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder.UserClientIp(System.Net.I
 Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder.UserEmail(string? v) -> Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder!
 Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder.UserId(string? v) -> Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder!
 Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder.UserName(string? v) -> Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder!
-Microsoft.OpenTelemetry.Agent365.Common.EnvironmentUtils
-Microsoft.OpenTelemetry.Agent365.Common.EnvironmentUtils.EnvironmentUtils() -> void
-Microsoft.OpenTelemetry.Agent365.Common.ExportFormatter
-Microsoft.OpenTelemetry.Agent365.Common.ExportFormatter.ExportFormatter(Microsoft.Extensions.Logging.ILogger<Microsoft.OpenTelemetry.Agent365.Common.ExportFormatter!>! logger) -> void
-Microsoft.OpenTelemetry.Agent365.Common.ExportFormatter.FormatLogData(System.Collections.Generic.IDictionary<string!, object?>! data) -> string!
-Microsoft.OpenTelemetry.Agent365.Common.ExportFormatter.FormatMany(System.Collections.Generic.IEnumerable<System.Diagnostics.Activity!>! activities, OpenTelemetry.Resources.Resource! resource) -> string!
-Microsoft.OpenTelemetry.Agent365.Common.ExportFormatter.FormatSingle(System.Diagnostics.Activity! activity, OpenTelemetry.Resources.Resource! resource) -> string!
-Microsoft.OpenTelemetry.Agent365.Common.PowerPlatformApiDiscovery
-Microsoft.OpenTelemetry.Agent365.Common.PowerPlatformApiDiscovery.GetTenantEndpoint(string! tenantId) -> string!
-Microsoft.OpenTelemetry.Agent365.Common.PowerPlatformApiDiscovery.GetTenantIslandClusterEndpoint(string! tenantId) -> string!
-Microsoft.OpenTelemetry.Agent365.Common.PowerPlatformApiDiscovery.GetTokenAudience() -> string!
-Microsoft.OpenTelemetry.Agent365.Common.PowerPlatformApiDiscovery.GetTokenEndpointHost() -> string!
-Microsoft.OpenTelemetry.Agent365.Common.PowerPlatformApiDiscovery.PowerPlatformApiDiscovery(string! clusterCategory) -> void
-Microsoft.OpenTelemetry.Agent365.DTOs.BaseData
-Microsoft.OpenTelemetry.Agent365.DTOs.BaseData.Attributes.get -> System.Collections.Generic.IDictionary<string!, object?>!
-Microsoft.OpenTelemetry.Agent365.DTOs.BaseData.BaseData(System.Collections.Generic.IDictionary<string!, object?>? attributes = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, string? spanKind = null, string? traceId = null) -> void
-Microsoft.OpenTelemetry.Agent365.DTOs.BaseData.Duration.get -> System.TimeSpan
-Microsoft.OpenTelemetry.Agent365.DTOs.BaseData.EndTime.get -> System.DateTimeOffset?
-Microsoft.OpenTelemetry.Agent365.DTOs.BaseData.EndTime.set -> void
-Microsoft.OpenTelemetry.Agent365.DTOs.BaseData.ParentSpanId.get -> string?
-Microsoft.OpenTelemetry.Agent365.DTOs.BaseData.SpanId.get -> string!
-Microsoft.OpenTelemetry.Agent365.DTOs.BaseData.SpanKind.get -> string?
-Microsoft.OpenTelemetry.Agent365.DTOs.BaseData.StartTime.get -> System.DateTimeOffset?
-Microsoft.OpenTelemetry.Agent365.DTOs.BaseData.StartTime.set -> void
-Microsoft.OpenTelemetry.Agent365.DTOs.BaseData.ToDictionary() -> System.Collections.Generic.Dictionary<string!, object?>!
-Microsoft.OpenTelemetry.Agent365.DTOs.BaseData.TraceId.get -> string?
-Microsoft.OpenTelemetry.Agent365.DTOs.Builders.BaseDataBuilder<T>
-Microsoft.OpenTelemetry.Agent365.DTOs.Builders.BaseDataBuilder<T>.BaseDataBuilder() -> void
-Microsoft.OpenTelemetry.Agent365.DTOs.Builders.ExecuteInferenceDataBuilder
-Microsoft.OpenTelemetry.Agent365.DTOs.Builders.ExecuteInferenceDataBuilder.ExecuteInferenceDataBuilder() -> void
-Microsoft.OpenTelemetry.Agent365.DTOs.Builders.ExecuteToolDataBuilder
-Microsoft.OpenTelemetry.Agent365.DTOs.Builders.ExecuteToolDataBuilder.ExecuteToolDataBuilder() -> void
-Microsoft.OpenTelemetry.Agent365.DTOs.Builders.InvokeAgentDataBuilder
-Microsoft.OpenTelemetry.Agent365.DTOs.Builders.InvokeAgentDataBuilder.InvokeAgentDataBuilder() -> void
-Microsoft.OpenTelemetry.Agent365.DTOs.Builders.OutputDataBuilder
-Microsoft.OpenTelemetry.Agent365.DTOs.Builders.OutputDataBuilder.OutputDataBuilder() -> void
-Microsoft.OpenTelemetry.Agent365.DTOs.ExecuteInferenceData
-Microsoft.OpenTelemetry.Agent365.DTOs.ExecuteInferenceData.ExecuteInferenceData(System.Collections.Generic.IDictionary<string!, object?>? attributes = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, string? traceId = null) -> void
-Microsoft.OpenTelemetry.Agent365.DTOs.ExecuteToolData
-Microsoft.OpenTelemetry.Agent365.DTOs.ExecuteToolData.ExecuteToolData(System.Collections.Generic.IDictionary<string!, object?>? attributes = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, string? spanKind = null, string? traceId = null) -> void
-Microsoft.OpenTelemetry.Agent365.DTOs.InvokeAgentData
-Microsoft.OpenTelemetry.Agent365.DTOs.InvokeAgentData.InvokeAgentData(System.Collections.Generic.IDictionary<string!, object?>? attributes = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, string? spanKind = null, string? traceId = null) -> void
-Microsoft.OpenTelemetry.Agent365.DTOs.OutputData
-Microsoft.OpenTelemetry.Agent365.DTOs.OutputData.OutputData(System.Collections.Generic.IDictionary<string!, object?>? attributes = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, string? traceId = null) -> void
-Microsoft.OpenTelemetry.Agent365.DTOs.SpanKindConstants
-Microsoft.OpenTelemetry.Agent365.Etw.A365EtwLogger<T>
-Microsoft.OpenTelemetry.Agent365.Etw.A365EtwLogger<T>.A365EtwLogger(Microsoft.Extensions.Logging.ILoggerFactory! factory) -> void
-Microsoft.OpenTelemetry.Agent365.Etw.A365EtwLogger<T>.LogInferenceCall(Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.InferenceCallDetails! inferenceCallDetails, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, string![]? inputMessages, string![]? outputMessages, System.DateTimeOffset? startTime, System.DateTimeOffset? endTime, string? spanId, string? parentSpanId, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Channel? channel, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.CallerDetails? callerDetails, string? traceId) -> void
-Microsoft.OpenTelemetry.Agent365.Etw.A365EtwLogger<T>.LogInvokeAgent(Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.InvokeAgentScopeDetails! invokeAgentScopeDetails, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Request? request, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.CallerDetails? callerDetails, string![]? inputMessages, string![]? outputMessages, System.DateTimeOffset? startTime, System.DateTimeOffset? endTime, string? spanId, string? parentSpanId, string? traceId) -> void
-Microsoft.OpenTelemetry.Agent365.Etw.A365EtwLogger<T>.LogOutput(Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails! agentDetails, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Response! response, string? conversationId = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Channel? channel = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.CallerDetails? callerDetails = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, string? traceId = null) -> void
-Microsoft.OpenTelemetry.Agent365.Etw.A365EtwLogger<T>.LogToolCall(Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.ToolCallDetails! toolCallDetails, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, string? responseContent, System.DateTimeOffset? startTime, System.DateTimeOffset? endTime, string? spanId, string? parentSpanId, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Channel? channel, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.CallerDetails? callerDetails, string? traceId) -> void
-Microsoft.OpenTelemetry.Agent365.Etw.Constants
-Microsoft.OpenTelemetry.Agent365.Etw.Constants.Constants() -> void
-Microsoft.OpenTelemetry.Agent365.Etw.EtwEventSource
-Microsoft.OpenTelemetry.Agent365.Etw.EtwEventSource.LogJson(string! message) -> void
-Microsoft.OpenTelemetry.Agent365.Etw.EtwEventSource.SpanStop(string! name, string! spanId, string! traceId, string! parentSpanId, string! content) -> void
-Microsoft.OpenTelemetry.Agent365.Etw.EtwLoggingBuilder
-Microsoft.OpenTelemetry.Agent365.Etw.EtwLoggingBuilder.Build() -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-Microsoft.OpenTelemetry.Agent365.Etw.EtwLogProcessor
-Microsoft.OpenTelemetry.Agent365.Etw.EtwLogProcessor.EtwLogProcessor(Microsoft.OpenTelemetry.Agent365.Common.ExportFormatter! formatter, Microsoft.Extensions.Logging.ILogger<Microsoft.OpenTelemetry.Agent365.Etw.EtwLogProcessor!>? logger = null) -> void
-Microsoft.OpenTelemetry.Agent365.Etw.EtwScopeEventProcessor
-Microsoft.OpenTelemetry.Agent365.Etw.EtwScopeEventProcessor.EtwScopeEventProcessor(Microsoft.OpenTelemetry.Agent365.Common.ExportFormatter! formatter, OpenTelemetry.Resources.Resource? resource = null, Microsoft.Extensions.Logging.ILogger<Microsoft.OpenTelemetry.Agent365.Etw.EtwScopeEventProcessor!>? logger = null) -> void
-Microsoft.OpenTelemetry.Agent365.Etw.EtwServiceCollectionExtensions
-Microsoft.OpenTelemetry.Agent365.Etw.EtwTracingBuilder
-Microsoft.OpenTelemetry.Agent365.Etw.EtwTracingBuilder.Build() -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-Microsoft.OpenTelemetry.Agent365.Etw.IA365EtwLogger<T>
-Microsoft.OpenTelemetry.Agent365.Etw.IA365EtwLogger<T>.LogInferenceCall(Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.InferenceCallDetails! inferenceCallDetails, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, string![]? inputMessages = null, string![]? outputMessages = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Channel? channel = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.CallerDetails? callerDetails = null, string? traceId = null) -> void
-Microsoft.OpenTelemetry.Agent365.Etw.IA365EtwLogger<T>.LogInvokeAgent(Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.InvokeAgentScopeDetails! invokeAgentScopeDetails, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Request? request = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.CallerDetails? callerDetails = null, string![]? inputMessages = null, string![]? outputMessages = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, string? traceId = null) -> void
-Microsoft.OpenTelemetry.Agent365.Etw.IA365EtwLogger<T>.LogOutput(Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails! agentDetails, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Response! response, string? conversationId = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Channel? channel = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.CallerDetails? callerDetails = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, string? traceId = null) -> void
-Microsoft.OpenTelemetry.Agent365.Etw.IA365EtwLogger<T>.LogToolCall(Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.ToolCallDetails! toolCallDetails, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, string? responseContent = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Channel? channel = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.CallerDetails? callerDetails = null, string? traceId = null) -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.AgentFramework.BuilderExtensions
-Microsoft.OpenTelemetry.Agent365.Extensions.OpenAI.BuilderExtensions
-Microsoft.OpenTelemetry.Agent365.Extensions.OpenAI.ChatToolCallExtensions
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.BuilderExtensions
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.ChatCompletionAgentExtensions
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.FunctionInvocationFilter
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.FunctionInvocationFilter.FunctionInvocationFilter() -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.FunctionInvocationFilter.OnFunctionInvocationAsync(Microsoft.SemanticKernel.FunctionInvocationContext! context, System.Func<Microsoft.SemanticKernel.FunctionInvocationContext!, System.Threading.Tasks.Task!>! next) -> System.Threading.Tasks.Task!
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoice
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoice.AiChoice() -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoice.Message.get -> Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceMessage?
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoice.Message.set -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceArguments
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceArguments.AiChoiceArguments() -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceArguments.MessageBody.get -> string?
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceArguments.MessageBody.set -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceFunction
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceFunction.AiChoiceFunction() -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceFunction.Arguments.get -> Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceArguments?
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceFunction.Arguments.set -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceMessage
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceMessage.AiChoiceMessage() -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceMessage.Content.get -> string?
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceMessage.Content.set -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceMessage.Role.get -> string?
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceMessage.Role.set -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceMessage.ToolCalls.get -> System.Collections.Generic.List<Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceToolCall!>?
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceMessage.ToolCalls.set -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceToolCall
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceToolCall.AiChoiceToolCall() -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceToolCall.Function.get -> Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceFunction?
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.AiChoiceToolCall.Function.set -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.MessageContent
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.MessageContent.Content.get -> string?
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.MessageContent.Content.set -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.MessageContent.MessageContent() -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.MessageContent.Name.get -> string?
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.MessageContent.Name.set -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.MessageContent.Role.get -> string?
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.MessageContent.Role.set -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.NestedContent
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.NestedContent.Content.get -> string?
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.NestedContent.Content.set -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.NestedContent.ContentType.get -> string?
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.NestedContent.ContentType.set -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models.NestedContent.NestedContent() -> void
-Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Utils.SemanticKernelSpanProcessorHelper
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenCache
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenCache.AgenticTokenCache(System.TimeSpan? cleanupInterval = null) -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenCache.Count.get -> int
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenCache.Dispose() -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenCache.GetObservabilityToken(string! agentId, string! tenantId) -> System.Threading.Tasks.Task<string?>!
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenCache.InvalidateAll() -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenCache.InvalidateToken(string! agentId, string! tenantId) -> bool
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenCache.RegisterObservability(string! agentId, string! tenantId, Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenStruct! tokenGenerator, string![]! observabilityScopes) -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenCache.RemoveExpiredTokens() -> int
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenStruct
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenStruct.AgenticTokenStruct(Microsoft.Agents.Builder.App.UserAuth.UserAuthorization! userAuthorization, Microsoft.Agents.Builder.ITurnContext! turnContext, string! authHandlerName, string? connectionName = null) -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenStruct.AuthHandlerName.get -> string!
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenStruct.AuthHandlerName.set -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenStruct.ConnectionName.get -> string?
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenStruct.ConnectionName.set -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenStruct.TurnContext.get -> Microsoft.Agents.Builder.ITurnContext!
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenStruct.TurnContext.set -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenStruct.UserAuthorization.get -> Microsoft.Agents.Builder.App.UserAuth.UserAuthorization!
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenStruct.UserAuthorization.set -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.IExporterTokenCache<T>
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.IExporterTokenCache<T>.GetObservabilityToken(string! agentId, string! tenantId) -> System.Threading.Tasks.Task<string?>!
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.IExporterTokenCache<T>.RegisterObservability(string! agentId, string! tenantId, T! tokenGenerator, string![]! observabilityScopes) -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.ServiceTokenCache
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.ServiceTokenCache.Count.get -> int
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.ServiceTokenCache.Dispose() -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.ServiceTokenCache.GetObservabilityToken(string! agentId, string! tenantId) -> System.Threading.Tasks.Task<string?>!
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.ServiceTokenCache.InvalidateAll() -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.ServiceTokenCache.InvalidateToken(string! agentId, string! tenantId) -> bool
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.ServiceTokenCache.RegisterObservability(string! agentId, string! tenantId, string! token, string![]! observabilityScopes) -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.ServiceTokenCache.RegisterObservability(string! agentId, string! tenantId, string! token, string![]! observabilityScopes, System.TimeSpan? expiresIn) -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.ServiceTokenCache.RemoveExpiredTokens() -> int
-Microsoft.OpenTelemetry.Agent365.Hosting.Caching.ServiceTokenCache.ServiceTokenCache(System.TimeSpan? defaultExpiration = null, System.TimeSpan? cleanupInterval = null) -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.BaggageBuilderExtensions
-Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.InvokeAgentScopeExtensions
-Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.TurnContextExtensions
-Microsoft.OpenTelemetry.Agent365.Hosting.Middleware.BaggageTurnMiddleware
-Microsoft.OpenTelemetry.Agent365.Hosting.Middleware.BaggageTurnMiddleware.BaggageTurnMiddleware() -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.Middleware.BaggageTurnMiddleware.OnTurnAsync(Microsoft.Agents.Builder.ITurnContext! turnContext, Microsoft.Agents.Builder.NextDelegate! next, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-Microsoft.OpenTelemetry.Agent365.Hosting.Middleware.ObservabilityBaggageMiddleware
-Microsoft.OpenTelemetry.Agent365.Hosting.Middleware.ObservabilityBaggageMiddleware.InvokeAsync(Microsoft.AspNetCore.Http.HttpContext! ctx) -> System.Threading.Tasks.Task!
-Microsoft.OpenTelemetry.Agent365.Hosting.Middleware.ObservabilityBaggageMiddleware.ObservabilityBaggageMiddleware(Microsoft.AspNetCore.Http.RequestDelegate! next, System.Func<Microsoft.AspNetCore.Http.HttpContext!, (string? tenant, string? agentId)>? resolver = null, bool tagActivity = true) -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.Middleware.ObservabilityBaggageMiddlewareExtensions
-Microsoft.OpenTelemetry.Agent365.Hosting.Middleware.OutputLoggingMiddleware
-Microsoft.OpenTelemetry.Agent365.Hosting.Middleware.OutputLoggingMiddleware.OnTurnAsync(Microsoft.Agents.Builder.ITurnContext! turnContext, Microsoft.Agents.Builder.NextDelegate! next, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-Microsoft.OpenTelemetry.Agent365.Hosting.Middleware.OutputLoggingMiddleware.OutputLoggingMiddleware() -> void
-Microsoft.OpenTelemetry.Agent365.Hosting.ObservabilityBuilderExtensions
-Microsoft.OpenTelemetry.Agent365.Hosting.ObservabilityServiceCollectionExtensions
-Microsoft.OpenTelemetry.Agent365.ObservabilityBuilderExtensions
 Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails
 Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails.AgentBlueprintId.get -> string?
 Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails.AgentClientIP.get -> System.Net.IPAddress?
@@ -376,17 +191,6 @@ Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.UserDetails.UserDetails(strin
 Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.UserDetails.UserEmail.get -> string?
 Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.UserDetails.UserId.get -> string?
 Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.UserDetails.UserName.get -> string?
-Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365Exporter
-Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365Exporter.Agent365Exporter(Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterCore! core, Microsoft.Extensions.Logging.ILogger<Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365Exporter!>! logger, Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterOptions! options, OpenTelemetry.Resources.Resource? resource = null, System.Net.Http.HttpClient? httpClient = null) -> void
-Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterAsync
-Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterAsync.Agent365ExporterAsync(Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterCore! core, Microsoft.Extensions.Logging.ILogger<Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365Exporter!>! logger, Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterOptions! options, OpenTelemetry.Resources.Resource? resource = null, System.Net.Http.HttpClient? httpClient = null) -> void
-Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterCore
-Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterCore.Agent365ExporterCore(Microsoft.OpenTelemetry.Agent365.Common.ExportFormatter! formatter, Microsoft.Extensions.Logging.ILogger<Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterCore!>! logger) -> void
-Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterCore.BuildEndpointPath(string! tenantId, string! agentId, bool useS2SEndpoint) -> string!
-Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterCore.BuildRequestUri(string! endpoint, string! endpointPath) -> string!
-Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterCore.ExportBatchCoreAsync(System.Collections.Generic.IEnumerable<(string! TenantId, string! AgentId, System.Collections.Generic.List<System.Diagnostics.Activity!>! Activities)>! groups, OpenTelemetry.Resources.Resource! resource, Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterOptions! options, System.Func<string!, string!, System.Threading.Tasks.Task<string?>!>! tokenResolver, System.Func<System.Net.Http.HttpRequestMessage!, System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage!>!>! sendAsync) -> System.Threading.Tasks.Task<OpenTelemetry.ExportResult>!
-Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterCore.PartitionByIdentity(in OpenTelemetry.Batch<System.Diagnostics.Activity!> batch) -> System.Collections.Generic.List<(string! TenantId, string! AgentId, System.Collections.Generic.List<System.Diagnostics.Activity!>! Activities)>!
-Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterCore.PartitionByIdentity(System.Collections.Generic.IEnumerable<System.Diagnostics.Activity!>! batch) -> System.Collections.Generic.List<(string! TenantId, string! AgentId, System.Collections.Generic.List<System.Diagnostics.Activity!>! Activities)>!
 Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterOptions
 Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterOptions.Agent365ExporterOptions() -> void
 Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterOptions.ClusterCategory.get -> string!
@@ -405,21 +209,8 @@ Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterOptions.Token
 Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterOptions.TokenResolver.set -> void
 Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterOptions.UseS2SEndpoint.get -> bool
 Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterOptions.UseS2SEndpoint.set -> void
-Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterType
-Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterType.Agent365Exporter = 0 -> Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterType
-Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterType.Agent365ExporterAsync = 1 -> Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterType
 Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.AsyncAuthTokenResolver
-Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.BaseExporterAsync<T>
-Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.BaseExporterAsync<T>.BaseExporterAsync() -> void
-Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.ObservabilityTracerProviderBuilderExtensions
 Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.TenantDomainResolver
-Microsoft.OpenTelemetry.Agent365.Tracing.Processors.ActivityProcessor
-Microsoft.OpenTelemetry.Agent365.Tracing.Processors.ActivityProcessor.ActivityProcessor() -> void
-Microsoft.OpenTelemetry.Agent365.Tracing.Processors.BatchActivityExportProcessorAsync
-Microsoft.OpenTelemetry.Agent365.Tracing.Processors.BatchActivityExportProcessorAsync.BatchActivityExportProcessorAsync(Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.BaseExporterAsync<System.Diagnostics.Activity!>! exporter, int maxQueueSize = 2048, int scheduledDelayMilliseconds = 5000, int maxExportBatchSize = 512) -> void
-Microsoft.OpenTelemetry.Agent365.Tracing.Processors.BatchActivityExportProcessorAsync.ForceFlushAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-Microsoft.OpenTelemetry.Agent365.Tracing.Processors.BatchActivityExportProcessorAsync.ShutdownAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.AutoInstrumentationConstants
 Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.ExecuteToolScope
 Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.ExecuteToolScope.RecordResponse(string! response) -> void
 Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.ExecuteToolScope.RecordThreatDiagnosticsSummary(Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.ThreatDiagnosticsSummary! threatDiagnosticsSummary) -> void
@@ -497,12 +288,6 @@ Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.MicrosoftOpenTelemetryOpti
 Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.OtlpEndpoint.get -> System.Uri?
 Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.OtlpEndpoint.set -> void
 Microsoft.OpenTelemetry.OpenTelemetryBuilderExtensions
-override Microsoft.OpenTelemetry.Agent365.DTOs.ExecuteInferenceData.Name.get -> string!
-override Microsoft.OpenTelemetry.Agent365.DTOs.ExecuteToolData.Name.get -> string!
-override Microsoft.OpenTelemetry.Agent365.DTOs.InvokeAgentData.Name.get -> string!
-override Microsoft.OpenTelemetry.Agent365.DTOs.OutputData.Name.get -> string!
-override Microsoft.OpenTelemetry.Agent365.Etw.EtwLogProcessor.OnEnd(OpenTelemetry.Logs.LogRecord! data) -> void
-override Microsoft.OpenTelemetry.Agent365.Etw.EtwScopeEventProcessor.OnEnd(System.Diagnostics.Activity! data) -> void
 override Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails.Equals(object? obj) -> bool
 override Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails.GetHashCode() -> int
 override Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Channel.Equals(object? obj) -> bool
@@ -519,67 +304,6 @@ override Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.ToolCallDetails.Equa
 override Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.ToolCallDetails.GetHashCode() -> int
 override Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.UserDetails.Equals(object? obj) -> bool
 override Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.UserDetails.GetHashCode() -> int
-override Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365Exporter.Export(in OpenTelemetry.Batch<System.Diagnostics.Activity!> batch) -> OpenTelemetry.ExportResult
-override Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterAsync.ExportAsync(System.Collections.Generic.IReadOnlyCollection<System.Diagnostics.Activity!>! batch, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
-override Microsoft.OpenTelemetry.Agent365.Tracing.Processors.ActivityProcessor.OnStart(System.Diagnostics.Activity! activity) -> void
-override Microsoft.OpenTelemetry.Agent365.Tracing.Processors.BatchActivityExportProcessorAsync.Dispose(bool disposing) -> void
-override Microsoft.OpenTelemetry.Agent365.Tracing.Processors.BatchActivityExportProcessorAsync.OnEnd(System.Diagnostics.Activity! data) -> void
-override Microsoft.OpenTelemetry.Agent365.Tracing.Processors.BatchActivityExportProcessorAsync.ToString() -> string!
-static Microsoft.OpenTelemetry.Agent365.Common.ActivityExtensions.CoalesceTag(this System.Diagnostics.Activity! activity, string! key, params string?[]! values) -> void
-static Microsoft.OpenTelemetry.Agent365.Common.ActivityExtensions.GetAttributeOrBaggage(this System.Diagnostics.Activity! activity, string! key) -> string?
-static Microsoft.OpenTelemetry.Agent365.Common.EnvironmentUtils.GetObservabilityAuthenticationScope() -> string![]!
-static Microsoft.OpenTelemetry.Agent365.Common.EnvironmentUtils.GetObservabilityAuthenticationScope(string! clusterCategory = "prod") -> string![]!
-static Microsoft.OpenTelemetry.Agent365.Common.EnvironmentUtils.GetObservabilityClusterCategory() -> string!
-static Microsoft.OpenTelemetry.Agent365.Common.EnvironmentUtils.GetObservabilityClusterCategory(string! clusterCategory = "prod") -> string!
-static Microsoft.OpenTelemetry.Agent365.Common.EnvironmentUtils.IsDevelopmentEnvironment() -> bool
-static Microsoft.OpenTelemetry.Agent365.DTOs.Builders.BaseDataBuilder<T>.AddAgentDetails(System.Collections.Generic.IDictionary<string!, object?>! attributes, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails! agentDetails) -> void
-static Microsoft.OpenTelemetry.Agent365.DTOs.Builders.BaseDataBuilder<T>.AddCallerAgentDetails(System.Collections.Generic.IDictionary<string!, object?>! attributes, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails? callerAgentDetails) -> void
-static Microsoft.OpenTelemetry.Agent365.DTOs.Builders.BaseDataBuilder<T>.AddCallerDetails(System.Collections.Generic.IDictionary<string!, object?>! attributes, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.CallerDetails? callerDetails) -> void
-static Microsoft.OpenTelemetry.Agent365.DTOs.Builders.BaseDataBuilder<T>.AddChannelAttributes(System.Collections.Generic.IDictionary<string!, object?>! attributes, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Channel? channel) -> void
-static Microsoft.OpenTelemetry.Agent365.DTOs.Builders.BaseDataBuilder<T>.AddEndpointDetails(System.Collections.Generic.IDictionary<string!, object?>! attributes, System.Uri? endpoint) -> void
-static Microsoft.OpenTelemetry.Agent365.DTOs.Builders.BaseDataBuilder<T>.AddExtraAttributes(System.Collections.Generic.IDictionary<string!, object?>! attributes, System.Collections.Generic.IDictionary<string!, object?>? extraAttributes) -> void
-static Microsoft.OpenTelemetry.Agent365.DTOs.Builders.BaseDataBuilder<T>.AddIfNotNull(System.Collections.Generic.IDictionary<string!, object?>! attributes, string! key, object? value) -> void
-static Microsoft.OpenTelemetry.Agent365.DTOs.Builders.BaseDataBuilder<T>.AddInputMessagesAttributes(System.Collections.Generic.IDictionary<string!, object?>! attributes, string![]? messages) -> void
-static Microsoft.OpenTelemetry.Agent365.DTOs.Builders.BaseDataBuilder<T>.AddOutputMessagesAttributes(System.Collections.Generic.IDictionary<string!, object?>! attributes, string![]? messages) -> void
-static Microsoft.OpenTelemetry.Agent365.DTOs.Builders.BaseDataBuilder<T>.AddRequestDetails(System.Collections.Generic.IDictionary<string!, object?>! attributes, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Request? request) -> void
-static Microsoft.OpenTelemetry.Agent365.DTOs.Builders.ExecuteInferenceDataBuilder.Build(Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.InferenceCallDetails! inferenceCallDetails, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, string![]? inputMessages = null, string![]? outputMessages = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Channel? channel = null, string? thoughtProcess = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.CallerDetails? callerDetails = null, System.Collections.Generic.IDictionary<string!, object?>? extraAttributes = null, string? traceId = null) -> Microsoft.OpenTelemetry.Agent365.DTOs.ExecuteInferenceData!
-static Microsoft.OpenTelemetry.Agent365.DTOs.Builders.ExecuteToolDataBuilder.Build(Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.ToolCallDetails! toolCallDetails, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, string? responseContent = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Channel? channel = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.CallerDetails? callerDetails = null, System.Collections.Generic.IDictionary<string!, object?>? extraAttributes = null, string? spanKind = null, string? traceId = null) -> Microsoft.OpenTelemetry.Agent365.DTOs.ExecuteToolData!
-static Microsoft.OpenTelemetry.Agent365.DTOs.Builders.InvokeAgentDataBuilder.Build(Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.InvokeAgentScopeDetails! invokeAgentScopeDetails, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Request? request = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.CallerDetails? callerDetails = null, string![]? inputMessages = null, string![]? outputMessages = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, System.Collections.Generic.IDictionary<string!, object?>? extraAttributes = null, string? spanKind = null, string? traceId = null) -> Microsoft.OpenTelemetry.Agent365.DTOs.InvokeAgentData!
-static Microsoft.OpenTelemetry.Agent365.DTOs.Builders.OutputDataBuilder.Build(Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails! agentDetails, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Response! response, string? conversationId = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Channel? channel = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.CallerDetails? callerDetails = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, System.Collections.Generic.IDictionary<string!, object?>? extraAttributes = null, string? traceId = null) -> Microsoft.OpenTelemetry.Agent365.DTOs.OutputData!
-static Microsoft.OpenTelemetry.Agent365.Etw.EtwServiceCollectionExtensions.AddLoggingWithEtw(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Microsoft.OpenTelemetry.Agent365.Etw.EtwLoggingBuilder!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static Microsoft.OpenTelemetry.Agent365.Etw.EtwServiceCollectionExtensions.AddTracingWithEtw(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Microsoft.OpenTelemetry.Agent365.Etw.EtwTracingBuilder!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static Microsoft.OpenTelemetry.Agent365.Extensions.AgentFramework.BuilderExtensions.WithAgentFramework(this Microsoft.OpenTelemetry.Agent365.Builder! builder, bool enableRelatedSources = true, params string![]! additionalSources) -> Microsoft.OpenTelemetry.Agent365.Builder!
-static Microsoft.OpenTelemetry.Agent365.Extensions.OpenAI.BuilderExtensions.WithOpenAI(this Microsoft.OpenTelemetry.Agent365.Builder! builder, bool enableRelatedSources = true) -> Microsoft.OpenTelemetry.Agent365.Builder!
-static Microsoft.OpenTelemetry.Agent365.Extensions.OpenAI.ChatToolCallExtensions.Trace(this OpenAI.Chat.ChatToolCall! chatToolCall, string! agentId, string? tenantId = null) -> Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.ExecuteToolScope?
-static Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.BuilderExtensions.WithSemanticKernel(this Microsoft.OpenTelemetry.Agent365.Builder! builder, bool enableRelatedSources = true) -> Microsoft.OpenTelemetry.Agent365.Builder!
-static Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.ChatCompletionAgentExtensions.WithTracing(this Microsoft.SemanticKernel.Agents.ChatCompletionAgent! agent) -> Microsoft.SemanticKernel.Agents.ChatCompletionAgent!
-static Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Utils.SemanticKernelSpanProcessorHelper.GetGenAiUserAndChoiceMessageContent(System.Diagnostics.Activity! activity) -> System.Collections.Generic.Dictionary<string!, System.Collections.Generic.List<string!>!>!
-static Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Utils.SemanticKernelSpanProcessorHelper.ProcessInvocationInputOutputTag(System.Diagnostics.Activity! activity, bool suppressInvocationInput = false) -> void
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.BaggageBuilderExtensions.FromTurnContext(this Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder! baggageBuilder, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.BaggageBuilderExtensions.SetCallerBaggage(this Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder! baggageBuilder, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.BaggageBuilderExtensions.SetChannelBaggage(this Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder! baggageBuilder, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.BaggageBuilderExtensions.SetConversationIdBaggage(this Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder! baggageBuilder, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.BaggageBuilderExtensions.SetTargetAgentBaggage(this Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder! baggageBuilder, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.BaggageBuilderExtensions.SetTenantIdBaggage(this Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder! baggageBuilder, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.InvokeAgentScopeExtensions.FromTurnContext(this Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InvokeAgentScope! invokeAgentScope, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InvokeAgentScope!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.InvokeAgentScopeExtensions.SetCallerTags(this Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InvokeAgentScope! invokeAgentScope, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InvokeAgentScope!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.InvokeAgentScopeExtensions.SetChannelTags(this Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InvokeAgentScope! invokeAgentScope, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InvokeAgentScope!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.InvokeAgentScopeExtensions.SetConversationIdTags(this Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InvokeAgentScope! invokeAgentScope, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InvokeAgentScope!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.InvokeAgentScopeExtensions.SetInputMessageTags(this Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InvokeAgentScope! invokeAgentScope, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InvokeAgentScope!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.InvokeAgentScopeExtensions.SetTargetAgentTags(this Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InvokeAgentScope! invokeAgentScope, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InvokeAgentScope!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.InvokeAgentScopeExtensions.SetTenantIdTags(this Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InvokeAgentScope! invokeAgentScope, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InvokeAgentScope!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.TurnContextExtensions.GetCallerBaggagePairs(this Microsoft.Agents.Builder.ITurnContext! turnContext) -> System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, object?>>!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.TurnContextExtensions.GetChannelBaggagePairs(this Microsoft.Agents.Builder.ITurnContext! turnContext) -> System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, object?>>!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.TurnContextExtensions.GetConversationIdAndItemLinkPairs(this Microsoft.Agents.Builder.ITurnContext! turnContext) -> System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, object?>>!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.TurnContextExtensions.GetTargetAgentBaggagePairs(this Microsoft.Agents.Builder.ITurnContext! turnContext) -> System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, object?>>!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.TurnContextExtensions.GetTenantIdPair(this Microsoft.Agents.Builder.ITurnContext! turnContext) -> System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, object?>>!
-static Microsoft.OpenTelemetry.Agent365.Hosting.Extensions.TurnContextExtensions.InjectObservabilityContext(this Microsoft.Agents.Builder.ITurnContext! turnContext, Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.OpenTelemetryScope! observabilityScope) -> void
-static Microsoft.OpenTelemetry.Agent365.Hosting.Middleware.ObservabilityBaggageMiddlewareExtensions.UseObservabilityRequestContext(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app, System.Func<Microsoft.AspNetCore.Http.HttpContext!, (string? tenant, string? agentId)>? resolver) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!
-static Microsoft.OpenTelemetry.Agent365.Hosting.ObservabilityBuilderExtensions.AddA365Tracing(this Microsoft.AspNetCore.Hosting.IWebHostBuilder! webHostBuilder, System.Action<Microsoft.OpenTelemetry.Agent365.Builder!>? configure = null, bool useOpenTelemetryBuilder = true, Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterType agent365ExporterType = Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterType.Agent365Exporter) -> Microsoft.AspNetCore.Hosting.IWebHostBuilder!
-static Microsoft.OpenTelemetry.Agent365.Hosting.ObservabilityBuilderExtensions.AddA365Tracing(this Microsoft.Extensions.Hosting.IHostBuilder! builder, System.Action<Microsoft.OpenTelemetry.Agent365.Builder!>? configure = null, bool useOpenTelemetryBuilder = true, Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterType agent365ExporterType = Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterType.Agent365Exporter) -> Microsoft.Extensions.Hosting.IHostBuilder!
-static Microsoft.OpenTelemetry.Agent365.Hosting.ObservabilityServiceCollectionExtensions.AddAgenticTracingExporter(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string? clusterCategory = "production") -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static Microsoft.OpenTelemetry.Agent365.Hosting.ObservabilityServiceCollectionExtensions.AddServiceTracingExporter(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string? clusterCategory = "production") -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static Microsoft.OpenTelemetry.Agent365.ObservabilityBuilderExtensions.AddA365Tracing<TBuilder>(this TBuilder builder, System.Action<Microsoft.OpenTelemetry.Agent365.Builder!>? configure = null, bool useOpenTelemetryBuilder = true, Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterType agent365ExporterType = Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterType.Agent365Exporter) -> TBuilder
 static Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.ExecuteToolScope.Start(Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Request! request, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.ToolCallDetails! details, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails! agentDetails, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.UserDetails? userDetails = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.SpanDetails? spanDetails = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.ThreatDiagnosticsSummary? threatDiagnosticsSummary = null) -> Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.ExecuteToolScope!
 static Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InferenceScope.Start(Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Request! request, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.InferenceCallDetails! details, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails! agentDetails, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.UserDetails? userDetails = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.SpanDetails? spanDetails = null) -> Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InferenceScope!
 static Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InvokeAgentScope.Start(Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Request! request, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.InvokeAgentScopeDetails! scopeDetails, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails! agentDetails, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.CallerDetails? callerDetails = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.SpanDetails? spanDetails = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.ThreatDiagnosticsSummary? threatDiagnosticsSummary = null) -> Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.InvokeAgentScope!
@@ -595,17 +319,9 @@ static Microsoft.OpenTelemetry.MicrosoftOpenTelemetryBuilderExtensions.UseMicros
 static Microsoft.OpenTelemetry.MicrosoftOpenTelemetryBuilderExtensions.UseMicrosoftOpenTelemetry<TBuilder>(this TBuilder builder, System.Action<Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions!>! configure) -> TBuilder
 static Microsoft.OpenTelemetry.OpenTelemetryBuilderExtensions.UseAzureMonitor(this OpenTelemetry.IOpenTelemetryBuilder! builder) -> OpenTelemetry.IOpenTelemetryBuilder!
 static Microsoft.OpenTelemetry.OpenTelemetryBuilderExtensions.UseAzureMonitor(this OpenTelemetry.IOpenTelemetryBuilder! builder, System.Action<Microsoft.OpenTelemetry.AzureMonitorOptions!>! configureAzureMonitor) -> OpenTelemetry.IOpenTelemetryBuilder!
-static readonly Microsoft.OpenTelemetry.Agent365.Etw.EtwEventSource.Log -> Microsoft.OpenTelemetry.Agent365.Etw.EtwEventSource!
-static readonly Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenCache.DefaultCleanupInterval -> System.TimeSpan
-static readonly Microsoft.OpenTelemetry.Agent365.Hosting.Caching.ServiceTokenCache.DefaultCleanupInterval -> System.TimeSpan
 static readonly Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.ToolType.Datastore -> string!
 static readonly Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.ToolType.Extension -> string!
 static readonly Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.ToolType.Function -> string!
-virtual Microsoft.OpenTelemetry.Agent365.Hosting.Caching.AgenticTokenCache.Dispose(bool disposing) -> void
-virtual Microsoft.OpenTelemetry.Agent365.Hosting.Caching.ServiceTokenCache.Dispose(bool disposing) -> void
-virtual Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.BaseExporterAsync<T>.Dispose() -> void
-virtual Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.BaseExporterAsync<T>.ForceFlushAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
-virtual Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.BaseExporterAsync<T>.ShutdownAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 ~Microsoft.OpenTelemetry.AzureMonitorOptions.ConnectionString.get -> string
 ~Microsoft.OpenTelemetry.AzureMonitorOptions.ConnectionString.set -> void
 ~Microsoft.OpenTelemetry.AzureMonitorOptions.Credential.get -> Azure.Core.TokenCredential

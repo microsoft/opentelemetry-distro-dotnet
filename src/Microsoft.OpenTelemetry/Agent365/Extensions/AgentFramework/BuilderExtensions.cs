@@ -12,7 +12,7 @@ using global::OpenTelemetry;
 /// <summary>
 /// Extension methods for configuring Builder with Agent Framework integration.
 /// </summary>
-public static class BuilderExtensions
+internal static class BuilderExtensions
 {
     /// <summary>
     /// The activity source name for Agent Framework tracing.

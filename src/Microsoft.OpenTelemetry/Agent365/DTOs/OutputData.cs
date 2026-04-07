@@ -10,7 +10,7 @@ namespace Microsoft.OpenTelemetry.Agent365.DTOs
     /// <summary>
     /// Encapsulates all telemetry data for an output_messages operation.
     /// </summary>
-    public class OutputData : BaseData
+    internal class OutputData : BaseData
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="OutputData"/> class.

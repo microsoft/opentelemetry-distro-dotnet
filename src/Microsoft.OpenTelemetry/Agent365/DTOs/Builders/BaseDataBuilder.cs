@@ -11,7 +11,7 @@ namespace Microsoft.OpenTelemetry.Agent365.DTOs.Builders
     /// <summary>
     /// Base class for building telemetry data.
     /// </summary>
-    public abstract class BaseDataBuilder<T> where T : BaseData
+    internal abstract class BaseDataBuilder<T> where T : BaseData
     {
         // Reserved attribute keys managed by specific builder methods; extra attributes must NOT override these.
         private static readonly HashSet<string> ReservedAttributeKeys = new HashSet<string>(StringComparer.Ordinal)

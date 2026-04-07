@@ -14,7 +14,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Tracing.Exporters
     /// <summary>
     /// Extension methods to add Agent365 Exporter to OpenTelemetry TracerProviderBuilder.
     /// </summary>
-    public static class ObservabilityTracerProviderBuilderExtensions
+    internal static class ObservabilityTracerProviderBuilderExtensions
     {
         private static readonly Lazy<ILoggerFactory> FallbackConsoleLoggerFactory = new Lazy<ILoggerFactory>(() => LoggerFactory.Create(b => b.AddConsole()));
 

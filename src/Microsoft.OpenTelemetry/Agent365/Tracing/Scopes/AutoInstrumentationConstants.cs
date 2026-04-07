@@ -6,7 +6,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Tracing.Scopes
     /// <summary>
     /// Constants used for auto-instrumentation.
     /// </summary>
-    public static class AutoInstrumentationConstants
+    internal static class AutoInstrumentationConstants
     {
         /// <summary> The key for the input to a GenAI agent invocation. </summary>
         /// <remarks> Set by the Semantic Kernel OpenTelemetry integration for agent invocations.</remarks>

@@ -9,7 +9,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models;
 /// Represents the structure of a message as found in OpenTelemetry activity events and invocation input tags.
 /// Used in the <c>gen_ai.agent.invocation_input</c> tag and <c>gen_ai.event.content</c> attribute.
 /// </summary>
-public class MessageContent
+internal class MessageContent
 {
     /// <summary>
     /// The role of the message, such as "user" or "assistant".

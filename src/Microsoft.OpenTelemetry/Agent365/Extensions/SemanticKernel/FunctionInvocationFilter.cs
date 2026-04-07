@@ -12,7 +12,7 @@ using System.Text.Json.Serialization;
 /// <summary>
 /// Function invocation filter that adds tracing capabilities to SemanticKernel function calls.
 /// </summary>
-public sealed class FunctionInvocationFilter : IFunctionInvocationFilter
+internal sealed class FunctionInvocationFilter : IFunctionInvocationFilter
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {

@@ -10,7 +10,7 @@ namespace Microsoft.OpenTelemetry.Agent365.DTOs
     /// <summary>
     /// Encapsulates all telemetry data for an invoke_agent operation, including attributes, timing, and span information.
     /// </summary>
-    public class InvokeAgentData : BaseData
+    internal class InvokeAgentData : BaseData
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="InvokeAgentData"/> class.

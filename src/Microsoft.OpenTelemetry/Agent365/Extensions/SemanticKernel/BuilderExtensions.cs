@@ -11,7 +11,7 @@ using global::OpenTelemetry;
 /// <summary>
 /// Extension methods for configuring Builder with SemanticKernel integration.
 /// </summary>
-public static class BuilderExtensions
+internal static class BuilderExtensions
 {
     /// <summary>
     /// Adds SemanticKernel integration to the builder with function invocation filtering.

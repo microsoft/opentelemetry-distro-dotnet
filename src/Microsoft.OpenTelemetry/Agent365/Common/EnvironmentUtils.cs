@@ -7,7 +7,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Common
     /// <summary>
     /// Utility logic for environment-related operations.
     /// </summary>
-    public class EnvironmentUtils
+    internal class EnvironmentUtils
     {
         private const string ProdObservabilityScope = "https://api.powerplatform.com/.default";
         private const string ProdObservabilityClusterCategory = "prod";

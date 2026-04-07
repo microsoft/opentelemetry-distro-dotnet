@@ -11,7 +11,7 @@ namespace Microsoft.OpenTelemetry.Agent365.DTOs.Builders
     /// <summary>
     /// Builds an OutputData instance.
     /// </summary>
-    public class OutputDataBuilder : BaseDataBuilder<OutputData>
+    internal class OutputDataBuilder : BaseDataBuilder<OutputData>
     {
         private const string OutputMessagesOperationName = "output_messages";
 

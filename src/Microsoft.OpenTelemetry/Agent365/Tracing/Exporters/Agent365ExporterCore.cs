@@ -21,7 +21,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Tracing.Exporters
     /// Utility methods for Agent365 trace exporters.
     /// Provides helpers for partitioning activities and building endpoint URIs.
     /// </summary>
-    public class Agent365ExporterCore
+    internal class Agent365ExporterCore
     {
         private const string CorrelationIdHeaderKey = "x-ms-correlation-id";
         private readonly ExportFormatter _formatter;

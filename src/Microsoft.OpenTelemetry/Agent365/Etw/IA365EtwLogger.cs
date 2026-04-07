@@ -9,7 +9,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Etw
     /// <summary>
     /// Interface for ETW Logger
     /// </summary>
-    public interface IA365EtwLogger<T>
+    internal interface IA365EtwLogger<T>
     {
         /// <summary>
         /// Logs an invoke_agent event.

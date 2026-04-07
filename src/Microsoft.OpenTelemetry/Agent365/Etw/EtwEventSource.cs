@@ -19,7 +19,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Etw
     /// </list>
     /// </remarks>
     [EventSource(Name = "OpenTelemetry-Microsoft-Agent365-Etw")]
-    public class EtwEventSource : EventSource
+    internal class EtwEventSource : EventSource
     {
         /// <summary>
         /// Singleton instance of the EtwEventSource.
