@@ -158,55 +158,17 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
         }
 
         [Fact]
-        public void AgentFramework_EnabledByDefault()
+        public void AgentFramework_AlwaysEnabled()
         {
             var services = new ServiceCollection();
             services.AddOpenTelemetry()
                 .UseMicrosoftOpenTelemetry(o => { });
 
-            // AgentFramework is enabled by default (EnableAgentFramework = true)
-            // This registers additional activity sources via UseAgentFramework()
+            // AgentFramework is always enabled — sources and processor are registered
             Assert.True(services.Any(s =>
                 s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder") ||
                 s.ServiceType.Name.Contains("TracerProviderBuilder")),
                 "Agent Framework sources should be registered.");
-        }
-
-        [Fact]
-        public void AgentFramework_CanBeDisabled()
-        {
-            const string envVar = "APPLICATIONINSIGHTS_CONNECTION_STRING";
-            var original = Environment.GetEnvironmentVariable(envVar);
-            try
-            {
-                Environment.SetEnvironmentVariable(envVar, null);
-
-                var services = new ServiceCollection();
-                var servicesBefore = services.Count;
-
-                services.AddOpenTelemetry()
-                    .UseMicrosoftOpenTelemetry(o =>
-                    {
-                        o.EnableAgentFramework = false;
-                    });
-
-                var servicesCountWithDisabled = services.Count;
-
-                var services2 = new ServiceCollection();
-                services2.AddOpenTelemetry()
-                    .UseMicrosoftOpenTelemetry(o =>
-                    {
-                        o.EnableAgentFramework = true;
-                    });
-
-                // With AgentFramework enabled, more services should be registered
-                Assert.True(services2.Count >= servicesCountWithDisabled,
-                    "Enabling AgentFramework should register additional services.");
-            }
-            finally
-            {
-                Environment.SetEnvironmentVariable(envVar, original);
-            }
         }
     }
 }

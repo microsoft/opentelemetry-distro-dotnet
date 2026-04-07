@@ -128,11 +128,8 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             o.Exporter.MaxExportBatchSize = options.Agent365.Exporter.MaxExportBatchSize;
         });
 
-        // --- Microsoft Agent Framework (always: captures MAF spans) ---
-        if (options.EnableAgentFramework)
-        {
-            builder.UseAgentFramework();
-        }
+        // --- Microsoft Agent Framework (always: captures MAF spans + processor) ---
+        builder.UseAgentFramework();
 
         // --- OTLP exporter ---
         if (exporters.HasFlag(ExportTarget.Otlp))

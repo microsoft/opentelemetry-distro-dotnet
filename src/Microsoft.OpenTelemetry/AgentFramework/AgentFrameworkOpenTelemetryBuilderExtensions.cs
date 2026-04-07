@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using Microsoft.OpenTelemetry.Agent365.Extensions.AgentFramework;
 using Microsoft.OpenTelemetry.AgentFramework;
 using Microsoft.Extensions.DependencyInjection;
 using global::OpenTelemetry;
@@ -40,7 +41,8 @@ internal static class AgentFrameworkOpenTelemetryBuilderExtensions
             tracing
                 .AddSource(AgentFrameworkConstants.DefaultSource)
                 .AddSource(AgentFrameworkConstants.AgentSource)
-                .AddSource(AgentFrameworkConstants.ChatClientSource);
+                .AddSource(AgentFrameworkConstants.ChatClientSource)
+                .AddProcessor(new AgentFrameworkSpanProcessor());
         });
 
         // Also capture metrics from the same sources
