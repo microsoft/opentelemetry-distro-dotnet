@@ -1,12 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-using Microsoft.OpenTelemetry.Agent365.Extensions.AgentFramework.Utils;
 using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
-using Microsoft.OpenTelemetry.AgentFramework;
 using global::OpenTelemetry;
 using System.Diagnostics;
 
-namespace Microsoft.OpenTelemetry.Agent365.Extensions.AgentFramework
+namespace Microsoft.OpenTelemetry.AgentFramework
 {
     internal class AgentFrameworkSpanProcessor : BaseProcessor<Activity>
     {

@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-using Microsoft.OpenTelemetry.Agent365.Extensions.AgentFramework;
 using Microsoft.OpenTelemetry.AgentFramework;
 using Microsoft.Extensions.DependencyInjection;
 using global::OpenTelemetry;
