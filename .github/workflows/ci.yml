@@ -1,0 +1,85 @@
+name: CI - Build and Test
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: main
+  pull_request:
+    branches: main
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.os }} / .NET ${{ matrix.dotnet-version }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        dotnet-version: ["8.0.x", "10.0.x"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET ${{ matrix.dotnet-version }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ matrix.dotnet-version }}
+
+      - name: Restore dependencies
+        run: dotnet restore Microsoft.OpenTelemetry.slnx
+
+      - name: Build solution
+        run: dotnet build Microsoft.OpenTelemetry.slnx --no-restore --configuration Release
+
+      - name: Run tests
+        id: test1
+        continue-on-error: true
+        run: dotnet test Microsoft.OpenTelemetry.slnx --no-build --configuration Release --verbosity normal --results-directory ${{ github.workspace }}/TestResults --logger "trx;logfileprefix=testResults_"
+
+      - name: Retry failed tests
+        if: steps.test1.outcome == 'failure'
+        run: pwsh -f ./.scripts/build_RetryTests.ps1 -TestResultsDirectory ${{ github.workspace }}/TestResults -WorkingDirectory ${{ github.workspace }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}-net${{ matrix.dotnet-version }}
+          path: |
+            ${{ github.workspace }}/TestResults/**/*.trx
+            ${{ github.workspace }}/RetryResults/**/*.trx
+          retention-days: 30
+
+  pack:
+    name: Pack NuGet
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore Microsoft.OpenTelemetry.slnx
+
+      - name: Build
+        run: dotnet build Microsoft.OpenTelemetry.slnx --no-restore --configuration Release
+
+      - name: Pack
+        run: dotnet pack src/Microsoft.OpenTelemetry/Microsoft.OpenTelemetry.csproj --no-build --configuration Release --output ./packages
+
+      - name: Upload NuGet package
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: ./packages/*.nupkg
+          retention-days: 30

@@ -6,7 +6,7 @@
     <IsTestProject>true</IsTestProject>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <NoWarn>$(NoWarn);SA1636;CS1591</NoWarn>
+    <NoWarn>$(NoWarn);SA1636;CS1591;xUnit1012</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
