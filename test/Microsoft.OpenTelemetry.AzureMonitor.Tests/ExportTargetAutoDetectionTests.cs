@@ -199,10 +199,9 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
             Assert.True(hasAzureMonitorOptions, "Azure Monitor instrumentation should be configured even when exporter is skipped.");
 
             // TracerProvider config IS registered
-            Assert.True(services.Any(s =>
+            Assert.Contains(services, s =>
                 s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder") ||
-                s.ServiceType.Name.Contains("TracerProviderBuilder")),
-                "Tracing configuration should be registered.");
+                s.ServiceType.Name.Contains("TracerProviderBuilder"));
         }
 
         [Fact]
@@ -232,9 +231,8 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
                 // Agent365 baggage processor source should be registered
                 // (UseAgent365 always adds the Agent365Sdk ActivitySource)
                 // We can verify by checking the services for ActivityProcessor registration
-                Assert.True(services.Any(s => s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder") ||
-                    s.ServiceType.Name.Contains("TracerProviderBuilder")),
-                    "Tracing configuration should be registered.");
+                Assert.Contains(services, s => s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder") ||
+                    s.ServiceType.Name.Contains("TracerProviderBuilder"));
             }
             finally
             {
