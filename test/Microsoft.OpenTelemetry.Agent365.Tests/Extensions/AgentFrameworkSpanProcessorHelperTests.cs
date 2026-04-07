@@ -4,7 +4,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using System.Diagnostics;
 using System.Text.Json;
-using Microsoft.OpenTelemetry.Agent365.Extensions.AgentFramework.Utils;
+using Microsoft.OpenTelemetry.AgentFramework;
 using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
 
 namespace Microsoft.OpenTelemetry.Agent365.Tests.Extensions
