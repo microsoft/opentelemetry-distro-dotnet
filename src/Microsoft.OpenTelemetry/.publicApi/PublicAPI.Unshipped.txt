@@ -249,11 +249,9 @@ Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.OpenTelemetryScope.TraceId.get -
 Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.OutputScope
 Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.OutputScope.RecordOutputMessages(System.Collections.Generic.IEnumerable<string!>! messages) -> void
 Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.TraceContextHelper
-Microsoft.OpenTelemetry.Agent365OpenTelemetryBuilderExtensions
 Microsoft.OpenTelemetry.Agent365Options
 Microsoft.OpenTelemetry.Agent365Options.Agent365Options() -> void
 Microsoft.OpenTelemetry.Agent365Options.Exporter.get -> Microsoft.OpenTelemetry.Agent365.Tracing.Exporters.Agent365ExporterOptions!
-Microsoft.OpenTelemetry.AgentFrameworkOpenTelemetryBuilderExtensions
 Microsoft.OpenTelemetry.AzureMonitorOptions
 Microsoft.OpenTelemetry.AzureMonitorOptions.AzureMonitorOptions() -> void
 Microsoft.OpenTelemetry.AzureMonitorOptions.DisableOfflineStorage.get -> bool
@@ -287,7 +285,6 @@ Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.Exporters.set -> void
 Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.MicrosoftOpenTelemetryOptions() -> void
 Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.OtlpEndpoint.get -> System.Uri?
 Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.OtlpEndpoint.set -> void
-Microsoft.OpenTelemetry.OpenTelemetryBuilderExtensions
 override Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails.Equals(object? obj) -> bool
 override Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails.GetHashCode() -> int
 override Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Channel.Equals(object? obj) -> bool
@@ -311,14 +308,9 @@ static Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.OpenTelemetryConstants.Te
 static Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.OutputScope.Start(Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Request! request, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.Response! response, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.AgentDetails! agentDetails, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.UserDetails? userDetails = null, Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.SpanDetails? spanDetails = null) -> Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.OutputScope!
 static Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.TraceContextHelper.ExtractContextFromHeaders(System.Collections.Generic.IDictionary<string!, string!>! headers) -> System.Diagnostics.ActivityContext
 static Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.TraceContextHelper.GetTraceparent(System.Collections.Generic.IDictionary<string!, string!>! headers) -> string?
-static Microsoft.OpenTelemetry.Agent365OpenTelemetryBuilderExtensions.UseAgent365(this OpenTelemetry.IOpenTelemetryBuilder! builder) -> OpenTelemetry.IOpenTelemetryBuilder!
-static Microsoft.OpenTelemetry.Agent365OpenTelemetryBuilderExtensions.UseAgent365(this OpenTelemetry.IOpenTelemetryBuilder! builder, System.Action<Microsoft.OpenTelemetry.Agent365Options!>! configure) -> OpenTelemetry.IOpenTelemetryBuilder!
-static Microsoft.OpenTelemetry.AgentFrameworkOpenTelemetryBuilderExtensions.UseAgentFramework(this OpenTelemetry.IOpenTelemetryBuilder! builder) -> OpenTelemetry.IOpenTelemetryBuilder!
 static Microsoft.OpenTelemetry.MicrosoftOpenTelemetryBuilderExtensions.UseMicrosoftOpenTelemetry(this OpenTelemetry.IOpenTelemetryBuilder! builder, System.Action<Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions!>! configure) -> OpenTelemetry.IOpenTelemetryBuilder!
 static Microsoft.OpenTelemetry.MicrosoftOpenTelemetryBuilderExtensions.UseMicrosoftOpenTelemetry<TBuilder>(this TBuilder builder) -> TBuilder
 static Microsoft.OpenTelemetry.MicrosoftOpenTelemetryBuilderExtensions.UseMicrosoftOpenTelemetry<TBuilder>(this TBuilder builder, System.Action<Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions!>! configure) -> TBuilder
-static Microsoft.OpenTelemetry.OpenTelemetryBuilderExtensions.UseAzureMonitor(this OpenTelemetry.IOpenTelemetryBuilder! builder) -> OpenTelemetry.IOpenTelemetryBuilder!
-static Microsoft.OpenTelemetry.OpenTelemetryBuilderExtensions.UseAzureMonitor(this OpenTelemetry.IOpenTelemetryBuilder! builder, System.Action<Microsoft.OpenTelemetry.AzureMonitorOptions!>! configureAzureMonitor) -> OpenTelemetry.IOpenTelemetryBuilder!
 static readonly Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.ToolType.Datastore -> string!
 static readonly Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.ToolType.Extension -> string!
 static readonly Microsoft.OpenTelemetry.Agent365.Tracing.Contracts.ToolType.Function -> string!

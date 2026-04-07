@@ -19,7 +19,7 @@ namespace Microsoft.OpenTelemetry;
 /// <summary>
 /// Extension methods for configuring Agent365 observability on <see cref="IOpenTelemetryBuilder"/>.
 /// </summary>
-public static class Agent365OpenTelemetryBuilderExtensions
+internal static class Agent365OpenTelemetryBuilderExtensions
 {
     /// <summary>
     /// Configures Agent365 observability for AI agent tracing, including
@@ -28,7 +28,7 @@ public static class Agent365OpenTelemetryBuilderExtensions
     /// </summary>
     /// <param name="builder">The OpenTelemetry builder.</param>
     /// <returns>The supplied <see cref="IOpenTelemetryBuilder"/> for chaining calls.</returns>
-    public static IOpenTelemetryBuilder UseAgent365(this IOpenTelemetryBuilder builder)
+    internal static IOpenTelemetryBuilder UseAgent365(this IOpenTelemetryBuilder builder)
     {
         return builder.UseAgent365(o => { });
     }
@@ -59,7 +59,7 @@ public static class Agent365OpenTelemetryBuilderExtensions
     ///     });
     /// </code>
     /// </remarks>
-    public static IOpenTelemetryBuilder UseAgent365(this IOpenTelemetryBuilder builder, Action<Agent365Options> configure)
+    internal static IOpenTelemetryBuilder UseAgent365(this IOpenTelemetryBuilder builder, Action<Agent365Options> configure)
     {
         var options = new Agent365Options();
         configure?.Invoke(options);
