@@ -44,9 +44,9 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
                 Assert.False(HasAgent365Exporter(services));
 
                 // But tracing config IS registered (instrumentation active)
-                Assert.True(services.Any(s =>
+                Assert.Contains(services, s =>
                     s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder") ||
-                    s.ServiceType.Name.Contains("TracerProviderBuilder")));
+                    s.ServiceType.Name.Contains("TracerProviderBuilder"));
             }
             finally
             {
@@ -70,10 +70,9 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
                 "Azure Monitor exporter should be skipped when not in ExportTarget.");
 
             // But AzureMonitor options ARE configured (instrumentation active)
-            Assert.True(services.Any(s =>
+            Assert.Contains(services, s =>
                 s.ServiceType.IsGenericType &&
-                s.ServiceType.GetGenericArguments().Any(a => a.Name == "AzureMonitorOptions")),
-                "AzureMonitor options should be configured (instrumentation runs).");
+                s.ServiceType.GetGenericArguments().Any(a => a.Name == "AzureMonitorOptions"));
         }
 
         [Fact]
@@ -131,10 +130,9 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
 
             // Console exporter registers via OpenTelemetry internals —
             // verify tracing config exists (console exporter is configured inside WithTracing)
-            Assert.True(services.Any(s =>
+            Assert.Contains(services, s =>
                 s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder") ||
-                s.ServiceType.Name.Contains("TracerProviderBuilder")),
-                "Tracing should be configured with console exporter.");
+                s.ServiceType.Name.Contains("TracerProviderBuilder"));
 
             // No Azure Monitor or Agent365
             Assert.False(HasAzureMonitorExporter(services));
@@ -151,10 +149,9 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
                     o.Exporters = ExportTarget.Otlp;
                     });
 
-            Assert.True(services.Any(s =>
+            Assert.Contains(services, s =>
                 s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder") ||
-                s.ServiceType.Name.Contains("TracerProviderBuilder")),
-                "Tracing should be configured with OTLP exporter.");
+                s.ServiceType.Name.Contains("TracerProviderBuilder"));
         }
 
         [Fact]
@@ -165,10 +162,9 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
                 .UseMicrosoftOpenTelemetry(o => { });
 
             // AgentFramework is always enabled — sources and processor are registered
-            Assert.True(services.Any(s =>
+            Assert.Contains(services, s =>
                 s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder") ||
-                s.ServiceType.Name.Contains("TracerProviderBuilder")),
-                "Agent Framework sources should be registered.");
+                s.ServiceType.Name.Contains("TracerProviderBuilder"));
         }
     }
 }
