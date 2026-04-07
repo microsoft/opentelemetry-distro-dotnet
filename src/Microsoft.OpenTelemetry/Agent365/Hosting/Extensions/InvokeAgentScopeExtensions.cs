@@ -10,7 +10,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Hosting.Extensions
     /// <summary>
     /// Extension methods for InvokeAgentScope.
     /// </summary>
-    public static class InvokeAgentScopeExtensions
+    internal static class InvokeAgentScopeExtensions
     {
         /// <summary>
         /// Sets tag values from TurnContext.

@@ -11,7 +11,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Tracing.Exporters
     /// Abstract base class for asynchronous exporters of telemetry objects.
     /// </summary>
     /// <typeparam name="T">The type of telemetry object to export.</typeparam>
-    public abstract class BaseExporterAsync<T> : IDisposable
+    internal abstract class BaseExporterAsync<T> : IDisposable
         where T : class
     {
         /// <summary>

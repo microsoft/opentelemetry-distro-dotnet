@@ -10,7 +10,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Extensions.OpenAI;
 /// <summary>
 /// Extension methods for ChatToolCall.
 /// </summary>
-public static class ChatToolCallExtensions
+internal static class ChatToolCallExtensions
 {
     /// <summary>
     /// Starts an ExecuteToolScope for the given ChatToolCall for OpenTelemetry tracing.

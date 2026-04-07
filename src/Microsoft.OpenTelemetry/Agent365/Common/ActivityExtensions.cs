@@ -8,7 +8,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Common
     /// <summary>
     /// Extension methods for Activity.
     /// </summary>
-    public static class ActivityExtensions
+    internal static class ActivityExtensions
     {
         /// <summary>
         /// Gets the value of a tag (takes precedence) or baggage item from the activity.

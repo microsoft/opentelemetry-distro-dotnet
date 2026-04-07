@@ -15,7 +15,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Tracing.Exporters
     /// Sends POST {Endpoint}/v1/traces with application/json.
     /// </summary>
 
-    public sealed class Agent365Exporter : BaseExporter<Activity>
+    internal sealed class Agent365Exporter : BaseExporter<Activity>
     {
         private readonly HttpClient _httpClient;
         private readonly Resource _resource;

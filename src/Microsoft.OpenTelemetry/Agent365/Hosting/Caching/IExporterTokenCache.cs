@@ -7,7 +7,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Hosting.Caching
     /// <summary>
     /// Cache only for observability (exporter) scoped tokens per (agentId, tenantId).
     /// </summary>
-    public interface IExporterTokenCache<T> where T : class
+    internal interface IExporterTokenCache<T> where T : class
     {
         /// <summary>
         /// Registers (idempotent) a credential to be used for observability token acquisition.

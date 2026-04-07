@@ -10,7 +10,7 @@ using global::OpenTelemetry.Trace;
 /// <summary>
 /// Extension methods for configuring Builder with OpenAI integration.
 /// </summary>
-public static class BuilderExtensions
+internal static class BuilderExtensions
 {
     /// <summary>
     /// Adds OpenAI integration to the builder.

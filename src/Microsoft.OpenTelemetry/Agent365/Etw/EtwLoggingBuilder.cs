@@ -11,7 +11,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Etw
     /// <summary>
     /// Builds the ETW + OpenTelemetry logging configuration.
     /// </summary>
-    public sealed class EtwLoggingBuilder
+    internal sealed class EtwLoggingBuilder
     {
         private static readonly Lazy<ILoggerFactory> FallbackConsoleLoggerFactory = new Lazy<ILoggerFactory>(() => LoggerFactory.Create(b => b.AddConsole()));
         private readonly IServiceCollection _services;

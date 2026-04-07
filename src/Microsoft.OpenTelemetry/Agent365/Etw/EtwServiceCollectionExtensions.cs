@@ -8,7 +8,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Etw
     /// <summary>
     /// Extension methods for configuring ETW in <see cref="IServiceCollection"/>.
     /// </summary>
-    public static class EtwServiceCollectionExtensions
+    internal static class EtwServiceCollectionExtensions
     {
         /// <summary>
         /// Adds OpenTelemetry tracing with ETW to the service collection.

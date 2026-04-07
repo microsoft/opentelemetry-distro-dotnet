@@ -12,7 +12,7 @@ namespace Microsoft.OpenTelemetry.Agent365.DTOs.Builders
     /// <summary>
     /// Builds an InvokeAgentData instance
     /// </summary>
-    public class InvokeAgentDataBuilder : BaseDataBuilder<InvokeAgentData>
+    internal class InvokeAgentDataBuilder : BaseDataBuilder<InvokeAgentData>
     {
         private const string InvokeAgentOperationName = "invoke_agent";
 

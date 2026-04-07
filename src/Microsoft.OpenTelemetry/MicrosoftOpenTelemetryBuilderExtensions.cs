@@ -96,8 +96,7 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
                 exporters |= ExportTarget.AzureMonitor;
             if (options.Agent365.Exporter.TokenResolver != null)
                 exporters |= ExportTarget.Agent365;
-            if (options.OtlpEndpoint != null)
-                exporters |= ExportTarget.Otlp;
+            
         }
 
         // --- Azure Monitor (always: instrumentation; exporter gated by Exporters flag) ---
@@ -140,18 +139,12 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         {
             builder.WithTracing(tracing =>
             {
-                if (options.OtlpEndpoint != null)
-                    tracing.AddOtlpExporter(o => o.Endpoint = options.OtlpEndpoint);
-                else
-                    tracing.AddOtlpExporter();
+                tracing.AddOtlpExporter();
             });
 
             builder.WithMetrics(metrics =>
             {
-                if (options.OtlpEndpoint != null)
-                    metrics.AddOtlpExporter(o => o.Endpoint = options.OtlpEndpoint);
-                else
-                    metrics.AddOtlpExporter();
+                metrics.AddOtlpExporter();
             });
         }
 

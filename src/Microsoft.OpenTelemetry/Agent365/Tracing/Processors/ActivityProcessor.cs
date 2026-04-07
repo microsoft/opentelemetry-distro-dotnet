@@ -10,7 +10,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Tracing.Processors
     /// <summary>
     /// Processes activity telemetry data by adding contextual baggage information.
     /// </summary>
-    public sealed class ActivityProcessor : BaseProcessor<Activity>
+    internal sealed class ActivityProcessor : BaseProcessor<Activity>
     {
         private static readonly string[] AttributeKeys = new[]
         {

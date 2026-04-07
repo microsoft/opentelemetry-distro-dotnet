@@ -10,7 +10,7 @@ namespace Microsoft.OpenTelemetry.Agent365.DTOs
     /// <summary>
     /// Encapsulates all telemetry data for an inference execution operation.
     /// </summary>
-    public class ExecuteInferenceData : BaseData
+    internal class ExecuteInferenceData : BaseData
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ExecuteInferenceData"/> class.

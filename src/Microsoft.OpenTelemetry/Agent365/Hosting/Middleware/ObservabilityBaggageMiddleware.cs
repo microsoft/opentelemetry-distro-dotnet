@@ -11,7 +11,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Hosting.Middleware
     /// <summary>
     /// ASP.NET Core middleware for setting per-request observability context (baggage).
     /// </summary>
-    public sealed class ObservabilityBaggageMiddleware
+    internal sealed class ObservabilityBaggageMiddleware
     {
         private readonly RequestDelegate _next;
         private readonly Func<HttpContext, (string? tenant, string? agentId)> _resolver;
@@ -56,7 +56,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Hosting.Middleware
     /// A middleware to set per-request observability context (baggage). 
     /// Middleware to be used in ASP.NET scenarios.
     /// </summary>
-    public static class ObservabilityBaggageMiddlewareExtensions
+    internal static class ObservabilityBaggageMiddlewareExtensions
     {
         /// <summary>
         /// Adds the observability baggage middleware to the application pipeline.

@@ -12,7 +12,7 @@ namespace Microsoft.OpenTelemetry.Agent365
     /// <summary>
     /// Provides extension methods for configuring Microsoft Agent 365 SDK with OpenTelemetry tracing.
     /// </summary>
-    public static class ObservabilityBuilderExtensions
+    internal static class ObservabilityBuilderExtensions
     {
 
         /// <summary>

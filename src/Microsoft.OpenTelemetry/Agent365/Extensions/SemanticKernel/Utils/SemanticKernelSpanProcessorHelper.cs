@@ -13,7 +13,7 @@ using System.Text.RegularExpressions;
 /// <summary>
 /// Provides helper methods for processing and filtering Semantic Kernel span tags and events.
 /// </summary>
-public static class SemanticKernelSpanProcessorHelper
+internal static class SemanticKernelSpanProcessorHelper
 {
     private static readonly Regex UnquotedPropertyValueRegex =
         new Regex(

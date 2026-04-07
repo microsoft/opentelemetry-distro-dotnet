@@ -49,10 +49,4 @@ public class MicrosoftOpenTelemetryOptions
     /// Listens to <c>Experimental.Microsoft.Agents.AI</c> activity sources automatically.
     /// </summary>
     public bool EnableAgentFramework { get; set; } = true;
-
-    /// <summary>
-    /// Gets or sets the OTLP exporter endpoint.
-    /// Only used when <see cref="Exporters"/> includes <see cref="ExportTarget.Otlp"/>.
-    /// </summary>
-    public Uri? OtlpEndpoint { get; set; }
 }

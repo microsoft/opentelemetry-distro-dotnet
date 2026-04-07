@@ -19,7 +19,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Common
     /// Provides functionality to format Activity spans into OTLP JSON payloads.
     /// </summary>
 
-    public class ExportFormatter
+    internal class ExportFormatter
     {
         private const int MaxSpanSizeBytes = 250 * 1024;
         private static readonly string[] LargePayloadAttributeKeys = new[]

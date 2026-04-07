@@ -9,7 +9,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Tracing.Scopes
     /// <summary>
     /// OpenTelemetry constant keys and values used across the Microsoft Agent 365 SDK.
     /// </summary>
-    public static class OpenTelemetryConstants
+    internal static class OpenTelemetryConstants
     {
         public const string EnableOpenTelemetrySwitch = "Azure.Experimental.EnableActivitySource";
         public const string SourceName = "Agent365Sdk";

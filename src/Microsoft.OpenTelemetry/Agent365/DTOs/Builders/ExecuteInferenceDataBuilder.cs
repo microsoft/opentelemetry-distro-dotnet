@@ -11,7 +11,7 @@ namespace Microsoft.OpenTelemetry.Agent365.DTOs.Builders
     /// <summary>
     /// Builds an ExecuteInferenceData instance.
     /// </summary>
-    public class ExecuteInferenceDataBuilder : BaseDataBuilder<ExecuteInferenceData>
+    internal class ExecuteInferenceDataBuilder : BaseDataBuilder<ExecuteInferenceData>
     {
         /// <summary>
         /// Builds complete data for an inference operation.

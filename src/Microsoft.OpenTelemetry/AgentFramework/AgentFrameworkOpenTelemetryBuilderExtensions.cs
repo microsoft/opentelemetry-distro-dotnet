@@ -11,7 +11,7 @@ namespace Microsoft.OpenTelemetry;
 /// <summary>
 /// Extension methods for configuring Microsoft Agent Framework observability on <see cref="IOpenTelemetryBuilder"/>.
 /// </summary>
-public static class AgentFrameworkOpenTelemetryBuilderExtensions
+internal static class AgentFrameworkOpenTelemetryBuilderExtensions
 {
     /// <summary>
     /// Configures the distro to capture telemetry from Microsoft Agent Framework.
@@ -32,7 +32,7 @@ public static class AgentFrameworkOpenTelemetryBuilderExtensions
     ///     .UseAgentFramework();
     /// </code>
     /// </remarks>
-    public static IOpenTelemetryBuilder UseAgentFramework(this IOpenTelemetryBuilder builder)
+    internal static IOpenTelemetryBuilder UseAgentFramework(this IOpenTelemetryBuilder builder)
     {
         builder.WithTracing(tracing =>
         {

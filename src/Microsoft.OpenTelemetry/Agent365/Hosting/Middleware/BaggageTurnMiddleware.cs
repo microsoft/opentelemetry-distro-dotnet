@@ -18,7 +18,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Hosting.Middleware
     /// Async replies (ContinueConversation events) are passed through without
     /// baggage setup because their context is established by the originating turn.
     /// </remarks>
-    public sealed class BaggageTurnMiddleware : IMiddleware
+    internal sealed class BaggageTurnMiddleware : IMiddleware
     {
         /// <inheritdoc/>
         public async Task OnTurnAsync(ITurnContext turnContext, NextDelegate next, CancellationToken cancellationToken = default)

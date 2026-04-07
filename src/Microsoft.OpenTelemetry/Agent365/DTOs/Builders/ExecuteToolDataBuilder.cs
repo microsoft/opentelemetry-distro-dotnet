@@ -12,7 +12,7 @@ namespace Microsoft.OpenTelemetry.Agent365.DTOs.Builders
     /// <summary>
     /// Builds an ExecuteToolData instance.
     /// </summary>
-    public class ExecuteToolDataBuilder : BaseDataBuilder<ExecuteToolData>
+    internal class ExecuteToolDataBuilder : BaseDataBuilder<ExecuteToolData>
     {
         private const string ExecuteToolOperationName = "execute_tool";
 

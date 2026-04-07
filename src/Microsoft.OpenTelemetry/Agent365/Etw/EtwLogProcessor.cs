@@ -11,7 +11,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Etw
     /// <summary>
     /// Processes logs by emitting ETW events.
     /// </summary>
-    public class EtwLogProcessor : BaseProcessor<LogRecord>
+    internal class EtwLogProcessor : BaseProcessor<LogRecord>
     {
         private readonly ExportFormatter _formatter;
         private readonly ILogger<EtwLogProcessor>? _logger;

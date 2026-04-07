@@ -11,7 +11,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Etw
     /// <summary>
     /// Provides ETW logging functionality for tracing events.
     /// </summary>
-    public class A365EtwLogger<T> : IA365EtwLogger<T>
+    internal class A365EtwLogger<T> : IA365EtwLogger<T>
     {
         private ILogger logger { get; }
         private const string InvokeAgentEventName = "InvokeAgent";

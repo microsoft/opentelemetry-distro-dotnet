@@ -9,7 +9,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models;
 /// Represents a nested content structure that may appear within a MessageContent's Content property.
 /// Used when Content is a JSON object with contentType and content fields.
 /// </summary>
-public class NestedContent
+internal class NestedContent
 {
     /// <summary>
     /// The type of the content (e.g., "Text").

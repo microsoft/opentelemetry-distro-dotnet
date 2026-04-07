@@ -8,7 +8,7 @@ namespace Microsoft.OpenTelemetry.Agent365.DTOs
     /// These constants are used in DTOs and Builders to avoid taking a dependency
     /// on <see cref="System.Diagnostics.ActivityKind"/>.
     /// </summary>
-    public static class SpanKindConstants
+    internal static class SpanKindConstants
     {
         /// <summary>
         /// Indicates that the span covers server-side handling of a synchronous RPC or other remote request.

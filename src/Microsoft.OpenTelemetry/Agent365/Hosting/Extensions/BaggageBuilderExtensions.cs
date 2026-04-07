@@ -9,7 +9,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Hosting.Extensions
     /// <summary>
     /// Utility class for BaggageBuilder extensions.
     /// </summary>
-    public static class BaggageBuilderExtensions
+    internal static class BaggageBuilderExtensions
     {
         /// <summary>
         /// Sets the baggage values from TurnContext.

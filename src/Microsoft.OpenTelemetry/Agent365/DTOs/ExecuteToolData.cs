@@ -10,7 +10,7 @@ namespace Microsoft.OpenTelemetry.Agent365.DTOs
     /// <summary>
     /// Encapsulates all telemetry data for an execute_tool operation.
     /// </summary>
-    public class ExecuteToolData : BaseData
+    internal class ExecuteToolData : BaseData
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ExecuteToolData"/> class.

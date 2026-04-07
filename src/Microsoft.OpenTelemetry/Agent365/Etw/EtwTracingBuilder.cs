@@ -13,7 +13,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Etw
     /// <summary>
     /// Builds the ETW + OpenTelemetry tracing configuration.
     /// </summary>
-    public sealed class EtwTracingBuilder
+    internal sealed class EtwTracingBuilder
     {
         private readonly IServiceCollection _services;
         private bool _isBuilt = false;

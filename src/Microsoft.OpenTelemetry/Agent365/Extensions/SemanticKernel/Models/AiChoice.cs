@@ -8,7 +8,7 @@ using System.Text.Json.Serialization;
 /// <summary>
 /// Represents an AI choice containing a message with role and tool calls information.
 /// </summary>
-public sealed class AiChoice
+internal sealed class AiChoice
 {
     /// <summary>
     /// Gets or sets the AI choice message, which includes role and tool calls information.
@@ -20,7 +20,7 @@ public sealed class AiChoice
 /// <summary>
 /// Represents an AI choice message, including the role and associated tool calls.
 /// </summary>
-public sealed class AiChoiceMessage
+internal sealed class AiChoiceMessage
 {
     /// <summary>
     /// Gets or sets the role of the AI message.
@@ -44,7 +44,7 @@ public sealed class AiChoiceMessage
 /// <summary>
 /// Represents a tool call within an AI choice message.
 /// </summary>
-public sealed class AiChoiceToolCall
+internal sealed class AiChoiceToolCall
 {
     /// <summary>
     /// Gets or sets the function associated with the tool call.
@@ -56,7 +56,7 @@ public sealed class AiChoiceToolCall
 /// <summary>
 /// Represents a function within a tool call.
 /// </summary>
-public sealed class AiChoiceFunction
+internal sealed class AiChoiceFunction
 {
     /// <summary>
     /// Gets or sets the arguments for the function.
@@ -68,7 +68,7 @@ public sealed class AiChoiceFunction
 /// <summary>
 /// Represents the arguments for an AI choice function.
 /// </summary>
-public sealed class AiChoiceArguments
+internal sealed class AiChoiceArguments
 {
     /// <summary>
     /// Gets or sets the message body for the function arguments.

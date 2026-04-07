@@ -14,7 +14,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Tracing.Processors
     /// <summary>
     /// Implements an async processor that batches <see cref="Activity"/> objects before calling exporter asynchronously.
     /// </summary>
-    public class BatchActivityExportProcessorAsync : BaseProcessor<Activity>
+    internal class BatchActivityExportProcessorAsync : BaseProcessor<Activity>
     {
         internal const int DefaultMaxQueueSize = 2048;
         internal const int DefaultScheduledDelayMilliseconds = 5000;

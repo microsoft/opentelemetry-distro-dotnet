@@ -10,7 +10,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Hosting.Extensions
     /// <summary>
     /// Extension methods for extracting values from ITurnContext.
     /// </summary>
-    public static class TurnContextExtensions
+    internal static class TurnContextExtensions
     {
         private const string O11ySpanIdKey = "O11ySpanId";
         private const string O11yTraceIdKey = "O11yTraceId";

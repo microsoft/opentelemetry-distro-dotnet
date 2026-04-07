@@ -21,7 +21,7 @@ namespace Microsoft.OpenTelemetry
     /// <summary>
     /// Extension methods for setting up Azure Monitor in an <see cref="IOpenTelemetryBuilder" />.
     /// </summary>
-    public static class OpenTelemetryBuilderExtensions
+    internal static class OpenTelemetryBuilderExtensions
     {
 
         /// <summary>
@@ -43,7 +43,7 @@ namespace Microsoft.OpenTelemetry
         /// <item>SQL Client.</item>
         /// </list>
         /// </remarks>
-        public static IOpenTelemetryBuilder UseAzureMonitor(this IOpenTelemetryBuilder builder)
+        internal static IOpenTelemetryBuilder UseAzureMonitor(this IOpenTelemetryBuilder builder)
         {
             builder.Services.TryAddSingleton<IConfigureOptions<AzureMonitorOptions>,
                         DefaultAzureMonitorOptions>();
@@ -70,7 +70,7 @@ namespace Microsoft.OpenTelemetry
         /// <item>SQL Client.</item>
         /// </list>
         /// </remarks>
-        public static IOpenTelemetryBuilder UseAzureMonitor(this IOpenTelemetryBuilder builder, Action<AzureMonitorOptions> configureAzureMonitor)
+        internal static IOpenTelemetryBuilder UseAzureMonitor(this IOpenTelemetryBuilder builder, Action<AzureMonitorOptions> configureAzureMonitor)
         {
             if (builder.Services == null)
             {
