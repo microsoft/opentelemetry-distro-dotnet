@@ -212,8 +212,6 @@ Microsoft.OpenTelemetry.MicrosoftOpenTelemetryBuilderExtensions
 Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions
 Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.Agent365.get -> Microsoft.OpenTelemetry.Agent365Options!
 Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.AzureMonitor.get -> Microsoft.OpenTelemetry.AzureMonitorOptions!
-Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.EnableAgentFramework.get -> bool
-Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.EnableAgentFramework.set -> void
 Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.Exporters.get -> Microsoft.OpenTelemetry.ExportTarget
 Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.Exporters.set -> void
 Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.MicrosoftOpenTelemetryOptions() -> void

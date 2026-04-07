@@ -40,7 +40,8 @@ internal static class AgentFrameworkOpenTelemetryBuilderExtensions
             tracing
                 .AddSource(AgentFrameworkConstants.DefaultSource)
                 .AddSource(AgentFrameworkConstants.AgentSource)
-                .AddSource(AgentFrameworkConstants.ChatClientSource);
+                .AddSource(AgentFrameworkConstants.ChatClientSource)
+                .AddProcessor(new AgentFrameworkSpanProcessor());
         });
 
         // Also capture metrics from the same sources

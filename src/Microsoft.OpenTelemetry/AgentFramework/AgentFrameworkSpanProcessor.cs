@@ -1,11 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-using Microsoft.OpenTelemetry.Agent365.Extensions.AgentFramework.Utils;
 using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
 using global::OpenTelemetry;
 using System.Diagnostics;
 
-namespace Microsoft.OpenTelemetry.Agent365.Extensions.AgentFramework
+namespace Microsoft.OpenTelemetry.AgentFramework
 {
     internal class AgentFrameworkSpanProcessor : BaseProcessor<Activity>
     {
@@ -53,7 +52,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Extensions.AgentFramework
 
         private bool IsTrackedSource(string sourceName)
         {
-            if (sourceName.StartsWith(BuilderExtensions.AgentFrameworkSource))
+            if (sourceName.StartsWith(AgentFrameworkConstants.DefaultSource))
             {
                 return true;
             }

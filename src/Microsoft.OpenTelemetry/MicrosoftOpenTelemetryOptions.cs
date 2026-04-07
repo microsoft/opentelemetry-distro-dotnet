@@ -43,10 +43,4 @@ public class MicrosoftOpenTelemetryOptions
     /// Only exporter is gated by <see cref="Exporters"/>; instrumentation (scopes, baggage) is always active.
     /// </summary>
     public Agent365Options Agent365 { get; } = new();
-
-    /// <summary>
-    /// Gets or sets whether to enable Microsoft Agent Framework span capture. Default is true.
-    /// Listens to <c>Experimental.Microsoft.Agents.AI</c> activity sources automatically.
-    /// </summary>
-    public bool EnableAgentFramework { get; set; } = true;
 }

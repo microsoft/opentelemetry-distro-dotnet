@@ -1,9 +1,8 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace Microsoft.OpenTelemetry.Agent365.Extensions.AgentFramework.Utils;
+namespace Microsoft.OpenTelemetry.AgentFramework;
 
-using Microsoft.OpenTelemetry.Agent365.Extensions.AgentFramework.Models;
 using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
 using System.Diagnostics;
 using System.Text.Json;

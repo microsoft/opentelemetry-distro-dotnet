@@ -3,7 +3,7 @@
 
 using System.Text.Json.Serialization;
 
-namespace Microsoft.OpenTelemetry.Agent365.Extensions.AgentFramework.Models;
+namespace Microsoft.OpenTelemetry.AgentFramework;
 
 /// <summary>
 /// Represents the structure of a message as found in Agent Framework OpenTelemetry activity tags.
