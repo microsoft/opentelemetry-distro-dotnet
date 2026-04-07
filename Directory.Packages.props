@@ -15,12 +15,15 @@
 
     <!-- Azure Monitor exporter -->
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.7.0" />
+    <PackageVersion Include="Azure.Identity" Version="1.17.1" />
 
     <!-- Agent365 dependencies -->
     <PackageVersion Include="Microsoft.SemanticKernel" Version="1.71.0" />
     <PackageVersion Include="Microsoft.SemanticKernel.Agents.Core" Version="1.71.0" />
     <PackageVersion Include="Azure.AI.OpenAI" Version="2.7.0-beta.2" />
     <PackageVersion Include="Microsoft.Agents.Builder" Version="1.4.83" />
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.0.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.4" />
 

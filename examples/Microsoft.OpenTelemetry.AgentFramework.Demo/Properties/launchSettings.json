@@ -1,0 +1,16 @@
+{
+  "profiles": {
+    "Microsoft.OpenTelemetry.AgentFramework.Demo": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5081",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "AZURE_OPENAI_ENDPOINT": "",
+        "AZURE_OPENAI_DEPLOYMENT_NAME": "",
+        "AZURE_OPENAI_API_KEY": "",
+        "APPLICATIONINSIGHTS_CONNECTION_STRING": ""
+      }
+    }
+  }
+}
