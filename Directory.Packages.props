@@ -24,6 +24,10 @@
     <PackageVersion Include="Microsoft.Agents.Builder" Version="1.4.83" />
     <PackageVersion Include="Microsoft.Agents.AI" Version="1.0.0" />
     <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0" />
+    <PackageVersion Include="Microsoft.Agents.Hosting.AspNetCore" Version="1.4.83" />
+    <PackageVersion Include="Microsoft.Agents.Authentication.Msal" Version="1.4.83" />
+    <PackageVersion Include="Microsoft.Agents.A365.Notifications" Version="0.2.151-beta" />
+    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.0.1-preview.1.25571.5" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.4" />
 
