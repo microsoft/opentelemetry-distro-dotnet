@@ -78,10 +78,25 @@ internal static class Agent365OpenTelemetryBuilderExtensions
                 .AddProcessor(new SemanticKernelSpanProcessor())
                 .AddProcessor(new OpenAISpanProcessor());
 
-            // Agent365 Exporter (enabled when TokenResolver is set and not skipped)
-            if (options.Exporter.TokenResolver != null && !options.SkipExporter)
+            // Agent365 Exporter (enabled when not skipped)
+            if (!options.SkipExporter)
             {
-                builder.Services.AddSingleton(options.Exporter);
+                if (options.Exporter.TokenResolver != null)
+                {
+                    // Inline TokenResolver provided — register options directly in DI
+                    builder.Services.AddSingleton(options.Exporter);
+                }
+                else
+                {
+                    // No inline TokenResolver — use distro's ObservabilityTokenStore.
+                    // Tokens are populated by agent middleware (e.g. A365OtelWrapper)
+                    // using ObservabilityTokenStore.SetToken() on each turn.
+                    var exporterOptions = new Agent365ExporterOptions
+                    {
+                        TokenResolver = ObservabilityTokenStore.GetTokenAsync
+                    };
+                    builder.Services.AddSingleton(exporterOptions);
+                }
                 tracing.AddAgent365Exporter();
             }
         });
