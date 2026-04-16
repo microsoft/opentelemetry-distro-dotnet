@@ -3,8 +3,8 @@
 
 using Microsoft.OpenTelemetry.Agent365;
 using Microsoft.OpenTelemetry.Agent365.Common;
-using Microsoft.OpenTelemetry.Agent365.Extensions.OpenAI;
 using Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel;
+using Microsoft.OpenTelemetry.Agent365.Hosting;
 using Microsoft.OpenTelemetry.Agent365.Tracing.Exporters;
 using Microsoft.OpenTelemetry.Agent365.Tracing.Processors;
 using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
@@ -70,13 +70,23 @@ internal static class Agent365OpenTelemetryBuilderExtensions
         // --- Core tracing: Agent365 scopes + baggage processor + framework span processors ---
         builder.WithTracing(tracing =>
         {
+            // Match the Agent365 SDK sampler: ParentBasedSampler with AlwaysOnSampler
+            // for all cases. The Bot Framework returns HTTP 202 immediately and processes
+            // LLM calls on async continuations with no parent Activity. Without this,
+            // parent-based samplers drop those orphan root spans — including gen_ai.*
+            // chat and invoke_agent spans.
             tracing
+                .SetSampler(new global::OpenTelemetry.Trace.ParentBasedSampler(
+                    rootSampler: new global::OpenTelemetry.Trace.AlwaysOnSampler(),
+                    localParentNotSampled: new global::OpenTelemetry.Trace.AlwaysOnSampler(),
+                    remoteParentNotSampled: new global::OpenTelemetry.Trace.AlwaysOnSampler()))
                 .AddSource(OpenTelemetryConstants.SourceName)
                 .AddSource(SemanticKernelTelemetryConstants.SemanticKernelSourceWildcard)
                 .AddSource("Azure.AI.OpenAI*")
+                .AddSource("Experimental.Microsoft.Extensions.AI")
+                .AddSource("Experimental.Microsoft.Agents.AI")
                 .AddProcessor<ActivityProcessor>()
-                .AddProcessor(new SemanticKernelSpanProcessor())
-                .AddProcessor(new OpenAISpanProcessor());
+                .AddProcessor(new SemanticKernelSpanProcessor());
 
             // Agent365 Exporter (enabled when not skipped)
             if (!options.SkipExporter)
@@ -88,14 +98,9 @@ internal static class Agent365OpenTelemetryBuilderExtensions
                 }
                 else
                 {
-                    // No inline TokenResolver — use distro's ObservabilityTokenStore.
-                    // Tokens are populated by agent middleware (e.g. A365OtelWrapper)
-                    // using ObservabilityTokenStore.SetToken() on each turn.
-                    var exporterOptions = new Agent365ExporterOptions
-                    {
-                        TokenResolver = ObservabilityTokenStore.GetTokenAsync
-                    };
-                    builder.Services.AddSingleton(exporterOptions);
+                    // No inline TokenResolver — register agentic token cache and options in DI.
+                    // Token cache is populated by agent middleware (e.g. via RegisterObservability).
+                    builder.Services.AddAgenticTracingExporter();
                 }
                 tracing.AddAgent365Exporter();
             }

@@ -14,7 +14,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Hosting.Caching
     /// Caches observability tokens per (agentId, tenantId) using the provided UserAuthorization and TurnContext.
     /// Includes automatic periodic cleanup of expired tokens for improved memory management.
     /// </summary>
-    internal class AgenticTokenCache : IExporterTokenCache<AgenticTokenStruct>, IDisposable
+    public class AgenticTokenCache : IExporterTokenCache<AgenticTokenStruct>, IDisposable
     {
         private sealed class Entry
         {
@@ -98,7 +98,8 @@ namespace Microsoft.OpenTelemetry.Agent365.Hosting.Caching
         /// </returns>
         public async Task<string?> GetObservabilityToken(string agentId, string tenantId)
         {
-            if (!_map.TryGetValue($"{agentId}:{tenantId}", out var entry))
+            var key = $"{agentId}:{tenantId}";
+            if (!_map.TryGetValue(key, out var entry))
                 return null;
 
             try
@@ -120,7 +121,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Hosting.Caching
                         exchangeScopes: entry.Scopes).ConfigureAwait(false);
 
                 entry.Token = token;
-                entry.ExpiresAt = GetTokenExpiration(token);
+                entry.ExpiresAt = token != null ? GetTokenExpiration(token) : null;
 
                 return token;
             }

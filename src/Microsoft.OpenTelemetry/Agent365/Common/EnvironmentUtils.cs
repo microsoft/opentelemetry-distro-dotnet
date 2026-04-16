@@ -7,7 +7,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Common
     /// <summary>
     /// Utility logic for environment-related operations.
     /// </summary>
-    internal class EnvironmentUtils
+    public class EnvironmentUtils
     {
         private const string ProdObservabilityScope = "https://api.powerplatform.com/.default";
         private const string ProdObservabilityClusterCategory = "prod";
@@ -29,7 +29,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Common
         /// <param name="clusterCategory">Cluster category (deprecated, defaults to production).</param>
         /// <returns>The authentication scope.</returns>
         [Obsolete("Cluster category argument is deprecated and will be removed in future versions. Defaults to production.")]
-        public static string[] GetObservabilityAuthenticationScope(string clusterCategory = ProdObservabilityClusterCategory)
+        internal static string[] GetObservabilityAuthenticationScope(string clusterCategory = ProdObservabilityClusterCategory)
         {
             // clusterCategory is ignored; always returns production scope
             return new[] { ProdObservabilityScope };
@@ -49,7 +49,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Common
         /// </summary>
         /// <param name="clusterCategory">Cluster category (deprecated, defaults to production).</param>
         /// <returns></returns>
-        public static string GetObservabilityClusterCategory(string clusterCategory = ProdObservabilityClusterCategory)
+        internal static string GetObservabilityClusterCategory(string clusterCategory = ProdObservabilityClusterCategory)
         {
             // clusterCategory is ignored; always returns production category
             return ProdObservabilityClusterCategory;

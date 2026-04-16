@@ -28,13 +28,17 @@ builder.Services.AddOpenTelemetry()
     .UseMicrosoftOpenTelemetry(o =>
     {
         o.Exporters = ExportTarget.Console | ExportTarget.Agent365;
+        // Token resolver is auto-registered via AddAgenticTracingExporter internally.
+        // To use a custom resolver, set: o.Agent365.Exporter.TokenResolver = ...
     })
     .WithTracing(tracing => tracing
         .AddSource(
             "A365.AgentFramework",
             "Microsoft.Agents.Builder",
             "Microsoft.Agents.Hosting",
-            "A365.AgentFramework.MyAgent"));
+            "A365.AgentFramework.MyAgent",
+            "Experimental.Microsoft.Agents.AI",
+            "Experimental.Microsoft.Extensions.AI"));
 
 builder.Configuration.AddUserSecrets(Assembly.GetExecutingAssembly());
 builder.Services.AddControllers();
@@ -91,7 +95,7 @@ builder.Services.AddSingleton<IChatClient>(sp => {
         .AsIChatClient()
         .AsBuilder()
         .UseFunctionInvocation()
-        .UseOpenTelemetry(sourceName: AgentMetrics.SourceName, configure: (cfg) => cfg.EnableSensitiveData = true)
+        .UseOpenTelemetry(configure: (cfg) => cfg.EnableSensitiveData = true)
         .Build(); 
 });
 

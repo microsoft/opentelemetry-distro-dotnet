@@ -1,8 +1,8 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-using Microsoft.OpenTelemetry.Agent365;
 using Microsoft.OpenTelemetry.Agent365.Common;
+using Microsoft.OpenTelemetry.Agent365.Hosting.Caching;
 using Microsoft.Agents.Builder;
 using Microsoft.Agents.Builder.App.UserAuth;
 using Microsoft.Agents.Builder.State;
@@ -15,6 +15,7 @@ namespace Agent365AgentFrameworkSampleAgent.telemetry
             string operationName,
             ITurnContext turnContext,
             ITurnState turnState,
+            IExporterTokenCache<AgenticTokenStruct>? agentTokenCache,
             UserAuthorization authSystem,
             string authHandlerName,
             ILogger? logger,
@@ -35,23 +36,18 @@ namespace Agent365AgentFrameworkSampleAgent.telemetry
                     .AgentId(agentId)
                     .Build();
 
-                    // Acquire and cache the observability token for the exporter
+                    // Register observability token for the exporter
                     try
                     {
-                        if (authSystem != null && !string.IsNullOrEmpty(authHandlerName))
-                        {
-                            var token = await authSystem.ExchangeTurnTokenAsync(
-                                turnContext, authHandlerName,
-                                exchangeScopes: new[] { "https://api.powerplatform.com/.default" });
-                            if (!string.IsNullOrEmpty(token))
-                            {
-                                ObservabilityTokenStore.SetToken(agentId, tenantId, token);
-                            }
-                        }
+                        agentTokenCache?.RegisterObservability(agentId, tenantId, new AgenticTokenStruct(
+                            userAuthorization: authSystem,
+                            turnContext: turnContext,
+                            authHandlerName: authHandlerName
+                        ), EnvironmentUtils.GetObservabilityAuthenticationScope());
                     }
                     catch (Exception ex)
                     {
-                        logger?.LogWarning("Failed to acquire observability token: {Message}", ex.Message);
+                        logger?.LogWarning("Failed to register observability token: {Message}", ex.Message);
                     }
 
                     // Invoke the actual operation.
