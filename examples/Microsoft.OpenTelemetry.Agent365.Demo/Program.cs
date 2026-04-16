@@ -36,7 +36,9 @@ builder.Services.AddOpenTelemetry()
             "A365.AgentFramework",
             "Microsoft.Agents.Builder",
             "Microsoft.Agents.Hosting",
-            "A365.AgentFramework.MyAgent"));
+            "A365.AgentFramework.MyAgent",
+            "Experimental.Microsoft.Agents.AI",
+            "Experimental.Microsoft.Extensions.AI"));
 
 builder.Configuration.AddUserSecrets(Assembly.GetExecutingAssembly());
 builder.Services.AddControllers();
@@ -93,7 +95,7 @@ builder.Services.AddSingleton<IChatClient>(sp => {
         .AsIChatClient()
         .AsBuilder()
         .UseFunctionInvocation()
-        .UseOpenTelemetry(sourceName: AgentMetrics.SourceName, configure: (cfg) => cfg.EnableSensitiveData = true)
+        .UseOpenTelemetry(configure: (cfg) => cfg.EnableSensitiveData = true)
         .Build(); 
 });
 

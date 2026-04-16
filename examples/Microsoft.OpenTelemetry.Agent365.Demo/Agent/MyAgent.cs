@@ -407,7 +407,7 @@ namespace Agent365AgentFrameworkSampleAgent.Agent
                     instructions: GetAgentInstructions(displayName),
                     tools: toolList)
                 .AsBuilder()
-                .UseOpenTelemetry(sourceName: AgentMetrics.SourceName, (cfg) => cfg.EnableSensitiveData = true)
+                .UseOpenTelemetry(configure: (cfg) => cfg.EnableSensitiveData = true)
                 .Build();
         }
 

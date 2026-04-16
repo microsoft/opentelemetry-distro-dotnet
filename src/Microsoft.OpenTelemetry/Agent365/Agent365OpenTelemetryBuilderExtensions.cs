@@ -70,10 +70,21 @@ internal static class Agent365OpenTelemetryBuilderExtensions
         // --- Core tracing: Agent365 scopes + baggage processor + framework span processors ---
         builder.WithTracing(tracing =>
         {
+            // Match the Agent365 SDK sampler: ParentBasedSampler with AlwaysOnSampler
+            // for all cases. The Bot Framework returns HTTP 202 immediately and processes
+            // LLM calls on async continuations with no parent Activity. Without this,
+            // parent-based samplers drop those orphan root spans — including gen_ai.*
+            // chat and invoke_agent spans.
             tracing
+                .SetSampler(new global::OpenTelemetry.Trace.ParentBasedSampler(
+                    rootSampler: new global::OpenTelemetry.Trace.AlwaysOnSampler(),
+                    localParentNotSampled: new global::OpenTelemetry.Trace.AlwaysOnSampler(),
+                    remoteParentNotSampled: new global::OpenTelemetry.Trace.AlwaysOnSampler()))
                 .AddSource(OpenTelemetryConstants.SourceName)
                 .AddSource(SemanticKernelTelemetryConstants.SemanticKernelSourceWildcard)
                 .AddSource("Azure.AI.OpenAI*")
+                .AddSource("Experimental.Microsoft.Extensions.AI")
+                .AddSource("Experimental.Microsoft.Agents.AI")
                 .AddProcessor<ActivityProcessor>()
                 .AddProcessor(new SemanticKernelSpanProcessor());
 

@@ -63,7 +63,18 @@ namespace Microsoft.OpenTelemetry.Agent365.Tracing.Processors
 
             foreach (var key in AttributeKeys)
             {
-                activity.CoalesceTag(key, Baggage.Current.GetBaggage(key));
+                var baggageValue = Baggage.Current.GetBaggage(key);
+                if (key == OpenTelemetryConstants.GenAiAgentIdKey && !string.IsNullOrEmpty(baggageValue))
+                {
+                    // Force overwrite gen_ai.agent.id from baggage — the baggage value is the
+                    // A365 platform identity set by agent middleware. Without this, the AI framework's
+                    // internal agent ID would be used, causing export to an unregistered identity.
+                    activity.SetTag(key, baggageValue);
+                }
+                else
+                {
+                    activity.CoalesceTag(key, baggageValue);
+                }
             }
 
             if (activity.OperationName == InvokeAgentScope.OperationName ||
