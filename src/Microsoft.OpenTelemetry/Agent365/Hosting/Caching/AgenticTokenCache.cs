@@ -14,7 +14,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Hosting.Caching
     /// Caches observability tokens per (agentId, tenantId) using the provided UserAuthorization and TurnContext.
     /// Includes automatic periodic cleanup of expired tokens for improved memory management.
     /// </summary>
-    internal class AgenticTokenCache : IExporterTokenCache<AgenticTokenStruct>, IDisposable
+    public class AgenticTokenCache : IExporterTokenCache<AgenticTokenStruct>, IDisposable
     {
         private sealed class Entry
         {

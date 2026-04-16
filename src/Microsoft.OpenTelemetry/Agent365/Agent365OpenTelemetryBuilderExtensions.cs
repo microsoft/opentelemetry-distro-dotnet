@@ -4,6 +4,7 @@
 using Microsoft.OpenTelemetry.Agent365;
 using Microsoft.OpenTelemetry.Agent365.Common;
 using Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel;
+using Microsoft.OpenTelemetry.Agent365.Hosting;
 using Microsoft.OpenTelemetry.Agent365.Tracing.Exporters;
 using Microsoft.OpenTelemetry.Agent365.Tracing.Processors;
 using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
@@ -86,14 +87,9 @@ internal static class Agent365OpenTelemetryBuilderExtensions
                 }
                 else
                 {
-                    // No inline TokenResolver — use distro's ObservabilityTokenStore.
-                    // Tokens are populated by agent middleware (e.g. A365OtelWrapper)
-                    // using ObservabilityTokenStore.SetToken() on each turn.
-                    var exporterOptions = new Agent365ExporterOptions
-                    {
-                        TokenResolver = ObservabilityTokenStore.GetTokenAsync
-                    };
-                    builder.Services.AddSingleton(exporterOptions);
+                    // No inline TokenResolver — register agentic token cache and options in DI.
+                    // Token cache is populated by agent middleware (e.g. via RegisterObservability).
+                    builder.Services.AddAgenticTracingExporter();
                 }
                 tracing.AddAgent365Exporter();
             }

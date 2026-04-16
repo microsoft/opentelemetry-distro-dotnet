@@ -9,7 +9,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Hosting.Caching
     /// <summary>
     /// Struct containing UserAuthorization and TurnContext for token generation.
     /// </summary>
-    internal class AgenticTokenStruct
+    public class AgenticTokenStruct
     {
         /// <summary>
         /// UserAuthorization instance used to acquire tokens.

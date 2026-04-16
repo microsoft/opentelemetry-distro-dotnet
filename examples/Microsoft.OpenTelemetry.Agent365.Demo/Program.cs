@@ -28,6 +28,8 @@ builder.Services.AddOpenTelemetry()
     .UseMicrosoftOpenTelemetry(o =>
     {
         o.Exporters = ExportTarget.Console | ExportTarget.Agent365;
+        // Token resolver is auto-registered via AddAgenticTracingExporter internally.
+        // To use a custom resolver, set: o.Agent365.Exporter.TokenResolver = ...
     })
     .WithTracing(tracing => tracing
         .AddSource(
