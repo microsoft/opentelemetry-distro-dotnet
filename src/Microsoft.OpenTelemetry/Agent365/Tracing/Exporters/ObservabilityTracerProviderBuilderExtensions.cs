@@ -23,7 +23,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Tracing.Exporters
         /// </summary>
         /// <param name="builder">The TracerProviderBuilder to configure.</param>
         /// <param name="exporterType">The Agent365 exporter type to use.</param>
-        internal static TracerProviderBuilder AddAgent365Exporter(this TracerProviderBuilder builder, Agent365ExporterType exporterType = Agent365ExporterType.Agent365Exporter)
+        internal static TracerProviderBuilder AddAgent365Exporter(this TracerProviderBuilder builder, Agent365ExporterType exporterType = Agent365ExporterType.Agent365ExporterAsync)
         {
             if (builder == null)
             {
@@ -45,7 +45,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Tracing.Exporters
         /// <param name="builder">The TracerProviderBuilder to configure.</param>
         /// <param name="serviceCollection">The service collection to use for dependency injection.</param>
         /// <param name="exporterType">The Agent365 exporter type to use.</param>
-        internal static TracerProviderBuilder AddAgent365Exporter(this TracerProviderBuilder builder, IServiceCollection serviceCollection, Agent365ExporterType exporterType = Agent365ExporterType.Agent365Exporter)
+        internal static TracerProviderBuilder AddAgent365Exporter(this TracerProviderBuilder builder, IServiceCollection serviceCollection, Agent365ExporterType exporterType = Agent365ExporterType.Agent365ExporterAsync)
         {
             if (builder == null)
             {
