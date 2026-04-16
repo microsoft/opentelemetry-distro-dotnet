@@ -3,7 +3,7 @@
 
 namespace Microsoft.OpenTelemetry.AgentFramework;
 
-using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using System.Diagnostics;
 using System.Text.Json;
 

@@ -5,17 +5,17 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Diagnostics;
 using System.Text.Json;
 using FluentAssertions;
-using Microsoft.OpenTelemetry.Agent365.Common;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Contracts;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
-using Microsoft.OpenTelemetry.Agent365.Tests.Tracing;
-using Microsoft.OpenTelemetry.Agent365.Tests.Tracing.Scopes;
-using Microsoft.OpenTelemetry.Agent365.DTOs;
+using Microsoft.Agents.A365.Observability.Runtime.Common;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Runtime.Tests.Tracing;
+using Microsoft.Agents.A365.Observability.Runtime.Tests.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Runtime.DTOs;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using global::OpenTelemetry.Resources;
 
-namespace Microsoft.OpenTelemetry.Agent365.Tests.Common;
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Common;
 
 public sealed class TestScope : OpenTelemetryScope
 {

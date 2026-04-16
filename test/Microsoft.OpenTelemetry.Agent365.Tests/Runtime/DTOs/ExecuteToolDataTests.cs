@@ -3,10 +3,10 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 // Licensed under the MIT License.
 
 using FluentAssertions;
-using Microsoft.OpenTelemetry.Agent365.DTOs;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Runtime.DTOs;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 
-namespace Microsoft.OpenTelemetry.Agent365.Tests.DTOs
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs
 {
     [TestClass]
     public class ExecuteToolDataTests

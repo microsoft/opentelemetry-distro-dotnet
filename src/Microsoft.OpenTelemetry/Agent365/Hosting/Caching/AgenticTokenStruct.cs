@@ -4,7 +4,7 @@ using Microsoft.Agents.Builder;
 using Microsoft.Agents.Builder.App.UserAuth;
 using System;
 
-namespace Microsoft.OpenTelemetry.Agent365.Hosting.Caching
+namespace Microsoft.Agents.A365.Observability.Hosting.Caching
 {
     /// <summary>
     /// Struct containing UserAuthorization and TurnContext for token generation.

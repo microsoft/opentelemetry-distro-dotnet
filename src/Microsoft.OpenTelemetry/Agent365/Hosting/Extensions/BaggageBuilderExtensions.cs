@@ -1,10 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 using System;
-using Microsoft.OpenTelemetry.Agent365.Common;
+using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.Builder;
 
-namespace Microsoft.OpenTelemetry.Agent365.Hosting.Extensions
+namespace Microsoft.Agents.A365.Observability.Hosting.Extensions
 {
     /// <summary>
     /// Utility class for BaggageBuilder extensions.

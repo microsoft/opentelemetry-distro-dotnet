@@ -1,6 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using global::OpenTelemetry;
 using System.Diagnostics;
 

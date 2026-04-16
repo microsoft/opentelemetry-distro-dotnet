@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 using System.Threading.Tasks;
 
-namespace Microsoft.OpenTelemetry.Agent365.Hosting.Caching
+namespace Microsoft.Agents.A365.Observability.Hosting.Caching
 {
     /// <summary>
     /// Cache only for observability (exporter) scoped tokens per (agentId, tenantId).

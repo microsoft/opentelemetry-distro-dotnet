@@ -3,15 +3,15 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 // Licensed under the MIT License.
 
 using FluentAssertions;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Contracts;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Exporters;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Net;
 using System.Text.Json;
 
-namespace Microsoft.OpenTelemetry.Agent365.Tests.IntegrationTests
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests.IntegrationTests
 {
     [TestClass]
     public class Agent365ExporterAsyncE2ETests

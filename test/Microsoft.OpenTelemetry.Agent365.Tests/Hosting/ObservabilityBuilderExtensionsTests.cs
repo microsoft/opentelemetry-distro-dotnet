@@ -1,6 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using FluentAssertions;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Exporters;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using global::OpenTelemetry.Trace;
 
-namespace Microsoft.OpenTelemetry.Agent365.Hosting.Tests
+namespace Microsoft.Agents.A365.Observability.Hosting.Tests
 {
     [TestClass]
     public class ObservabilityBuilderExtensionsTests

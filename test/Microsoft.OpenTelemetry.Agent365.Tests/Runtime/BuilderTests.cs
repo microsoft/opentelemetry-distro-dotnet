@@ -3,14 +3,14 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 // Licensed under the MIT License.
 
 using FluentAssertions;
-using Microsoft.OpenTelemetry.Agent365;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Exporters;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Runtime;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using global::OpenTelemetry.Trace;
 
-namespace Microsoft.OpenTelemetry.Agent365.Tests;
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests;
 
 /// <summary>
 /// Tests to verify direct usage of the public Builder constructor and Build().
@@ -24,7 +24,7 @@ public sealed class BuilderTests
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder().Build();
 
-        var builder = new Microsoft.OpenTelemetry.Agent365.Builder(services: services, configuration: configuration, useOpenTelemetryBuilder: true);
+        var builder = new Microsoft.Agents.A365.Observability.Runtime.Builder(services: services, configuration: configuration, useOpenTelemetryBuilder: true);
 
         var result = builder.Build();
 
@@ -38,7 +38,7 @@ public sealed class BuilderTests
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder().Build();
 
-        var builder = new Microsoft.OpenTelemetry.Agent365.Builder(services: services, configuration: configuration, useOpenTelemetryBuilder: false);
+        var builder = new Microsoft.Agents.A365.Observability.Runtime.Builder(services: services, configuration: configuration, useOpenTelemetryBuilder: false);
 
         var result = builder.Build();
 
@@ -51,7 +51,7 @@ public sealed class BuilderTests
     {
         var services = new ServiceCollection();
 
-        var builder = new Microsoft.OpenTelemetry.Agent365.Builder(services: services, configuration: null, useOpenTelemetryBuilder: true);
+        var builder = new Microsoft.Agents.A365.Observability.Runtime.Builder(services: services, configuration: null, useOpenTelemetryBuilder: true);
 
         var result = builder.Build();
 
@@ -76,7 +76,7 @@ public sealed class BuilderTests
                 UseS2SEndpoint = false
             });
 
-            var builder = new Microsoft.OpenTelemetry.Agent365.Builder(
+            var builder = new Microsoft.Agents.A365.Observability.Runtime.Builder(
                 services: services,
                 configuration: configuration,
                 useOpenTelemetryBuilder: true,
@@ -111,7 +111,7 @@ public sealed class BuilderTests
                 UseS2SEndpoint = false
             });
 
-            var builder = new Microsoft.OpenTelemetry.Agent365.Builder(
+            var builder = new Microsoft.Agents.A365.Observability.Runtime.Builder(
                 services: services,
                 configuration: configuration,
                 useOpenTelemetryBuilder: true,
@@ -145,7 +145,7 @@ public sealed class BuilderTests
                 UseS2SEndpoint = false
             });
 
-            var builder = new Microsoft.OpenTelemetry.Agent365.Builder(
+            var builder = new Microsoft.Agents.A365.Observability.Runtime.Builder(
                 services: services,
                 configuration: configuration,
                 useOpenTelemetryBuilder: false,
@@ -182,7 +182,7 @@ public sealed class BuilderTests
                 UseS2SEndpoint = false
             });
 
-            var builder = new Microsoft.OpenTelemetry.Agent365.Builder(
+            var builder = new Microsoft.Agents.A365.Observability.Runtime.Builder(
                 services: services,
                 configuration: configuration,
                 useOpenTelemetryBuilder: false,

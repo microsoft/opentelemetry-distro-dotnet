@@ -1,9 +1,9 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-namespace Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel;
+namespace Microsoft.Agents.A365.Observability.Extensions.SemanticKernel;
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.OpenTelemetry.Agent365;
+using Microsoft.Agents.A365.Observability.Runtime;
 using Microsoft.SemanticKernel;
 using global::OpenTelemetry.Trace;
 using global::OpenTelemetry;

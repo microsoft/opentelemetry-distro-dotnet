@@ -3,12 +3,12 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 // Licensed under the MIT License.
 
 using FluentAssertions;
-using Microsoft.OpenTelemetry.Agent365.DTOs;
-using Microsoft.OpenTelemetry.Agent365.DTOs.Builders;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Contracts;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Runtime.DTOs;
+using Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 
-namespace Microsoft.OpenTelemetry.Agent365.Tests.DTOs.Builders
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
 {
     [TestClass]
     public class BaseDataBuilderTests

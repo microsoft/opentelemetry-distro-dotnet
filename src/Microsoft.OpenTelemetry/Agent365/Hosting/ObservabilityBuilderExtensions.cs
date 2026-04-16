@@ -1,10 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-namespace Microsoft.OpenTelemetry.Agent365.Hosting
+namespace Microsoft.Agents.A365.Observability.Hosting
 {
     using System;
-    using Microsoft.OpenTelemetry.Agent365;
-    using Microsoft.OpenTelemetry.Agent365.Tracing.Exporters;
+    using Microsoft.Agents.A365.Observability.Runtime;
+    using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.Extensions.Hosting;
 

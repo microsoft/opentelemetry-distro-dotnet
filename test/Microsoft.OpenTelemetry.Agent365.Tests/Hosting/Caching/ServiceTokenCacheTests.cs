@@ -1,8 +1,8 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using FluentAssertions;
-using Microsoft.OpenTelemetry.Agent365.Hosting.Caching;
+using Microsoft.Agents.A365.Observability.Hosting.Caching;
 
-namespace Microsoft.OpenTelemetry.Agent365.Hosting.Tests.Caching;
+namespace Microsoft.Agents.A365.Observability.Hosting.Tests.Caching;
 
 [TestClass]
 public sealed class ServiceTokenCacheTests

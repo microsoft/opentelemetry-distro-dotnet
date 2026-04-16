@@ -1,15 +1,15 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace Microsoft.OpenTelemetry.Agent365.Tests.Tracing;
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Tracing;
 
 using System.Diagnostics;
 using FluentAssertions;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Processors;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
 using global::OpenTelemetry;
 using global::OpenTelemetry.Trace;
-using static Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.OpenTelemetryConstants;
+using static Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants;
 
 public abstract class ActivityTest
 {

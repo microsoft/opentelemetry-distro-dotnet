@@ -3,12 +3,12 @@
 
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.OpenTelemetry.Agent365.Hosting.Extensions;
-using Microsoft.OpenTelemetry.Agent365.Common;
+using Microsoft.Agents.A365.Observability.Hosting.Extensions;
+using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.Builder;
 using Microsoft.Agents.Core.Models;
 
-namespace Microsoft.OpenTelemetry.Agent365.Hosting.Middleware
+namespace Microsoft.Agents.A365.Observability.Hosting.Middleware
 {
     /// <summary>
     /// Bot Framework middleware that propagates OpenTelemetry baggage context

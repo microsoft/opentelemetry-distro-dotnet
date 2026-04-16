@@ -2,10 +2,10 @@
 // Licensed under the MIT License.
 
 using System.Collections.Generic;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Agents.Builder;
 
-namespace Microsoft.OpenTelemetry.Agent365.Hosting.Extensions
+namespace Microsoft.Agents.A365.Observability.Hosting.Extensions
 {
     /// <summary>
     /// Extension methods for extracting values from ITurnContext.

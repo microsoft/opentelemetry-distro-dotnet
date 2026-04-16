@@ -1,9 +1,9 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace Microsoft.OpenTelemetry.Agent365.Tests.Tracing.Scopes;
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Tracing.Scopes;
 
-using Microsoft.OpenTelemetry.Agent365.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
 
 public static class Util
 {

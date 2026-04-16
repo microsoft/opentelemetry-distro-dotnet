@@ -2,13 +2,13 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace Microsoft.OpenTelemetry.Agent365.Tests.Tracing.Scopes;
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Tracing.Scopes;
 
 using System;
 using FluentAssertions;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Contracts;
-using static Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.OpenTelemetryConstants;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using static Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants;
 
 [TestClass]
 public sealed class InferenceScopeTest : ActivityTest

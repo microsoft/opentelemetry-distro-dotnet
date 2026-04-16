@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models;
+namespace Microsoft.Agents.A365.Observability.Extensions.SemanticKernel.Models;
 
 using System.Text.Json.Serialization;
 

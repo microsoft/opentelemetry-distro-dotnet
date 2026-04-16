@@ -8,7 +8,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Microsoft.OpenTelemetry.Agent365.Hosting.Caching
+namespace Microsoft.Agents.A365.Observability.Hosting.Caching
 {
     /// <summary>
     /// Caches observability tokens per (agentId, tenantId) using the provided UserAuthorization and TurnContext.

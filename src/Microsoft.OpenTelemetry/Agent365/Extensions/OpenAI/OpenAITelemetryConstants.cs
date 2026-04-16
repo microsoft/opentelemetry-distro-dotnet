@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace Microsoft.OpenTelemetry.Agent365.Extensions.OpenAI;
+namespace Microsoft.Agents.A365.Observability.Extensions.OpenAI;
 
 /// <summary>
 /// Contains constants for operation names, tag names, and activity source names used in OpenAI tracing.
