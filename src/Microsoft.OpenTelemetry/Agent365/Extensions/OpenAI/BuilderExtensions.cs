@@ -25,8 +25,7 @@ internal static class BuilderExtensions
             AppContext.SetSwitch("OpenAI.Experimental.EnableOpenTelemetry", true);
             builder.Services.AddOpenTelemetry()
                 .WithTracing(tracing => tracing
-                    .AddSource(OpenAITelemetryConstants.OpenAISourceWildcard)
-                    .AddProcessor(new OpenAISpanProcessor()));
+                    .AddSource(OpenAITelemetryConstants.OpenAISourceWildcard));
         }
 
         return builder;

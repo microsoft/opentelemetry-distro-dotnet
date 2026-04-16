@@ -3,7 +3,6 @@
 
 using Microsoft.OpenTelemetry.Agent365;
 using Microsoft.OpenTelemetry.Agent365.Common;
-using Microsoft.OpenTelemetry.Agent365.Extensions.OpenAI;
 using Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel;
 using Microsoft.OpenTelemetry.Agent365.Tracing.Exporters;
 using Microsoft.OpenTelemetry.Agent365.Tracing.Processors;
@@ -75,8 +74,7 @@ internal static class Agent365OpenTelemetryBuilderExtensions
                 .AddSource(SemanticKernelTelemetryConstants.SemanticKernelSourceWildcard)
                 .AddSource("Azure.AI.OpenAI*")
                 .AddProcessor<ActivityProcessor>()
-                .AddProcessor(new SemanticKernelSpanProcessor())
-                .AddProcessor(new OpenAISpanProcessor());
+                .AddProcessor(new SemanticKernelSpanProcessor());
 
             // Agent365 Exporter (enabled when not skipped)
             if (!options.SkipExporter)

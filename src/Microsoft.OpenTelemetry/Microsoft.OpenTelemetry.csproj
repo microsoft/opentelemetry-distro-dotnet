@@ -54,7 +54,6 @@
     <!-- Agent365 extensions -->
     <PackageReference Include="Microsoft.SemanticKernel" />
     <PackageReference Include="Microsoft.SemanticKernel.Agents.Core" />
-    <PackageReference Include="Azure.AI.OpenAI" />
     <PackageReference Include="Microsoft.Agents.Builder" />
     <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>

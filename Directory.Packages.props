@@ -20,7 +20,6 @@
     <!-- Agent365 dependencies -->
     <PackageVersion Include="Microsoft.SemanticKernel" Version="1.71.0" />
     <PackageVersion Include="Microsoft.SemanticKernel.Agents.Core" Version="1.71.0" />
-    <PackageVersion Include="Azure.AI.OpenAI" Version="2.7.0-beta.2" />
     <PackageVersion Include="Microsoft.Agents.Builder" Version="1.4.83" />
     <PackageVersion Include="Microsoft.Agents.AI" Version="1.0.0" />
     <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0" />
