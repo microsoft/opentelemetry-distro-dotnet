@@ -2,10 +2,10 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-using Microsoft.OpenTelemetry.Agent365.Etw;
+using Microsoft.Agents.A365.Observability.Runtime.Etw;
 using System.Diagnostics.Tracing;
 
-namespace Microsoft.OpenTelemetry.Agent365.Tests.Etw
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
 {
     [TestClass]
     public class EtwEventSourceTests

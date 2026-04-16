@@ -2,9 +2,9 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-using Microsoft.OpenTelemetry.Agent365.Common;
+using Microsoft.Agents.A365.Observability.Runtime.Common;
 
-namespace Microsoft.OpenTelemetry.Agent365.Tests.Common;
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Common;
 
 [TestClass]
 public class EnvironmentUtilsTests

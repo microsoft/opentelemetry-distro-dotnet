@@ -1,16 +1,16 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.OpenTelemetry.Agent365.Common;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Exporters;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Runtime.Common;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using global::OpenTelemetry;
 using global::OpenTelemetry.Resources;
 using System.Diagnostics;
 using System.Reflection;
 using System.Net;
 
-namespace Microsoft.OpenTelemetry.Agent365.Tests.Tracing.Exporters;
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Tracing.Exporters;
 
 [TestClass]
 public sealed class Agent365ExporterTests

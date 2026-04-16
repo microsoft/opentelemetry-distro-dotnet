@@ -4,12 +4,12 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using System.Diagnostics;
 using System.Text.Json;
-using Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel;
-using Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models;
-using Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Utils;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Extensions.SemanticKernel;
+using Microsoft.Agents.A365.Observability.Extensions.SemanticKernel.Models;
+using Microsoft.Agents.A365.Observability.Extensions.SemanticKernel.Utils;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 
-namespace Microsoft.OpenTelemetry.Agent365.Tests.Extensions
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Extensions
 {
     [TestClass]
     public class SemanticKernelSpanProcessorHelperTests

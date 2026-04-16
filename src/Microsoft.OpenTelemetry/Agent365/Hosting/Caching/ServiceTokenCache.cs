@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Microsoft.OpenTelemetry.Agent365.Hosting.Caching
+namespace Microsoft.Agents.A365.Observability.Hosting.Caching
 {
     /// <summary>
     /// Caches observability tokens per (agentId, tenantId) with expiration and invalidation support.

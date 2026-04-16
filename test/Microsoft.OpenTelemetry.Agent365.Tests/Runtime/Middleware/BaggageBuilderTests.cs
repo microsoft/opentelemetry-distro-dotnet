@@ -1,15 +1,15 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace Microsoft.OpenTelemetry.Agent365.Tests.Middleware;
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Middleware;
 
 using System.Net;
 using FluentAssertions;
-using Microsoft.OpenTelemetry.Agent365.Common;
+using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using global::OpenTelemetry;
 
-using static Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.OpenTelemetryConstants;
+using static Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants;
 
 [TestClass]
 public sealed class BaggageBuilderTest

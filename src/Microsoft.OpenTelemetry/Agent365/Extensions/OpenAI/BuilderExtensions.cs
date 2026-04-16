@@ -1,10 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace Microsoft.OpenTelemetry.Agent365.Extensions.OpenAI;
+namespace Microsoft.Agents.A365.Observability.Extensions.OpenAI;
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.OpenTelemetry.Agent365;
+using Microsoft.Agents.A365.Observability.Runtime;
 using global::OpenTelemetry.Trace;
 
 /// <summary>

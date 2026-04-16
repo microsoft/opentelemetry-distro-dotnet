@@ -5,10 +5,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.OpenTelemetry.Agent365.Hosting.Middleware;
+using Microsoft.Agents.A365.Observability.Hosting.Middleware;
 using System.Text.Json;
 
-namespace Microsoft.OpenTelemetry.Agent365.Hosting.Tests.Middleware;
+namespace Microsoft.Agents.A365.Observability.Hosting.Tests.Middleware;
 
 [TestClass]
 public class ObservabilityBaggageMiddlewareTests

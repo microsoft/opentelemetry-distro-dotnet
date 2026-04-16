@@ -1,10 +1,10 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using FluentAssertions;
-using Microsoft.OpenTelemetry.Agent365;
+using Microsoft.Agents.A365.Observability.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-namespace Microsoft.OpenTelemetry.Agent365.Tests;
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests;
 
 /// <summary>
 /// Test to verify that the new builder pattern works as expected in the issue example.

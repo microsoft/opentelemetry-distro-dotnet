@@ -1,10 +1,10 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Exporters;
-using Microsoft.OpenTelemetry.Agent365.Hosting.Caching;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
+using Microsoft.Agents.A365.Observability.Hosting.Caching;
 
-namespace Microsoft.OpenTelemetry.Agent365.Hosting.Tests.Extensions;
+namespace Microsoft.Agents.A365.Observability.Hosting.Tests.Extensions;
 
 /// <summary>
 /// Tests for Agent 365 extension methods.

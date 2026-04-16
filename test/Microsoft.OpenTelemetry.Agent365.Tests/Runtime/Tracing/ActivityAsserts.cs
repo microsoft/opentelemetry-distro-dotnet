@@ -1,4 +1,4 @@
-namespace Microsoft.OpenTelemetry.Agent365.Tests.Tracing;
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Tracing;
 
 using System.Diagnostics;
 using FluentAssertions;

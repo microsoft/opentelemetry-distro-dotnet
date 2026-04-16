@@ -2,12 +2,12 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace Microsoft.OpenTelemetry.Agent365.Tests.Tracing.Scopes;
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Tracing.Scopes;
 
 using System.Diagnostics;
 using FluentAssertions;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Contracts;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 
 [TestClass]
 public sealed class OutputScopeTest : ActivityTest

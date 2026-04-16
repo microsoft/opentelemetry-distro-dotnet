@@ -2,16 +2,16 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-using Microsoft.OpenTelemetry.Agent365.Etw;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Contracts;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Runtime.Etw;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics.Tracing;
 using System.Net;
 using System.Text.Json;
 
-namespace Microsoft.OpenTelemetry.Agent365.Tests.Etw
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
 {
     [TestClass]
     public class EtwLoggingBuilderTests

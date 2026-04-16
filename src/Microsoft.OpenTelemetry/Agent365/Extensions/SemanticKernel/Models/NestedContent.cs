@@ -3,7 +3,7 @@
 
 using System.Text.Json.Serialization;
 
-namespace Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models;
+namespace Microsoft.Agents.A365.Observability.Extensions.SemanticKernel.Models;
 
 /// <summary>
 /// Represents a nested content structure that may appear within a MessageContent's Content property.

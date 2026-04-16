@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel;
+namespace Microsoft.Agents.A365.Observability.Extensions.SemanticKernel;
 
 /// <summary>
 /// Contains constants for operation names, tag names, and activity source names used in SemanticKernel and OpenAI tracing.

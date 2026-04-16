@@ -3,7 +3,7 @@
 
 using System.Text.Json.Serialization;
 
-namespace Microsoft.OpenTelemetry.Agent365.Extensions.SemanticKernel.Models;
+namespace Microsoft.Agents.A365.Observability.Extensions.SemanticKernel.Models;
 
 /// <summary>
 /// Represents the structure of a message as found in OpenTelemetry activity events and invocation input tags.

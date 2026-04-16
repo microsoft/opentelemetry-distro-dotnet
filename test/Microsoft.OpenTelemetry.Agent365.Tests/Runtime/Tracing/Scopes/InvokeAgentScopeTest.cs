@@ -2,15 +2,15 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace Microsoft.OpenTelemetry.Agent365.Tests.Tracing.Scopes;
+namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Tracing.Scopes;
 
 using System;
 using System.Diagnostics;
 using System.Net;
 using FluentAssertions;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Contracts;
-using static Microsoft.OpenTelemetry.Agent365.Tracing.Scopes.OpenTelemetryConstants;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using static Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants;
 
 [TestClass]
 public sealed class InvokeAgentScopeTest : ActivityTest
@@ -347,7 +347,7 @@ public sealed class InvokeAgentScopeTest : ActivityTest
         var serverPort = "8443";
 
         // Act - set server address/port in baggage, then start an invoke_agent span
-        using (new Microsoft.OpenTelemetry.Agent365.Common.BaggageBuilder()
+        using (new Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder()
             .InvokeAgentServer(serverAddress, 8443)
             .Build())
         {

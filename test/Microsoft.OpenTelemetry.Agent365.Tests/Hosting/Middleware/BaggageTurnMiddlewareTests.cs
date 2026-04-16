@@ -3,14 +3,14 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 // Licensed under the MIT License.
 
 using FluentAssertions;
-using Microsoft.OpenTelemetry.Agent365.Hosting.Middleware;
-using Microsoft.OpenTelemetry.Agent365.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Hosting.Middleware;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Agents.Builder;
 using Microsoft.Agents.Core.Models;
 using Moq;
 using global::OpenTelemetry;
 
-namespace Microsoft.OpenTelemetry.Agent365.Hosting.Tests.Middleware;
+namespace Microsoft.Agents.A365.Observability.Hosting.Tests.Middleware;
 
 [TestClass]
 public class BaggageTurnMiddlewareTests
