@@ -16,6 +16,7 @@
     <!-- Azure Monitor exporter -->
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.7.0" />
     <PackageVersion Include="Azure.Identity" Version="1.17.1" />
+    <PackageVersion Include="Azure.AI.OpenAI" Version="2.7.0-beta.2" />
 
     <!-- Agent365 dependencies -->
     <PackageVersion Include="Microsoft.SemanticKernel" Version="1.71.0" />
