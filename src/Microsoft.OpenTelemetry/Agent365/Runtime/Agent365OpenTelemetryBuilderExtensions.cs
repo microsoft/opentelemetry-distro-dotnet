@@ -83,8 +83,11 @@ internal static class Agent365OpenTelemetryBuilderExtensions
                 .AddSource(OpenTelemetryConstants.SourceName)
                 .AddSource(SemanticKernelTelemetryConstants.SemanticKernelSourceWildcard)
                 .AddSource("Azure.AI.OpenAI*")
+                .AddSource("OpenAI.*")
                 .AddSource("Experimental.Microsoft.Extensions.AI")
                 .AddSource("Experimental.Microsoft.Agents.AI")
+                .AddSource("Experimental.Microsoft.Agents.AI.Agent")
+                .AddSource("Experimental.Microsoft.Agents.AI.ChatClient")
                 .AddProcessor<ActivityProcessor>()
                 .AddProcessor(new SemanticKernelSpanProcessor());
 
