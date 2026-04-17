@@ -44,7 +44,7 @@ internal static class Agent365OpenTelemetryBuilderExtensions
     /// <item>Agent365 activity source for tracing scopes (InvokeAgent, Inference, ExecuteTool, Output).</item>
     /// <item>Baggage-to-tags activity processor for context propagation.</item>
     /// <item>Agent365 exporter when <c>TokenResolver</c> is configured.</item>
-    /// <item>Optional framework integrations: Semantic Kernel, Agent Framework, Azure OpenAI.</item>
+    /// <item>Optional framework integrations: Agent Framework, Azure OpenAI.</item>
     /// </list>
     /// <para>Usage:</para>
     /// <code>
@@ -52,9 +52,6 @@ internal static class Agent365OpenTelemetryBuilderExtensions
     ///     .UseAgent365(o =>
     ///     {
     ///         o.Exporter.TokenResolver = (agentId, tenantId) => GetTokenAsync(agentId, tenantId);
-    ///         o.WithSemanticKernel()
-    ///          .WithAgentFramework()
-    ///          .WithOpenAI();
     ///     });
     /// </code>
     /// </remarks>
@@ -108,9 +105,6 @@ internal static class Agent365OpenTelemetryBuilderExtensions
                 tracing.AddAgent365Exporter();
             }
         });
-
-        // Register SK function invocation filter
-        builder.Services.AddSingleton<Microsoft.SemanticKernel.IFunctionInvocationFilter, FunctionInvocationFilter>();
 
         return builder;
     }

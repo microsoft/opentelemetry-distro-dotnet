@@ -29,7 +29,6 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
     /// {
     ///     o.AzureMonitor.ConnectionString = "InstrumentationKey=...";
     ///     o.Agent365.Exporter.TokenResolver = (agentId, tenantId) => GetTokenAsync(agentId, tenantId);
-    ///     o.Agent365.WithSemanticKernel().WithOpenAI();
     ///     o.OtlpEndpoint = new Uri("http://localhost:4317");
     /// });
     /// </code>
@@ -73,7 +72,6 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
     ///
     ///         // Agent365
     ///         o.Agent365.Exporter.TokenResolver = (agentId, tenantId) => GetTokenAsync(agentId, tenantId);
-    ///         o.Agent365.WithSemanticKernel().WithOpenAI();
     ///     });
     /// </code>
     /// </remarks>
