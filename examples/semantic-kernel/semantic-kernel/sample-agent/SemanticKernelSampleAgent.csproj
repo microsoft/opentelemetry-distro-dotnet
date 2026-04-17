@@ -1,0 +1,45 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<LangVersion>latest</LangVersion>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+		<NoWarn>$(NoWarn);SKEXP0010;CS1591;CS1572;CS1573</NoWarn>
+		<UserSecretsId>b842df34-390f-490d-9dc0-73909363ad16</UserSecretsId>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Compile Remove="wwwroot\**" />
+		<Content Remove="wwwroot\**" />
+		<EmbeddedResource Remove="wwwroot\**" />
+		<None Remove="wwwroot\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Microsoft OpenTelemetry Distro (replaces A365 Observability + OTel individual packages) -->
+		<ProjectReference Include="..\..\..\..\src\Microsoft.OpenTelemetry\Microsoft.OpenTelemetry.csproj" />
+
+		<!-- A365 SDK Packages (non-observability) -->
+		<PackageReference Include="Microsoft.Agents.A365.Notifications" Version="0.2.152-beta" />
+		<PackageReference Include="Microsoft.Agents.A365.Tooling.Extensions.SemanticKernel" Version="0.2.152-beta" />
+
+		<!-- Agent Framework Packages -->
+		<PackageReference Include="Azure.Identity" Version="1.19.0" />
+		<PackageReference Include="AdaptiveCards" Version="3.1.0" />
+		<PackageReference Include="Microsoft.SemanticKernel.Agents.AzureAI" Version="1.74.0-preview" />
+		<PackageReference Include="Microsoft.SemanticKernel.Agents.Core" Version="1.74.0" />
+		<PackageReference Include="Microsoft.SemanticKernel" Version="1.74.0" />
+		<PackageReference Include="Microsoft.SemanticKernel.Connectors.AzureOpenAI" Version="1.74.0" />
+		<PackageReference Include="Microsoft.SemanticKernel.Connectors.OpenAI" Version="1.74.0" />
+		<PackageReference Include="Microsoft.Agents.Authentication.Msal" Version="1.4.*-*" />
+		<PackageReference Include="Microsoft.Agents.Hosting.AspNetCore" Version="1.4.*-*" />
+		<PackageReference Include="ModelContextProtocol.Core" Version="0.3.0-preview.4" />
+
+		<!-- Additional Packages -->
+		<PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.9.0" />
+		<PackageReference Include="Microsoft.Extensions.ServiceDiscovery" Version="9.5.0" />
+	</ItemGroup>
+
+</Project>
