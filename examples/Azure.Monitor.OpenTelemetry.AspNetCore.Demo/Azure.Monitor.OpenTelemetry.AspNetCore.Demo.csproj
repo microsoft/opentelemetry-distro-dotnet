@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Microsoft.OpenTelemetry\Microsoft.OpenTelemetry.csproj" />
+    <PackageReference Include="Microsoft.OpenTelemetry" />
   </ItemGroup>
 
 </Project>

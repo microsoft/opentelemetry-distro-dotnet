@@ -42,5 +42,6 @@
     <PackageVersion Include="FluentAssertions" Version="6.12.1" />
     <PackageVersion Include="MSTest.TestAdapter" Version="3.8.0" />
     <PackageVersion Include="MSTest.TestFramework" Version="3.8.0" />
+    <PackageVersion Include="Microsoft.OpenTelemetry" Version="1.0.0-alpha.1" />
   </ItemGroup>
 </Project>

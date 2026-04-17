@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
@@ -15,7 +15,7 @@
 
 	<ItemGroup>
 		<!-- Microsoft OpenTelemetry Distro (replaces A365 Observability + OTel individual packages) -->
-		<ProjectReference Include="..\..\src\Microsoft.OpenTelemetry\Microsoft.OpenTelemetry.csproj" />
+		<PackageReference Include="Microsoft.OpenTelemetry" Version="1.0.0-alpha.1" />
 
 		<!-- A365 SDK Packages (non-observability) -->
 		<PackageReference Include="Microsoft.Agents.A365.Notifications" Version="0.2.151-beta" />
@@ -28,7 +28,7 @@
 		<PackageReference Include="Microsoft.Agents.AI" Version="1.0.0" />
 		<PackageReference Include="Microsoft.Agents.Authentication.Msal" Version="1.4.*" />
 		<PackageReference Include="Microsoft.Agents.Hosting.AspNetCore" Version="1.4.*" />
-		<PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.0.1-preview.1.25571.5" />
+		<PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.4.0" />
 
 		<!-- Additional Packages -->
 		<PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.9.0" />
