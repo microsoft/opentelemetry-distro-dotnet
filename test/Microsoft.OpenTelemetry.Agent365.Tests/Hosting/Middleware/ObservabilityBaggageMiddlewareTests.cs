@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Agents.A365.Observability.Hosting.Middleware;
-using System.Text.Json;
 
 namespace Microsoft.Agents.A365.Observability.Hosting.Tests.Middleware;
 
@@ -26,10 +25,9 @@ public class ObservabilityBaggageMiddlewareTests
                 app.UseRouting();
                 app.UseEndpoints(endpoints =>
                 {
-                    endpoints.MapGet("/", (HttpContext ctx) =>
+                    endpoints.MapGet("/", async (HttpContext ctx) =>
                     {
-                        var (tenant, agent) = ("tenant-abc", "agent-xyz");
-                        return Results.Json(new { tenant, agent });
+                        await ctx.Response.WriteAsync("tenant-abc|agent-xyz");
                     });
                 });
             });
@@ -39,12 +37,9 @@ public class ObservabilityBaggageMiddlewareTests
 
         // Act
         var response = await client.GetAsync("/");
-        var json = await response.Content.ReadAsStringAsync();
+        var body = await response.Content.ReadAsStringAsync();
 
         // Assert
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-        Assert.AreEqual("tenant-abc", root.GetProperty("tenant").GetString());
-        Assert.AreEqual("agent-xyz", root.GetProperty("agent").GetString());
+        Assert.AreEqual("tenant-abc|agent-xyz", body);
     }
 }
