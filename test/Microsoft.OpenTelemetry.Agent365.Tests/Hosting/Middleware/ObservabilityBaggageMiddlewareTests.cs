@@ -1,10 +1,8 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Microsoft.AspNetCore.Builder;
+﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Agents.A365.Observability.Hosting.Middleware;
 using System.Text.Json;
 
@@ -16,34 +14,28 @@ public class ObservabilityBaggageMiddlewareTests
     [TestMethod]
     public async Task Middleware_UsesResolverValues()
     {
-        // Arrange — use HostBuilder (WebHostBuilder is deprecated in net10.0)
-        using var host = new HostBuilder()
-            .ConfigureWebHost(webBuilder =>
+        // Arrange
+        var builder = new WebHostBuilder()
+            .ConfigureServices(services =>
             {
-                webBuilder.UseTestServer();
-                webBuilder.ConfigureServices(services =>
+                services.AddRouting();
+            })
+            .Configure(app =>
+            {
+                app.UseObservabilityRequestContext(ctx => ("tenant-abc", "agent-xyz"));
+                app.UseRouting();
+                app.UseEndpoints(endpoints =>
                 {
-                    services.AddRouting();
-                });
-                webBuilder.Configure(app =>
-                {
-                    app.UseObservabilityRequestContext(ctx => ("tenant-abc", "agent-xyz"));
-                    app.UseRouting();
-                    app.UseEndpoints(endpoints =>
+                    endpoints.MapGet("/", (HttpContext ctx) =>
                     {
-                        endpoints.MapGet("/", async (HttpContext ctx) =>
-                        {
-                            ctx.Response.ContentType = "application/json";
-                            await ctx.Response.WriteAsync(
-                                JsonSerializer.Serialize(new { tenant = "tenant-abc", agent = "agent-xyz" }));
-                        });
+                        var (tenant, agent) = ("tenant-abc", "agent-xyz");
+                        return Results.Json(new { tenant, agent });
                     });
                 });
-            })
-            .Build();
+            });
 
-        await host.StartAsync();
-        var client = host.GetTestClient();
+        using var server = new TestServer(builder);
+        var client = server.CreateClient();
 
         // Act
         var response = await client.GetAsync("/");

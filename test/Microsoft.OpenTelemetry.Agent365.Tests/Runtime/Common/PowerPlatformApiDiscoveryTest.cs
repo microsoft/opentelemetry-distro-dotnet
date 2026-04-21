@@ -1,5 +1,4 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Microsoft.Agents.A365.Observability.Runtime.Common;
+﻿using Microsoft.Agents.A365.Observability.Runtime.Common;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Common;
 

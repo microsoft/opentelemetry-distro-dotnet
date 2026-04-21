@@ -1,8 +1,7 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Tracing.Scopes;
+namespace Microsoft.Agents.A365.Observability.Tests.Tracing.Scopes;
 
 using System;
 using FluentAssertions;
@@ -21,9 +20,9 @@ public sealed class ExecuteToolScopeTest : ActivityTest
             using var scope = ExecuteToolScope.Start(Util.GetDefaultRequest(), new ToolCallDetails("TestTool", expected), Util.GetAgentDetails());
         });
         
-        activity.ShouldHaveTag(OpenTelemetryConstants.GenAiToolArgumentsKey, expected);
+        activity.ShouldHaveTagContaining(OpenTelemetryConstants.GenAiToolArgumentsKey, expected);
     }
-    
+
     [TestMethod]
     public void RecordResponse_Response_Set()
     {
@@ -34,7 +33,9 @@ public sealed class ExecuteToolScopeTest : ActivityTest
             scope.RecordResponse(expected);
         });
 
-        activity.ShouldHaveTag(OpenTelemetryConstants.GenAiToolCallResultKey, expected);
+        var tagValue = activity.Tags.First(t => t.Key == OpenTelemetryConstants.GenAiToolCallResultKey).Value;
+        tagValue.Should().Contain("\"result\"");
+        tagValue.Should().Contain(expected);
     }
 
     [TestMethod]

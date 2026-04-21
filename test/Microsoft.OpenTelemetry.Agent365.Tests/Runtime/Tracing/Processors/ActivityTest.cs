@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Tracing;
+namespace Microsoft.Agents.A365.Observability.Tests.Tracing;
 
 using System.Diagnostics;
 using FluentAssertions;

@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Tracing.Scopes;
+namespace Microsoft.Agents.A365.Observability.Tests.Tracing.Scopes;
 
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
 

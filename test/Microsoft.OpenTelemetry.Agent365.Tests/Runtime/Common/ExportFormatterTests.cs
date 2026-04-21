@@ -1,4 +1,3 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
@@ -8,8 +7,8 @@ using FluentAssertions;
 using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
-using Microsoft.Agents.A365.Observability.Runtime.Tests.Tracing;
-using Microsoft.Agents.A365.Observability.Runtime.Tests.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Tests.Tracing;
+using Microsoft.Agents.A365.Observability.Tests.Tracing.Scopes;
 using Microsoft.Agents.A365.Observability.Runtime.DTOs;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -243,7 +242,6 @@ public partial class ExportFormatterTests : ActivityTest
     }
 
     [TestMethod]
-    [Ignore("Test pollution: passes in isolation but fails in full suite due to Activity.Current state from other tests.")]
     public void Format_NullOrEmptyAttributes_AreOmitted()
     {
         // Arrange
@@ -398,7 +396,6 @@ public partial class ExportFormatterTests : ActivityTest
     }
 
     [TestMethod]
-    [Ignore("Test pollution: passes in isolation but fails in full suite due to Activity.Current state from other tests.")]
     public void FormatSingle_Activity_NullOrEmptyAttributesAreOmitted()
     {
         // Arrange
