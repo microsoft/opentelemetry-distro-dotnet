@@ -5,7 +5,7 @@
     <AssemblyTitle>Microsoft OpenTelemetry Distro</AssemblyTitle>
     <RootNamespace>Microsoft.OpenTelemetry</RootNamespace>
     <AssemblyName>Microsoft.OpenTelemetry</AssemblyName>
-    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <TargetFrameworks>net8.0</TargetFrameworks>
     <PackageTags>OpenTelemetry;Telemetry;Azure Monitor;OTLP;Agent365;AgentFramework;AI;Agents;Distro</PackageTags>
     <NoWarn>$(NoWarn);SA1636;CS1591;NU1903;CS1574;RS0016;RS0017;RS0026;RS0041</NoWarn>
 
