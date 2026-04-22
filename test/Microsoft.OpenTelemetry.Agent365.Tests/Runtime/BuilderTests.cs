@@ -1,4 +1,3 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
@@ -9,8 +8,9 @@ using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using global::OpenTelemetry.Trace;
+using RuntimeBuilder = Microsoft.Agents.A365.Observability.Runtime.Builder;
 
-namespace Microsoft.Agents.A365.Observability.Runtime.Tests;
+namespace Microsoft.Agents.A365.Observability.Tests;
 
 /// <summary>
 /// Tests to verify direct usage of the public Builder constructor and Build().
@@ -24,7 +24,7 @@ public sealed class BuilderTests
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder().Build();
 
-        var builder = new Microsoft.Agents.A365.Observability.Runtime.Builder(services: services, configuration: configuration, useOpenTelemetryBuilder: true);
+        var builder = new RuntimeBuilder(services: services, configuration: configuration, useOpenTelemetryBuilder: true);
 
         var result = builder.Build();
 
@@ -38,7 +38,7 @@ public sealed class BuilderTests
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder().Build();
 
-        var builder = new Microsoft.Agents.A365.Observability.Runtime.Builder(services: services, configuration: configuration, useOpenTelemetryBuilder: false);
+        var builder = new RuntimeBuilder(services: services, configuration: configuration, useOpenTelemetryBuilder: false);
 
         var result = builder.Build();
 
@@ -51,7 +51,7 @@ public sealed class BuilderTests
     {
         var services = new ServiceCollection();
 
-        var builder = new Microsoft.Agents.A365.Observability.Runtime.Builder(services: services, configuration: null, useOpenTelemetryBuilder: true);
+        var builder = new RuntimeBuilder(services: services, configuration: null, useOpenTelemetryBuilder: true);
 
         var result = builder.Build();
 
@@ -76,7 +76,7 @@ public sealed class BuilderTests
                 UseS2SEndpoint = false
             });
 
-            var builder = new Microsoft.Agents.A365.Observability.Runtime.Builder(
+            var builder = new RuntimeBuilder(
                 services: services,
                 configuration: configuration,
                 useOpenTelemetryBuilder: true,
@@ -111,7 +111,7 @@ public sealed class BuilderTests
                 UseS2SEndpoint = false
             });
 
-            var builder = new Microsoft.Agents.A365.Observability.Runtime.Builder(
+            var builder = new RuntimeBuilder(
                 services: services,
                 configuration: configuration,
                 useOpenTelemetryBuilder: true,
@@ -145,7 +145,7 @@ public sealed class BuilderTests
                 UseS2SEndpoint = false
             });
 
-            var builder = new Microsoft.Agents.A365.Observability.Runtime.Builder(
+            var builder = new RuntimeBuilder(
                 services: services,
                 configuration: configuration,
                 useOpenTelemetryBuilder: false,
@@ -158,7 +158,7 @@ public sealed class BuilderTests
             tracerProvider.Should().BeNull("useOpenTelemetryBuilder=false should not register TracerProvider in DI");
 
             using var source = new System.Diagnostics.ActivitySource(OpenTelemetryConstants.SourceName);
-            source.HasListeners().Should().BeTrue("Agent365Exporter should register ActivitySource listeners even when not using OpenTelemetryBuilder");
+            source.HasListeners().Should().BeTrue("Agent365Exporter should register ActivitySource listeners even when not using global::OpenTelemetryBuilder");
         }
         finally
         {
@@ -182,7 +182,7 @@ public sealed class BuilderTests
                 UseS2SEndpoint = false
             });
 
-            var builder = new Microsoft.Agents.A365.Observability.Runtime.Builder(
+            var builder = new RuntimeBuilder(
                 services: services,
                 configuration: configuration,
                 useOpenTelemetryBuilder: false,
@@ -195,7 +195,7 @@ public sealed class BuilderTests
             tracerProvider.Should().BeNull("useOpenTelemetryBuilder=false should not register TracerProvider in DI");
 
             using var source = new System.Diagnostics.ActivitySource(OpenTelemetryConstants.SourceName);
-            source.HasListeners().Should().BeTrue("Agent365ExporterAsync should register ActivitySource listeners even when not using OpenTelemetryBuilder");
+            source.HasListeners().Should().BeTrue("Agent365ExporterAsync should register ActivitySource listeners even when not using global::OpenTelemetryBuilder");
         }
         finally
         {

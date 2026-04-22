@@ -10,7 +10,6 @@ using Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.OpenTelemetry.Agent365;
 using global::OpenTelemetry;
 using global::OpenTelemetry.Trace;
 

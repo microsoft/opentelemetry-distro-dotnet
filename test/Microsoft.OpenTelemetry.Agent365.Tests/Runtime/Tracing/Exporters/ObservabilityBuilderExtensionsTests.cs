@@ -1,12 +1,10 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
-using Microsoft.OpenTelemetry.Agent365;
 using global::OpenTelemetry.Trace;
 
-namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Tracing.Exporters;
+namespace Microsoft.Agents.A365.Observability.Tests.Tracing.Exporters;
 
 [TestClass]
 public sealed class ObservabilityBuilderExtensionsTests

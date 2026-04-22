@@ -1,4 +1,3 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 

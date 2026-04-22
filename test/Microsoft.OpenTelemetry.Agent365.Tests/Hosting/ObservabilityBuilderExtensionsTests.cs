@@ -1,4 +1,3 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using FluentAssertions;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
 using Microsoft.AspNetCore.Builder;

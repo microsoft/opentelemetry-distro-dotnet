@@ -1,8 +1,7 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Tracing.Scopes;
+namespace Microsoft.Agents.A365.Observability.Tests.Tracing.Scopes;
 
 using System;
 using System.Diagnostics;
@@ -26,7 +25,10 @@ public sealed class InvokeAgentScopeTest : ActivityTest
             scope.RecordResponse(expected);
         });
 
-        activity.ShouldHaveTag("gen_ai.output.messages", expected);
+        var tagValue = activity.Tags.First(t => t.Key == "gen_ai.output.messages").Value;
+        tagValue.Should().Contain("\"version\":\"0.1.0\"");
+        tagValue.Should().Contain("\"role\":\"assistant\"");
+        tagValue.Should().Contain(expected);
     }
 
     [TestMethod]
@@ -51,7 +53,12 @@ public sealed class InvokeAgentScopeTest : ActivityTest
             using var scope = InvokeAgentScope.Start(Util.GetDefaultRequest(), ScopeDetails, TestAgentDetails);
             scope.RecordInputMessages(messages);
         });
-        activity.ShouldHaveTag("gen_ai.input.messages", string.Join(",", messages));
+
+        var tagValue = activity.Tags.First(t => t.Key == "gen_ai.input.messages").Value;
+        tagValue.Should().Contain("\"version\":\"0.1.0\"");
+        tagValue.Should().Contain("\"role\":\"user\"");
+        tagValue.Should().Contain("Hello");
+        tagValue.Should().Contain("How are you?");
     }
 
     [TestMethod]
@@ -63,7 +70,12 @@ public sealed class InvokeAgentScopeTest : ActivityTest
             using var scope = InvokeAgentScope.Start(Util.GetDefaultRequest(), ScopeDetails, TestAgentDetails);
             scope.RecordOutputMessages(messages);
         });
-        activity.ShouldHaveTag("gen_ai.output.messages", string.Join(",", messages));
+
+        var tagValue = activity.Tags.First(t => t.Key == "gen_ai.output.messages").Value;
+        tagValue.Should().Contain("\"version\":\"0.1.0\"");
+        tagValue.Should().Contain("\"role\":\"assistant\"");
+        tagValue.Should().Contain("Hi there!");
+        tagValue.Should().Contain("I\\u0027m fine.");
     }
 
     [TestMethod]
@@ -92,7 +104,10 @@ public sealed class InvokeAgentScopeTest : ActivityTest
             using var scope = InvokeAgentScope.Start(request, ScopeDetails, TestAgentDetails);
         });
 
-        activity.ShouldHaveTag(GenAiInputMessagesKey, requestContent);
+        var tagValue = activity.Tags.First(t => t.Key == GenAiInputMessagesKey).Value;
+        tagValue.Should().Contain("\"version\":\"0.1.0\"");
+        tagValue.Should().Contain("\"role\":\"user\"");
+        tagValue.Should().Contain(requestContent);
     }
 
     [TestMethod]
@@ -347,7 +362,7 @@ public sealed class InvokeAgentScopeTest : ActivityTest
         var serverPort = "8443";
 
         // Act - set server address/port in baggage, then start an invoke_agent span
-        using (new Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder()
+        using (new Runtime.Common.BaggageBuilder()
             .InvokeAgentServer(serverAddress, 8443)
             .Build())
         {

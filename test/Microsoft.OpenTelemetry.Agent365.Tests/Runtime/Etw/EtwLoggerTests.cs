@@ -1,5 +1,4 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 using Microsoft.Agents.A365.Observability.Runtime.Etw;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;

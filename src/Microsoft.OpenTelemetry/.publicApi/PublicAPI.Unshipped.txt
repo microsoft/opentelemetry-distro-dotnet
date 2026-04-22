@@ -1,8 +1,133 @@
 #nullable enable
+abstract Microsoft.Agents.A365.Observability.Runtime.DTOs.BaseData.Name.get -> string!
+abstract Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.BaseExporterAsync<T>.ExportAsync(System.Collections.Generic.IReadOnlyCollection<T!>! batch, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+const Microsoft.Agents.A365.Observability.Hosting.Middleware.OutputLoggingMiddleware.A365ParentTraceparentKey = "A365ParentTraceparent" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.DTOs.SpanKindConstants.Client = "Client" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.DTOs.SpanKindConstants.Consumer = "Consumer" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.DTOs.SpanKindConstants.Internal = "Internal" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.DTOs.SpanKindConstants.Producer = "Producer" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.DTOs.SpanKindConstants.Server = "Server" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Etw.Constants.EtwCategoryPrefix = "A365.Observability.Etw." -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageConstants.SchemaVersion = "0.1.0" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.DefaultEndpointHost = "agent365.svc.cloud.microsoft" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.AutoInstrumentationConstants.GenAiInvocationInputKey = "gen_ai.agent.invocation_input" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.AutoInstrumentationConstants.GenAiInvocationOutputKey = "gen_ai.agent.invocation_output" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.ExecuteToolScope.OperationName = "execute_tool" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope.OperationName = "invoke_agent" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.AgentAUIDKey = "microsoft.agent.user.id" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.AgentBlueprintIdKey = "microsoft.a365.agent.blueprint.id" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.AgentEmailKey = "microsoft.agent.user.email" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.AgentPlatformIdKey = "microsoft.a365.agent.platform.id" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.CallerAgentAUIDKey = "microsoft.a365.caller.agent.user.id" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.CallerAgentBlueprintIdKey = "microsoft.a365.caller.agent.blueprint.id" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.CallerAgentEmailKey = "microsoft.a365.caller.agent.user.email" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.CallerAgentIdKey = "microsoft.a365.caller.agent.id" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.CallerAgentNameKey = "microsoft.a365.caller.agent.name" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.CallerAgentPlatformIdKey = "microsoft.a365.caller.agent.platform.id" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.CallerAgentVersionKey = "microsoft.a365.caller.agent.version" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.CallerClientIpKey = "client.address" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.ChannelLinkKey = "microsoft.channel.link" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.ChannelNameKey = "microsoft.channel.name" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.EnableOpenTelemetrySwitch = "Azure.Experimental.EnableActivitySource" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.ErrorMessageKey = "error.message" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.ErrorTypeKey = "error.type" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiAgentDescriptionKey = "gen_ai.agent.description" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiAgentIdKey = "gen_ai.agent.id" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiAgentInvocationInputKey = "gen_ai.agent.invocation_input" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiAgentInvocationOutputKey = "gen_ai.agent.invocation_output" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiAgentNameKey = "gen_ai.agent.name" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiAgentThoughtProcessKey = "microsoft.a365.agent.thought.process" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiAgentVersionKey = "gen_ai.agent.version" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiChoiceEventName = "gen_ai.choice" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiClientOperationDurationMetricName = "gen_ai.client.operation.duration" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiConversationIdKey = "gen_ai.conversation.id" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiConversationItemLinkKey = "microsoft.conversation.item.link" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiInputMessagesKey = "gen_ai.input.messages" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiOperationNameKey = "gen_ai.operation.name" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiOutputMessagesKey = "gen_ai.output.messages" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiProviderNameKey = "gen_ai.provider.name" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiRequestModelKey = "gen_ai.request.model" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiResponseFinishReasonsKey = "gen_ai.response.finish_reasons" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiToolArgumentsKey = "gen_ai.tool.arguments" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiToolCallIdKey = "gen_ai.tool.call.id" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiToolCallResultKey = "gen_ai.tool.call.result" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiToolDescriptionKey = "gen_ai.tool.description" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiToolNameKey = "gen_ai.tool.name" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiToolServerNameKey = "gen_ai.tool.server.name" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiToolTypeKey = "gen_ai.tool.type" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiUsageInputTokensKey = "gen_ai.usage.input_tokens" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiUsageOutputTokensKey = "gen_ai.usage.output_tokens" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiUserMessageEventName = "gen_ai.user.message" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.ServerAddressKey = "server.address" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.ServerPortKey = "server.port" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.ServiceNameKey = "service.name" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.SessionDescriptionKey = "microsoft.session.description" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.SessionIdKey = "microsoft.session.id" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.SourceName = "Agent365Sdk" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.TelemetrySdkLanguageKey = "telemetry.sdk.language" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.TelemetrySdkLanguageValue = "dotnet" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.TelemetrySdkNameKey = "telemetry.sdk.name" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.TelemetrySdkNameValue = "A365ObservabilitySDK" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.TelemetrySdkVersionKey = "telemetry.sdk.version" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.TenantIdKey = "microsoft.tenant.id" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.ThreatDiagnosticsSummaryKey = "threat.diagnostics.summary" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.UserEmailKey = "user.email" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.UserIdKey = "user.id" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.UserNameKey = "user.name" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OutputScope.OperationName = "output_messages" -> string!
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenCache
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenCache.AgenticTokenCache(System.TimeSpan? cleanupInterval = null) -> void
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenCache.Count.get -> int
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenCache.Dispose() -> void
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenCache.GetObservabilityToken(string! agentId, string! tenantId) -> System.Threading.Tasks.Task<string?>!
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenCache.InvalidateAll() -> void
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenCache.InvalidateToken(string! agentId, string! tenantId) -> bool
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenCache.RegisterObservability(string! agentId, string! tenantId, Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenStruct! tokenGenerator, string![]! observabilityScopes) -> void
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenCache.RemoveExpiredTokens() -> int
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenStruct
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenStruct.AgenticTokenStruct(Microsoft.Agents.Builder.App.UserAuth.UserAuthorization! userAuthorization, Microsoft.Agents.Builder.ITurnContext! turnContext, string! authHandlerName, string? connectionName = null) -> void
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenStruct.AuthHandlerName.get -> string!
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenStruct.AuthHandlerName.set -> void
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenStruct.ConnectionName.get -> string?
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenStruct.ConnectionName.set -> void
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenStruct.TurnContext.get -> Microsoft.Agents.Builder.ITurnContext!
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenStruct.TurnContext.set -> void
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenStruct.UserAuthorization.get -> Microsoft.Agents.Builder.App.UserAuth.UserAuthorization!
+Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenStruct.UserAuthorization.set -> void
+Microsoft.Agents.A365.Observability.Hosting.Caching.IExporterTokenCache<T>
+Microsoft.Agents.A365.Observability.Hosting.Caching.IExporterTokenCache<T>.GetObservabilityToken(string! agentId, string! tenantId) -> System.Threading.Tasks.Task<string?>!
+Microsoft.Agents.A365.Observability.Hosting.Caching.IExporterTokenCache<T>.RegisterObservability(string! agentId, string! tenantId, T! tokenGenerator, string![]! observabilityScopes) -> void
+Microsoft.Agents.A365.Observability.Hosting.Caching.ServiceTokenCache
+Microsoft.Agents.A365.Observability.Hosting.Caching.ServiceTokenCache.Count.get -> int
+Microsoft.Agents.A365.Observability.Hosting.Caching.ServiceTokenCache.Dispose() -> void
+Microsoft.Agents.A365.Observability.Hosting.Caching.ServiceTokenCache.GetObservabilityToken(string! agentId, string! tenantId) -> System.Threading.Tasks.Task<string?>!
+Microsoft.Agents.A365.Observability.Hosting.Caching.ServiceTokenCache.InvalidateAll() -> void
+Microsoft.Agents.A365.Observability.Hosting.Caching.ServiceTokenCache.InvalidateToken(string! agentId, string! tenantId) -> bool
+Microsoft.Agents.A365.Observability.Hosting.Caching.ServiceTokenCache.RegisterObservability(string! agentId, string! tenantId, string! token, string![]! observabilityScopes) -> void
+Microsoft.Agents.A365.Observability.Hosting.Caching.ServiceTokenCache.RegisterObservability(string! agentId, string! tenantId, string! token, string![]! observabilityScopes, System.TimeSpan? expiresIn) -> void
+Microsoft.Agents.A365.Observability.Hosting.Caching.ServiceTokenCache.RemoveExpiredTokens() -> int
+Microsoft.Agents.A365.Observability.Hosting.Caching.ServiceTokenCache.ServiceTokenCache(System.TimeSpan? defaultExpiration = null, System.TimeSpan? cleanupInterval = null) -> void
+Microsoft.Agents.A365.Observability.Hosting.Extensions.BaggageBuilderExtensions
+Microsoft.Agents.A365.Observability.Hosting.Extensions.InvokeAgentScopeExtensions
+Microsoft.Agents.A365.Observability.Hosting.Extensions.TurnContextExtensions
+Microsoft.Agents.A365.Observability.Hosting.Middleware.BaggageTurnMiddleware
+Microsoft.Agents.A365.Observability.Hosting.Middleware.BaggageTurnMiddleware.BaggageTurnMiddleware() -> void
+Microsoft.Agents.A365.Observability.Hosting.Middleware.BaggageTurnMiddleware.OnTurnAsync(Microsoft.Agents.Builder.ITurnContext! turnContext, Microsoft.Agents.Builder.NextDelegate! next, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Microsoft.Agents.A365.Observability.Hosting.Middleware.ObservabilityBaggageMiddleware
+Microsoft.Agents.A365.Observability.Hosting.Middleware.ObservabilityBaggageMiddleware.InvokeAsync(Microsoft.AspNetCore.Http.HttpContext! ctx) -> System.Threading.Tasks.Task!
+Microsoft.Agents.A365.Observability.Hosting.Middleware.ObservabilityBaggageMiddleware.ObservabilityBaggageMiddleware(Microsoft.AspNetCore.Http.RequestDelegate! next, System.Func<Microsoft.AspNetCore.Http.HttpContext!, (string? tenant, string? agentId)>? resolver = null, bool tagActivity = true) -> void
+Microsoft.Agents.A365.Observability.Hosting.Middleware.ObservabilityBaggageMiddlewareExtensions
+Microsoft.Agents.A365.Observability.Hosting.Middleware.OutputLoggingMiddleware
+Microsoft.Agents.A365.Observability.Hosting.Middleware.OutputLoggingMiddleware.OnTurnAsync(Microsoft.Agents.Builder.ITurnContext! turnContext, Microsoft.Agents.Builder.NextDelegate! next, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Microsoft.Agents.A365.Observability.Hosting.Middleware.OutputLoggingMiddleware.OutputLoggingMiddleware() -> void
+Microsoft.Agents.A365.Observability.Hosting.ObservabilityBuilderExtensions
+Microsoft.Agents.A365.Observability.Hosting.ObservabilityServiceCollectionExtensions
+Microsoft.Agents.A365.Observability.Runtime.Builder
+Microsoft.Agents.A365.Observability.Runtime.Builder.Build() -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Microsoft.Agents.A365.Observability.Runtime.Builder.Builder(Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration? configuration, bool useOpenTelemetryBuilder = true, Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType agent365ExporterType = Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType.Agent365Exporter) -> void
+Microsoft.Agents.A365.Observability.Runtime.Builder.Configuration.get -> Microsoft.Extensions.Configuration.IConfiguration?
+Microsoft.Agents.A365.Observability.Runtime.Builder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Microsoft.Agents.A365.Observability.Runtime.Common.ActivityExtensions
 Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder
 Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder.AgentBlueprintId(string? v) -> Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder!
 Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder.AgentDescription(string? v) -> Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder!
@@ -29,6 +154,77 @@ Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder.UserClientIp(S
 Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder.UserEmail(string? v) -> Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder!
 Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder.UserId(string? v) -> Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder!
 Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder.UserName(string? v) -> Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder!
+Microsoft.Agents.A365.Observability.Runtime.Common.EnvironmentUtils
+Microsoft.Agents.A365.Observability.Runtime.Common.EnvironmentUtils.EnvironmentUtils() -> void
+Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter
+Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter.ExportFormatter(Microsoft.Extensions.Logging.ILogger<Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter!>! logger) -> void
+Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter.FormatLogData(System.Collections.Generic.IDictionary<string!, object?>! data) -> string!
+Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter.FormatMany(System.Collections.Generic.IEnumerable<System.Diagnostics.Activity!>! activities, OpenTelemetry.Resources.Resource! resource) -> string!
+Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter.FormatSingle(System.Diagnostics.Activity! activity, OpenTelemetry.Resources.Resource! resource) -> string!
+Microsoft.Agents.A365.Observability.Runtime.Common.PowerPlatformApiDiscovery
+Microsoft.Agents.A365.Observability.Runtime.Common.PowerPlatformApiDiscovery.GetTenantEndpoint(string! tenantId) -> string!
+Microsoft.Agents.A365.Observability.Runtime.Common.PowerPlatformApiDiscovery.GetTenantIslandClusterEndpoint(string! tenantId) -> string!
+Microsoft.Agents.A365.Observability.Runtime.Common.PowerPlatformApiDiscovery.GetTokenAudience() -> string!
+Microsoft.Agents.A365.Observability.Runtime.Common.PowerPlatformApiDiscovery.GetTokenEndpointHost() -> string!
+Microsoft.Agents.A365.Observability.Runtime.Common.PowerPlatformApiDiscovery.PowerPlatformApiDiscovery(string! clusterCategory) -> void
+Microsoft.Agents.A365.Observability.Runtime.DTOs.BaseData
+Microsoft.Agents.A365.Observability.Runtime.DTOs.BaseData.Attributes.get -> System.Collections.Generic.IDictionary<string!, object?>!
+Microsoft.Agents.A365.Observability.Runtime.DTOs.BaseData.BaseData(System.Collections.Generic.IDictionary<string!, object?>? attributes = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, string? spanKind = null, string? traceId = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.DTOs.BaseData.Duration.get -> System.TimeSpan
+Microsoft.Agents.A365.Observability.Runtime.DTOs.BaseData.EndTime.get -> System.DateTimeOffset?
+Microsoft.Agents.A365.Observability.Runtime.DTOs.BaseData.EndTime.set -> void
+Microsoft.Agents.A365.Observability.Runtime.DTOs.BaseData.ParentSpanId.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.DTOs.BaseData.SpanId.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.DTOs.BaseData.SpanKind.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.DTOs.BaseData.StartTime.get -> System.DateTimeOffset?
+Microsoft.Agents.A365.Observability.Runtime.DTOs.BaseData.StartTime.set -> void
+Microsoft.Agents.A365.Observability.Runtime.DTOs.BaseData.ToDictionary() -> System.Collections.Generic.Dictionary<string!, object?>!
+Microsoft.Agents.A365.Observability.Runtime.DTOs.BaseData.TraceId.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.BaseDataBuilder<T>
+Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.BaseDataBuilder<T>.BaseDataBuilder() -> void
+Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.ExecuteInferenceDataBuilder
+Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.ExecuteInferenceDataBuilder.ExecuteInferenceDataBuilder() -> void
+Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.ExecuteToolDataBuilder
+Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.ExecuteToolDataBuilder.ExecuteToolDataBuilder() -> void
+Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.InvokeAgentDataBuilder
+Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.InvokeAgentDataBuilder.InvokeAgentDataBuilder() -> void
+Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.OutputDataBuilder
+Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.OutputDataBuilder.OutputDataBuilder() -> void
+Microsoft.Agents.A365.Observability.Runtime.DTOs.ExecuteInferenceData
+Microsoft.Agents.A365.Observability.Runtime.DTOs.ExecuteInferenceData.ExecuteInferenceData(System.Collections.Generic.IDictionary<string!, object?>? attributes = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, string? traceId = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.DTOs.ExecuteToolData
+Microsoft.Agents.A365.Observability.Runtime.DTOs.ExecuteToolData.ExecuteToolData(System.Collections.Generic.IDictionary<string!, object?>? attributes = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, string? spanKind = null, string? traceId = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.DTOs.InvokeAgentData
+Microsoft.Agents.A365.Observability.Runtime.DTOs.InvokeAgentData.InvokeAgentData(System.Collections.Generic.IDictionary<string!, object?>? attributes = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, string? spanKind = null, string? traceId = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.DTOs.OutputData
+Microsoft.Agents.A365.Observability.Runtime.DTOs.OutputData.OutputData(System.Collections.Generic.IDictionary<string!, object?>? attributes = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, string? traceId = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.DTOs.SpanKindConstants
+Microsoft.Agents.A365.Observability.Runtime.Etw.A365EtwLogger<T>
+Microsoft.Agents.A365.Observability.Runtime.Etw.A365EtwLogger<T>.A365EtwLogger(Microsoft.Extensions.Logging.ILoggerFactory! factory) -> void
+Microsoft.Agents.A365.Observability.Runtime.Etw.A365EtwLogger<T>.LogInferenceCall(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InferenceCallDetails! inferenceCallDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, string![]? inputMessages, string![]? outputMessages, System.DateTimeOffset? startTime, System.DateTimeOffset? endTime, string? spanId, string? parentSpanId, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Channel? channel, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.CallerDetails? callerDetails, string? traceId) -> void
+Microsoft.Agents.A365.Observability.Runtime.Etw.A365EtwLogger<T>.LogInvokeAgent(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDetails! invokeAgentScopeDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request? request, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.CallerDetails? callerDetails, string![]? inputMessages, string![]? outputMessages, System.DateTimeOffset? startTime, System.DateTimeOffset? endTime, string? spanId, string? parentSpanId, string? traceId) -> void
+Microsoft.Agents.A365.Observability.Runtime.Etw.A365EtwLogger<T>.LogOutput(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Response! response, string? conversationId = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Channel? channel = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.CallerDetails? callerDetails = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, string? traceId = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Etw.A365EtwLogger<T>.LogToolCall(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails! toolCallDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, string? responseContent, System.DateTimeOffset? startTime, System.DateTimeOffset? endTime, string? spanId, string? parentSpanId, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Channel? channel, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.CallerDetails? callerDetails, string? traceId) -> void
+Microsoft.Agents.A365.Observability.Runtime.Etw.Constants
+Microsoft.Agents.A365.Observability.Runtime.Etw.Constants.Constants() -> void
+Microsoft.Agents.A365.Observability.Runtime.Etw.EtwEventSource
+Microsoft.Agents.A365.Observability.Runtime.Etw.EtwEventSource.LogJson(string! message) -> void
+Microsoft.Agents.A365.Observability.Runtime.Etw.EtwEventSource.SpanStop(string! name, string! spanId, string! traceId, string! parentSpanId, string! content) -> void
+Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLoggingBuilder
+Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLoggingBuilder.Build() -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLogProcessor
+Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLogProcessor.EtwLogProcessor(Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter! formatter, Microsoft.Extensions.Logging.ILogger<Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLogProcessor!>? logger = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Etw.EtwScopeEventProcessor
+Microsoft.Agents.A365.Observability.Runtime.Etw.EtwScopeEventProcessor.EtwScopeEventProcessor(Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter! formatter, OpenTelemetry.Resources.Resource? resource = null, Microsoft.Extensions.Logging.ILogger<Microsoft.Agents.A365.Observability.Runtime.Etw.EtwScopeEventProcessor!>? logger = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Etw.EtwServiceCollectionExtensions
+Microsoft.Agents.A365.Observability.Runtime.Etw.EtwTracingBuilder
+Microsoft.Agents.A365.Observability.Runtime.Etw.EtwTracingBuilder.Build() -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Microsoft.Agents.A365.Observability.Runtime.Etw.IA365EtwLogger<T>
+Microsoft.Agents.A365.Observability.Runtime.Etw.IA365EtwLogger<T>.LogInferenceCall(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InferenceCallDetails! inferenceCallDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, string![]? inputMessages = null, string![]? outputMessages = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Channel? channel = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.CallerDetails? callerDetails = null, string? traceId = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Etw.IA365EtwLogger<T>.LogInvokeAgent(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDetails! invokeAgentScopeDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request? request = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.CallerDetails? callerDetails = null, string![]? inputMessages = null, string![]? outputMessages = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, string? traceId = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Etw.IA365EtwLogger<T>.LogOutput(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Response! response, string? conversationId = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Channel? channel = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.CallerDetails? callerDetails = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, string? traceId = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Etw.IA365EtwLogger<T>.LogToolCall(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails! toolCallDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, string? responseContent = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Channel? channel = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.CallerDetails? callerDetails = null, string? traceId = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.ObservabilityBuilderExtensions
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails.AgentBlueprintId.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails.AgentClientIP.get -> System.Net.IPAddress?
@@ -81,6 +277,92 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDe
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDetails.Endpoint.get -> System.Uri?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDetails.Equals(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDetails? other) -> bool
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDetails.InvokeAgentScopeDetails(System.Uri? endpoint = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.BlobPart
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.BlobPart.BlobPart(string! modality, string! content, string? mimeType = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.BlobPart.Content.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.BlobPart.MimeType.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.BlobPart.Modality.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.BlobPart.Type.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ChatMessage
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ChatMessage.ChatMessage(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole role, System.Collections.Generic.IReadOnlyList<Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.IMessagePart!>! parts, string? name = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ChatMessage.Name.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ChatMessage.Parts.get -> System.Collections.Generic.IReadOnlyList<Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.IMessagePart!>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ChatMessage.Role.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.FilePart
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.FilePart.FileId.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.FilePart.FilePart(string! modality, string! fileId, string? mimeType = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.FilePart.MimeType.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.FilePart.Modality.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.FilePart.Type.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.FinishReason
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.FinishReason.ContentFilter = 2 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.FinishReason
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.FinishReason.Error = 4 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.FinishReason
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.FinishReason.Length = 1 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.FinishReason
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.FinishReason.Stop = 0 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.FinishReason
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.FinishReason.ToolCall = 3 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.FinishReason
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.GenericPart
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.GenericPart.Data.get -> System.Collections.Generic.IDictionary<string!, object!>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.GenericPart.GenericPart(string! type, System.Collections.Generic.IDictionary<string!, object!>? data = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.GenericPart.Type.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.IMessagePart
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.IMessagePart.Type.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.InputMessages
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.InputMessages.InputMessages(System.Collections.Generic.IReadOnlyList<Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ChatMessage!>! messages) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.InputMessages.Messages.get -> System.Collections.Generic.IReadOnlyList<Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ChatMessage!>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.InputMessages.Version.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageConstants
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole.Assistant = 2 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole.System = 0 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole.Tool = 3 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole.User = 1 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.Modality
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.Modality.Audio = 2 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.Modality
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.Modality.Image = 0 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.Modality
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.Modality.Video = 1 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.Modality
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessage
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessage.FinishReason.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessage.OutputMessage(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole role, System.Collections.Generic.IReadOnlyList<Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.IMessagePart!>! parts, string? name = null, string? finishReason = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessages
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessages.Messages.get -> System.Collections.Generic.IReadOnlyList<Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessage!>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessages.OutputMessages(System.Collections.Generic.IReadOnlyList<Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessage!>! messages) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessages.Version.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ReasoningPart
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ReasoningPart.Content.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ReasoningPart.ReasoningPart(string! content) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ReasoningPart.Type.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ServerToolCallPart
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ServerToolCallPart.Id.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ServerToolCallPart.Name.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ServerToolCallPart.ServerToolCall.get -> System.Collections.Generic.IDictionary<string!, object!>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ServerToolCallPart.ServerToolCallPart(string! name, System.Collections.Generic.IDictionary<string!, object!>! serverToolCall, string? id = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ServerToolCallPart.Type.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ServerToolCallResponsePart
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ServerToolCallResponsePart.Id.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ServerToolCallResponsePart.ServerToolCallResponse.get -> System.Collections.Generic.IDictionary<string!, object!>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ServerToolCallResponsePart.ServerToolCallResponsePart(System.Collections.Generic.IDictionary<string!, object!>! serverToolCallResponse, string? id = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ServerToolCallResponsePart.Type.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.TextPart
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.TextPart.Content.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.TextPart.TextPart(string! content) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.TextPart.Type.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ToolCallRequestPart
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ToolCallRequestPart.Arguments.get -> object?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ToolCallRequestPart.Id.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ToolCallRequestPart.Name.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ToolCallRequestPart.ToolCallRequestPart(string! name, string? id = null, object? arguments = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ToolCallRequestPart.Type.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ToolCallResponsePart
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ToolCallResponsePart.Id.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ToolCallResponsePart.Response.get -> object?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ToolCallResponsePart.ToolCallResponsePart(string? id = null, object? response = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ToolCallResponsePart.Type.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.UriPart
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.UriPart.MimeType.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.UriPart.Modality.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.UriPart.Type.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.UriPart.Uri.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.UriPart.UriPart(string! modality, string! uri, string? mimeType = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.OperationSource
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.OperationSource.Gateway = 1 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.OperationSource
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.OperationSource.MCPServer = 2 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.OperationSource
@@ -91,13 +373,19 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request.Content.ge
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request.ConversationId.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request.Deconstruct(out string? content, out string? sessionId, out Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Channel? channel, out string? conversationId) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request.Equals(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request? other) -> bool
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request.InputContent.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.InputMessages?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request.OperationSource.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request.Request(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.InputMessages! inputContent, string? sessionId = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Channel? channel = null, string? conversationId = null, string? operationSource = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request.Request(string? content = null, string? sessionId = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Channel? channel = null, string? conversationId = null, string? operationSource = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request.SessionId.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Response
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Response.Equals(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Response? other) -> bool
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Response.Messages.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Response.OutputContent.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessages?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Response.Response(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessages! outputContent) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Response.Response(System.Collections.Generic.IDictionary<string!, object!>! toolResultObject) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Response.Response(System.Collections.Generic.IReadOnlyList<string!>? messages = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Response.ToolResultObject.get -> System.Collections.Generic.IDictionary<string!, object!>?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SpanDetails
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SpanDetails.EndTime.get -> System.DateTimeOffset?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SpanDetails.ParentContext.get -> System.Diagnostics.ActivityContext?
@@ -113,11 +401,13 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ThreatDiagnosticsS
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ThreatDiagnosticsSummary.ThreatDiagnosticsSummary(bool blockAction, int reasonCode, string! reason, string? diagnostics = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.Arguments.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ArgumentsObject.get -> System.Collections.Generic.IDictionary<string!, object!>?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.Deconstruct(out string! toolName, out string? arguments, out string? toolCallId, out string? description, out string? toolType, out System.Uri? endpoint, out string? toolServerName) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.Description.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.Endpoint.get -> System.Uri?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.Equals(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails? other) -> bool
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallDetails(string! toolName, string? arguments, string? toolCallId = null, string? description = null, string? toolType = null, System.Uri? endpoint = null, string? toolServerName = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallDetails(string! toolName, System.Collections.Generic.IDictionary<string!, object!>! argumentsObject, string? toolCallId = null, string? description = null, string? toolType = null, System.Uri? endpoint = null, string? toolServerName = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallId.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolName.get -> string!
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolServerName.get -> string?
@@ -131,6 +421,17 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.UserDetails.UserDe
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.UserDetails.UserEmail.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.UserDetails.UserId.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.UserDetails.UserName.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365Exporter
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365Exporter.Agent365Exporter(Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore! core, Microsoft.Extensions.Logging.ILogger<Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365Exporter!>! logger, Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions! options, OpenTelemetry.Resources.Resource? resource = null, System.Net.Http.HttpClient? httpClient = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterAsync
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterAsync.Agent365ExporterAsync(Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore! core, Microsoft.Extensions.Logging.ILogger<Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365Exporter!>! logger, Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions! options, OpenTelemetry.Resources.Resource? resource = null, System.Net.Http.HttpClient? httpClient = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore.Agent365ExporterCore(Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter! formatter, Microsoft.Extensions.Logging.ILogger<Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore!>! logger) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore.BuildEndpointPath(string! tenantId, string! agentId, bool useS2SEndpoint) -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore.BuildRequestUri(string! endpoint, string! endpointPath) -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore.ExportBatchCoreAsync(System.Collections.Generic.IEnumerable<(string! TenantId, string! AgentId, System.Collections.Generic.List<System.Diagnostics.Activity!>! Activities)>! groups, OpenTelemetry.Resources.Resource! resource, Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions! options, System.Func<string!, string!, System.Threading.Tasks.Task<string?>!>! tokenResolver, System.Func<System.Net.Http.HttpRequestMessage!, System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage!>!>! sendAsync) -> System.Threading.Tasks.Task<OpenTelemetry.ExportResult>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore.PartitionByIdentity(in OpenTelemetry.Batch<System.Diagnostics.Activity!> batch) -> System.Collections.Generic.List<(string! TenantId, string! AgentId, System.Collections.Generic.List<System.Diagnostics.Activity!>! Activities)>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore.PartitionByIdentity(System.Collections.Generic.IEnumerable<System.Diagnostics.Activity!>! batch) -> System.Collections.Generic.List<(string! TenantId, string! AgentId, System.Collections.Generic.List<System.Diagnostics.Activity!>! Activities)>!
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.Agent365ExporterOptions() -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.ClusterCategory.get -> string!
@@ -149,23 +450,47 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOp
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.TokenResolver.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.UseS2SEndpoint.get -> bool
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.UseS2SEndpoint.set -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType.Agent365Exporter = 0 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType.Agent365ExporterAsync = 1 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.AsyncAuthTokenResolver
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.BaseExporterAsync<T>
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.BaseExporterAsync<T>.BaseExporterAsync() -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.ObservabilityTracerProviderBuilderExtensions
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.TenantDomainResolver
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.ActivityProcessor
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.ActivityProcessor.ActivityProcessor() -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.BatchActivityExportProcessorAsync(Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.BaseExporterAsync<System.Diagnostics.Activity!>! exporter, int maxQueueSize = 2048, int scheduledDelayMilliseconds = 5000, int maxExportBatchSize = 512) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.ForceFlushAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.ShutdownAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.AutoInstrumentationConstants
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.ExecuteToolScope
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.ExecuteToolScope.RecordResponse(string! response) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.ExecuteToolScope.RecordResponse(System.Collections.Generic.IDictionary<string!, object!>! result) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.ExecuteToolScope.RecordThreatDiagnosticsSummary(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ThreatDiagnosticsSummary! threatDiagnosticsSummary) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InferenceScope
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InferenceScope.RecordFinishReasons(string![]! finishReasons) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InferenceScope.RecordInputMessages(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.InputMessages! messages) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InferenceScope.RecordInputMessages(string![]! messages) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InferenceScope.RecordInputTokens(int inputTokens) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InferenceScope.RecordOutputMessages(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessages! messages) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InferenceScope.RecordOutputMessages(string![]! messages) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InferenceScope.RecordOutputTokens(int outputTokens) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InferenceScope.RecordThoughtProcess(string! thoughtProcess) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope.RecordInputMessages(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.InputMessages! messages) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope.RecordInputMessages(string![]! messages) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope.RecordOutputMessages(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessages! messages) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope.RecordOutputMessages(string![]! messages) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope.RecordResponse(string! response) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope.RecordThreatDiagnosticsSummary(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ThreatDiagnosticsSummary! threatDiagnosticsSummary) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.OperationNames
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.OperationNames.ExecuteInference = 1 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.OperationNames
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.OperationNames.ExecuteTool = 2 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.OperationNames
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.OperationNames.InvokeAgent = 0 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.OperationNames
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.OperationNames.OutputMessages = 3 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.OperationNames
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryScope
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryScope.AddBaggage(string! key, string! value) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryScope.Dispose() -> void
@@ -181,11 +506,16 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryScope.Se
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryScope.SetTagMaybe(string! name, object? value) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryScope.TraceId.get -> string!
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OutputScope
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OutputScope.RecordOutputMessages(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessages! messages) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OutputScope.RecordOutputMessages(System.Collections.Generic.IDictionary<string!, object!>! toolResult) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OutputScope.RecordOutputMessages(System.Collections.Generic.IEnumerable<string!>! messages) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.TraceContextHelper
 Microsoft.Agents.A365.Observability.RuntimeOptions
 Microsoft.Agents.A365.Observability.RuntimeOptions.Agent365Options() -> void
 Microsoft.Agents.A365.Observability.RuntimeOptions.Exporter.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions!
+Microsoft.OpenTelemetry.Agent365Options
+Microsoft.OpenTelemetry.Agent365Options.Agent365Options() -> void
+Microsoft.OpenTelemetry.Agent365Options.Exporter.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions!
 Microsoft.OpenTelemetry.AzureMonitorOptions
 Microsoft.OpenTelemetry.AzureMonitorOptions.AzureMonitorOptions() -> void
 Microsoft.OpenTelemetry.AzureMonitorOptions.DisableOfflineStorage.get -> bool
@@ -210,11 +540,17 @@ Microsoft.OpenTelemetry.ExportTarget.None = 0 -> Microsoft.OpenTelemetry.ExportT
 Microsoft.OpenTelemetry.ExportTarget.Otlp = 4 -> Microsoft.OpenTelemetry.ExportTarget
 Microsoft.OpenTelemetry.MicrosoftOpenTelemetryBuilderExtensions
 Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions
-Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.Agent365.get -> Microsoft.Agents.A365.Observability.RuntimeOptions!
+Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.Agent365.get -> Microsoft.OpenTelemetry.Agent365Options!
 Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.AzureMonitor.get -> Microsoft.OpenTelemetry.AzureMonitorOptions!
 Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.Exporters.get -> Microsoft.OpenTelemetry.ExportTarget
 Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.Exporters.set -> void
 Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.MicrosoftOpenTelemetryOptions() -> void
+override Microsoft.Agents.A365.Observability.Runtime.DTOs.ExecuteInferenceData.Name.get -> string!
+override Microsoft.Agents.A365.Observability.Runtime.DTOs.ExecuteToolData.Name.get -> string!
+override Microsoft.Agents.A365.Observability.Runtime.DTOs.InvokeAgentData.Name.get -> string!
+override Microsoft.Agents.A365.Observability.Runtime.DTOs.OutputData.Name.get -> string!
+override Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLogProcessor.OnEnd(OpenTelemetry.Logs.LogRecord! data) -> void
+override Microsoft.Agents.A365.Observability.Runtime.Etw.EtwScopeEventProcessor.OnEnd(System.Diagnostics.Activity! data) -> void
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails.Equals(object? obj) -> bool
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails.GetHashCode() -> int
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Channel.Equals(object? obj) -> bool
@@ -231,18 +567,81 @@ override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallD
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.GetHashCode() -> int
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.UserDetails.Equals(object? obj) -> bool
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.UserDetails.GetHashCode() -> int
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365Exporter.Export(in OpenTelemetry.Batch<System.Diagnostics.Activity!> batch) -> OpenTelemetry.ExportResult
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterAsync.ExportAsync(System.Collections.Generic.IReadOnlyCollection<System.Diagnostics.Activity!>! batch, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.ActivityProcessor.OnStart(System.Diagnostics.Activity! activity) -> void
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.Dispose(bool disposing) -> void
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.OnEnd(System.Diagnostics.Activity! data) -> void
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.ToString() -> string!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.BaggageBuilderExtensions.FromTurnContext(this Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder! baggageBuilder, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.BaggageBuilderExtensions.SetCallerBaggage(this Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder! baggageBuilder, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.BaggageBuilderExtensions.SetChannelBaggage(this Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder! baggageBuilder, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.BaggageBuilderExtensions.SetConversationIdBaggage(this Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder! baggageBuilder, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.BaggageBuilderExtensions.SetTargetAgentBaggage(this Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder! baggageBuilder, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.BaggageBuilderExtensions.SetTenantIdBaggage(this Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder! baggageBuilder, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.InvokeAgentScopeExtensions.FromTurnContext(this Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope! invokeAgentScope, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.InvokeAgentScopeExtensions.SetCallerTags(this Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope! invokeAgentScope, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.InvokeAgentScopeExtensions.SetChannelTags(this Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope! invokeAgentScope, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.InvokeAgentScopeExtensions.SetConversationIdTags(this Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope! invokeAgentScope, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.InvokeAgentScopeExtensions.SetInputMessageTags(this Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope! invokeAgentScope, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.InvokeAgentScopeExtensions.SetTargetAgentTags(this Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope! invokeAgentScope, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.InvokeAgentScopeExtensions.SetTenantIdTags(this Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope! invokeAgentScope, Microsoft.Agents.Builder.ITurnContext! turnContext) -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.TurnContextExtensions.GetCallerBaggagePairs(this Microsoft.Agents.Builder.ITurnContext! turnContext) -> System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, object?>>!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.TurnContextExtensions.GetChannelBaggagePairs(this Microsoft.Agents.Builder.ITurnContext! turnContext) -> System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, object?>>!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.TurnContextExtensions.GetConversationIdAndItemLinkPairs(this Microsoft.Agents.Builder.ITurnContext! turnContext) -> System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, object?>>!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.TurnContextExtensions.GetTargetAgentBaggagePairs(this Microsoft.Agents.Builder.ITurnContext! turnContext) -> System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, object?>>!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.TurnContextExtensions.GetTenantIdPair(this Microsoft.Agents.Builder.ITurnContext! turnContext) -> System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, object?>>!
+static Microsoft.Agents.A365.Observability.Hosting.Extensions.TurnContextExtensions.InjectObservabilityContext(this Microsoft.Agents.Builder.ITurnContext! turnContext, Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryScope! observabilityScope) -> void
+static Microsoft.Agents.A365.Observability.Hosting.Middleware.ObservabilityBaggageMiddlewareExtensions.UseObservabilityRequestContext(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app, System.Func<Microsoft.AspNetCore.Http.HttpContext!, (string? tenant, string? agentId)>? resolver) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!
+static Microsoft.Agents.A365.Observability.Hosting.ObservabilityBuilderExtensions.AddA365Tracing(this Microsoft.AspNetCore.Hosting.IWebHostBuilder! webHostBuilder, System.Action<Microsoft.Agents.A365.Observability.Runtime.Builder!>? configure = null, bool useOpenTelemetryBuilder = true, Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType agent365ExporterType = Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType.Agent365Exporter) -> Microsoft.AspNetCore.Hosting.IWebHostBuilder!
+static Microsoft.Agents.A365.Observability.Hosting.ObservabilityBuilderExtensions.AddA365Tracing(this Microsoft.Extensions.Hosting.IHostBuilder! builder, System.Action<Microsoft.Agents.A365.Observability.Runtime.Builder!>? configure = null, bool useOpenTelemetryBuilder = true, Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType agent365ExporterType = Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType.Agent365Exporter) -> Microsoft.Extensions.Hosting.IHostBuilder!
+static Microsoft.Agents.A365.Observability.Hosting.ObservabilityServiceCollectionExtensions.AddAgenticTracingExporter(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string? clusterCategory = "production") -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Agents.A365.Observability.Hosting.ObservabilityServiceCollectionExtensions.AddServiceTracingExporter(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string? clusterCategory = "production") -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Agents.A365.Observability.Runtime.Common.ActivityExtensions.CoalesceTag(this System.Diagnostics.Activity! activity, string! key, params string?[]! values) -> void
+static Microsoft.Agents.A365.Observability.Runtime.Common.ActivityExtensions.GetAttributeOrBaggage(this System.Diagnostics.Activity! activity, string! key) -> string?
+static Microsoft.Agents.A365.Observability.Runtime.Common.EnvironmentUtils.GetObservabilityAuthenticationScope() -> string![]!
+static Microsoft.Agents.A365.Observability.Runtime.Common.EnvironmentUtils.GetObservabilityAuthenticationScope(string! clusterCategory = "prod") -> string![]!
+static Microsoft.Agents.A365.Observability.Runtime.Common.EnvironmentUtils.GetObservabilityClusterCategory() -> string!
+static Microsoft.Agents.A365.Observability.Runtime.Common.EnvironmentUtils.GetObservabilityClusterCategory(string! clusterCategory = "prod") -> string!
+static Microsoft.Agents.A365.Observability.Runtime.Common.EnvironmentUtils.IsDevelopmentEnvironment() -> bool
+static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.BaseDataBuilder<T>.AddAgentDetails(System.Collections.Generic.IDictionary<string!, object?>! attributes, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails) -> void
+static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.BaseDataBuilder<T>.AddCallerAgentDetails(System.Collections.Generic.IDictionary<string!, object?>! attributes, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails? callerAgentDetails) -> void
+static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.BaseDataBuilder<T>.AddCallerDetails(System.Collections.Generic.IDictionary<string!, object?>! attributes, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.CallerDetails? callerDetails) -> void
+static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.BaseDataBuilder<T>.AddChannelAttributes(System.Collections.Generic.IDictionary<string!, object?>! attributes, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Channel? channel) -> void
+static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.BaseDataBuilder<T>.AddEndpointDetails(System.Collections.Generic.IDictionary<string!, object?>! attributes, System.Uri? endpoint) -> void
+static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.BaseDataBuilder<T>.AddExtraAttributes(System.Collections.Generic.IDictionary<string!, object?>! attributes, System.Collections.Generic.IDictionary<string!, object?>? extraAttributes) -> void
+static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.BaseDataBuilder<T>.AddIfNotNull(System.Collections.Generic.IDictionary<string!, object?>! attributes, string! key, object? value) -> void
+static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.BaseDataBuilder<T>.AddInputMessagesAttributes(System.Collections.Generic.IDictionary<string!, object?>! attributes, string![]? messages) -> void
+static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.BaseDataBuilder<T>.AddOutputMessagesAttributes(System.Collections.Generic.IDictionary<string!, object?>! attributes, string![]? messages) -> void
+static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.BaseDataBuilder<T>.AddRequestDetails(System.Collections.Generic.IDictionary<string!, object?>! attributes, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request? request) -> void
+static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.ExecuteInferenceDataBuilder.Build(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InferenceCallDetails! inferenceCallDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, string![]? inputMessages = null, string![]? outputMessages = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Channel? channel = null, string? thoughtProcess = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.CallerDetails? callerDetails = null, System.Collections.Generic.IDictionary<string!, object?>? extraAttributes = null, string? traceId = null) -> Microsoft.Agents.A365.Observability.Runtime.DTOs.ExecuteInferenceData!
+static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.ExecuteToolDataBuilder.Build(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails! toolCallDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, string? responseContent = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Channel? channel = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.CallerDetails? callerDetails = null, System.Collections.Generic.IDictionary<string!, object?>? extraAttributes = null, string? spanKind = null, string? traceId = null) -> Microsoft.Agents.A365.Observability.Runtime.DTOs.ExecuteToolData!
+static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.InvokeAgentDataBuilder.Build(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDetails! invokeAgentScopeDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request? request = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.CallerDetails? callerDetails = null, string![]? inputMessages = null, string![]? outputMessages = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, System.Collections.Generic.IDictionary<string!, object?>? extraAttributes = null, string? spanKind = null, string? traceId = null) -> Microsoft.Agents.A365.Observability.Runtime.DTOs.InvokeAgentData!
+static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.OutputDataBuilder.Build(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Response! response, string? conversationId = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Channel? channel = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.CallerDetails? callerDetails = null, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, System.Collections.Generic.IDictionary<string!, object?>? extraAttributes = null, string? traceId = null) -> Microsoft.Agents.A365.Observability.Runtime.DTOs.OutputData!
+static Microsoft.Agents.A365.Observability.Runtime.Etw.EtwServiceCollectionExtensions.AddLoggingWithEtw(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLoggingBuilder!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Agents.A365.Observability.Runtime.Etw.EtwServiceCollectionExtensions.AddTracingWithEtw(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Microsoft.Agents.A365.Observability.Runtime.Etw.EtwTracingBuilder!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Agents.A365.Observability.Runtime.ObservabilityBuilderExtensions.AddA365Tracing<TBuilder>(this TBuilder builder, System.Action<Microsoft.Agents.A365.Observability.Runtime.Builder!>? configure = null, bool useOpenTelemetryBuilder = true, Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType agent365ExporterType = Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType.Agent365Exporter) -> TBuilder
 static Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.ExecuteToolScope.Start(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request! request, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails! details, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.UserDetails? userDetails = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SpanDetails? spanDetails = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ThreatDiagnosticsSummary? threatDiagnosticsSummary = null) -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.ExecuteToolScope!
 static Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InferenceScope.Start(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request! request, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InferenceCallDetails! details, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.UserDetails? userDetails = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SpanDetails? spanDetails = null) -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InferenceScope!
 static Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope.Start(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request! request, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDetails! scopeDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.CallerDetails? callerDetails = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SpanDetails? spanDetails = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ThreatDiagnosticsSummary? threatDiagnosticsSummary = null) -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope!
+static Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.TelemetrySdkVersionValue.get -> string!
 static Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OutputScope.Start(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request! request, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Response! response, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.UserDetails? userDetails = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SpanDetails? spanDetails = null) -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OutputScope!
 static Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.TraceContextHelper.ExtractContextFromHeaders(System.Collections.Generic.IDictionary<string!, string!>! headers) -> System.Diagnostics.ActivityContext
 static Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.TraceContextHelper.GetTraceparent(System.Collections.Generic.IDictionary<string!, string!>! headers) -> string?
 static Microsoft.OpenTelemetry.MicrosoftOpenTelemetryBuilderExtensions.UseMicrosoftOpenTelemetry(this OpenTelemetry.IOpenTelemetryBuilder! builder, System.Action<Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions!>! configure) -> OpenTelemetry.IOpenTelemetryBuilder!
 static Microsoft.OpenTelemetry.MicrosoftOpenTelemetryBuilderExtensions.UseMicrosoftOpenTelemetry<TBuilder>(this TBuilder builder) -> TBuilder
 static Microsoft.OpenTelemetry.MicrosoftOpenTelemetryBuilderExtensions.UseMicrosoftOpenTelemetry<TBuilder>(this TBuilder builder, System.Action<Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions!>! configure) -> TBuilder
+static readonly Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenCache.DefaultCleanupInterval -> System.TimeSpan
+static readonly Microsoft.Agents.A365.Observability.Hosting.Caching.ServiceTokenCache.DefaultCleanupInterval -> System.TimeSpan
+static readonly Microsoft.Agents.A365.Observability.Runtime.Etw.EtwEventSource.Log -> Microsoft.Agents.A365.Observability.Runtime.Etw.EtwEventSource!
 static readonly Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolType.Datastore -> string!
 static readonly Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolType.Extension -> string!
 static readonly Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolType.Function -> string!
+virtual Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenCache.Dispose(bool disposing) -> void
+virtual Microsoft.Agents.A365.Observability.Hosting.Caching.ServiceTokenCache.Dispose(bool disposing) -> void
+virtual Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.BaseExporterAsync<T>.Dispose() -> void
+virtual Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.BaseExporterAsync<T>.ForceFlushAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+virtual Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.BaseExporterAsync<T>.ShutdownAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 ~Microsoft.OpenTelemetry.AzureMonitorOptions.ConnectionString.get -> string
 ~Microsoft.OpenTelemetry.AzureMonitorOptions.ConnectionString.set -> void
 ~Microsoft.OpenTelemetry.AzureMonitorOptions.Credential.get -> Azure.Core.TokenCredential

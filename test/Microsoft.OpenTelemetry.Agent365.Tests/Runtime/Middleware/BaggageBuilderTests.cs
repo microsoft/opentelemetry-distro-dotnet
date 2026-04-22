@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Middleware;
+namespace Microsoft.Agents.A365.Observability.Tests.Middleware;
 
 using System.Net;
 using FluentAssertions;
