@@ -11,9 +11,6 @@
     <Authors>Microsoft</Authors>
     <Copyright>© Microsoft Corporation. All rights reserved.</Copyright>
     <Company>Microsoft Corporation</Company>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <DebugType>embedded</DebugType>
 
     <!-- Redirect bin/obj to target/ at repo root -->
     <BaseOutputPath>$(MSBuildThisFileDirectory)target\bin\$(MSBuildProjectName)\</BaseOutputPath>
