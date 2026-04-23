@@ -15,7 +15,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime
     /// <summary>
     /// Builder for configuring SDK with OpenTelemetry tracing.
     /// </summary>
-    public sealed class Builder
+    internal sealed class Builder
     {
         private readonly IServiceCollection _services;
         private readonly bool _useOpenTelemetryBuilder;
