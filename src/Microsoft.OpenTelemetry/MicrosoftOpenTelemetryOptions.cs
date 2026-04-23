@@ -16,7 +16,7 @@ public class MicrosoftOpenTelemetryOptions
     /// <list type="bullet">
     /// <item><see cref="ExportTarget.AzureMonitor"/> — when <see cref="AzureMonitor"/>.<see cref="AzureMonitorOptions.ConnectionString"/> is set.</item>
     /// <item><see cref="ExportTarget.Agent365"/> — when <see cref="Agent365"/>.<see cref="Agent365Options.Exporter"/>.<c>TokenResolver</c> is set.</item>
-    /// <item><see cref="ExportTarget.Otlp"/> — when <see cref="OtlpEndpoint"/> is set.</item>
+    /// <item><see cref="ExportTarget.Otlp"/> — when OTLP endpoint is configured.</item>
     /// </list>
     /// Set explicitly to override auto-detection:
     /// <c>o.Exporters = ExportTarget.AzureMonitor | ExportTarget.Agent365;</c>
