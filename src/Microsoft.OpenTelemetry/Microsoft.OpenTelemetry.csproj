@@ -52,8 +52,8 @@
     <!-- Azure Monitor exporter -->
     <PackageReference Include="Azure.Monitor.OpenTelemetry.Exporter" />
 
-    <!-- Agent365 extensions -->
-    <PackageReference Include="Microsoft.Agents.Builder" />
+    <!-- Agent365 extensions (PrivateAssets=all: compile-time only, not propagated to consumers) -->
+    <PackageReference Include="Microsoft.Agents.Builder" PrivateAssets="all" />
   </ItemGroup>
 
 </Project>
