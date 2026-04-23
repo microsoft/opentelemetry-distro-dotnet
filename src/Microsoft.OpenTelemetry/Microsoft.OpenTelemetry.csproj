@@ -7,7 +7,7 @@
     <AssemblyName>Microsoft.OpenTelemetry</AssemblyName>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <PackageTags>OpenTelemetry;Telemetry;Azure Monitor;OTLP;Agent365;AgentFramework;AI;Agents;Distro</PackageTags>
-    <NoWarn>$(NoWarn);NU1903;RS0026</NoWarn>
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
 
     <!-- NuGet packaging -->
     <PackageId>Microsoft.OpenTelemetry</PackageId>
