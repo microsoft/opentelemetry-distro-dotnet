@@ -540,9 +540,9 @@ virtual Microsoft.Agents.A365.Observability.Hosting.Caching.ServiceTokenCache.Di
 virtual Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.BaseExporterAsync<T>.Dispose() -> void
 virtual Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.BaseExporterAsync<T>.ForceFlushAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 virtual Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.BaseExporterAsync<T>.ShutdownAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
-~Microsoft.OpenTelemetry.AzureMonitorOptions.ConnectionString.get -> string
-~Microsoft.OpenTelemetry.AzureMonitorOptions.ConnectionString.set -> void
-~Microsoft.OpenTelemetry.AzureMonitorOptions.Credential.get -> Azure.Core.TokenCredential
-~Microsoft.OpenTelemetry.AzureMonitorOptions.Credential.set -> void
-~Microsoft.OpenTelemetry.AzureMonitorOptions.StorageDirectory.get -> string
-~Microsoft.OpenTelemetry.AzureMonitorOptions.StorageDirectory.set -> void
+Microsoft.OpenTelemetry.AzureMonitorOptions.ConnectionString.get -> string?
+Microsoft.OpenTelemetry.AzureMonitorOptions.ConnectionString.set -> void
+Microsoft.OpenTelemetry.AzureMonitorOptions.Credential.get -> Azure.Core.TokenCredential?
+Microsoft.OpenTelemetry.AzureMonitorOptions.Credential.set -> void
+Microsoft.OpenTelemetry.AzureMonitorOptions.StorageDirectory.get -> string?
+Microsoft.OpenTelemetry.AzureMonitorOptions.StorageDirectory.set -> void

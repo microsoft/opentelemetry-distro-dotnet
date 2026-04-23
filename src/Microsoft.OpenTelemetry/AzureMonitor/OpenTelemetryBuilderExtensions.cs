@@ -158,7 +158,7 @@ namespace Microsoft.OpenTelemetry
                     // If connection string is not set in the options, try to get it from configuration.
                     if (string.IsNullOrWhiteSpace(options.ConnectionString) && config[EnvironmentVariableConstants.APPLICATIONINSIGHTS_CONNECTION_STRING] != null)
                     {
-                        options.ConnectionString = config[EnvironmentVariableConstants.APPLICATIONINSIGHTS_CONNECTION_STRING];
+                        options.ConnectionString = config[EnvironmentVariableConstants.APPLICATIONINSIGHTS_CONNECTION_STRING]!;
                     }
                 });
 
