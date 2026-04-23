@@ -5,7 +5,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
     /// <summary>
     /// Constants used in ETW logging.
     /// </summary>
-    public class Constants
+    internal class Constants
     {
         /// <summary>
         /// Category prefix for ETW logs.

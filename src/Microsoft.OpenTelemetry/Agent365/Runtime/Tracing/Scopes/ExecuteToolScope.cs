@@ -21,7 +21,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// <summary>
         /// The operation name for tool execution tracing.
         /// </summary>
-        public const string OperationName = "execute_tool";
+        internal const string OperationName = "execute_tool";
 
         /// <summary>
         /// Creates and starts a new scope for tool execution tracing.

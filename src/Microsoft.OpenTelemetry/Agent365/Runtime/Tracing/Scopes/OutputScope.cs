@@ -24,7 +24,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// <summary>
         /// The operation name for output tracing.
         /// </summary>
-        public const string OperationName = "output_messages";
+        internal const string OperationName = "output_messages";
 
         /// <summary>
         /// Creates and starts a new scope for output tracing.

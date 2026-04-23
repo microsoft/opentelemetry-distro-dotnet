@@ -31,6 +31,7 @@
     <PackageReference Include="MSTest.TestAdapter" />
     <PackageReference Include="MSTest.TestFramework" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <PackageReference Include="Microsoft.Agents.Builder" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
