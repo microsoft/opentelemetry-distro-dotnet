@@ -3,6 +3,7 @@
 using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using global::OpenTelemetry.Logs;
 using System;
 
@@ -13,7 +14,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
     /// </summary>
     public sealed class EtwLoggingBuilder
     {
-        private static readonly Lazy<ILoggerFactory> FallbackConsoleLoggerFactory = new Lazy<ILoggerFactory>(() => LoggerFactory.Create(b => b.AddConsole()));
         private readonly IServiceCollection _services;
         private bool _isBuilt = false;
 
@@ -45,7 +45,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
                 .AddSingleton(typeof(IA365EtwLogger<>), typeof(A365EtwLogger<>))
                 .AddSingleton<ExportFormatter>(sp =>
                 {
-                    var logger = sp.GetService<ILogger<ExportFormatter>>() ?? FallbackConsoleLoggerFactory.Value.CreateLogger<ExportFormatter>();
+                    var logger = sp.GetService<ILogger<ExportFormatter>>() ?? NullLoggerFactory.Instance.CreateLogger<ExportFormatter>();
                     return new ExportFormatter(logger);
                 })
                 .AddLogging(logging =>
@@ -55,7 +55,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
                         otelLogging.ParseStateValues = true;
                         otelLogging.AddProcessor(sp =>
                         {
-                            return new EtwLogProcessor(formatter: sp.GetRequiredService<ExportFormatter>(), logger: sp.GetService<ILogger<EtwLogProcessor>>() ?? FallbackConsoleLoggerFactory.Value.CreateLogger<EtwLogProcessor>());
+                            return new EtwLogProcessor(formatter: sp.GetRequiredService<ExportFormatter>(), logger: sp.GetService<ILogger<EtwLogProcessor>>() ?? NullLoggerFactory.Instance.CreateLogger<EtwLogProcessor>());
                         });
                         if (EnvironmentUtils.IsDevelopmentEnvironment())
                         {

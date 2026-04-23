@@ -53,7 +53,6 @@
 
     <!-- Agent365 extensions (PrivateAssets=all: compile-time only, not propagated to consumers) -->
     <PackageReference Include="Microsoft.Agents.Builder" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
   </ItemGroup>
 
 </Project>
