@@ -23,6 +23,8 @@
     <PackageReference Include="OpenTelemetry.Exporter.InMemory" />
     <PackageReference Include="Microsoft.Data.SqlClient" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 

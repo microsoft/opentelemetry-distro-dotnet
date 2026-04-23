@@ -4,6 +4,7 @@ using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using global::OpenTelemetry;
 using global::OpenTelemetry.Trace;
 using System;
@@ -16,7 +17,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
     /// </summary>
     public static class ObservabilityTracerProviderBuilderExtensions
     {
-        private static readonly Lazy<ILoggerFactory> FallbackConsoleLoggerFactory = new Lazy<ILoggerFactory>(() => LoggerFactory.Create(b => b.AddConsole()));
 
         /// <summary>
         /// Adds the Agent365 Exporter to the OpenTelemetry TracerProviderBuilder using deferred initialization.
@@ -70,7 +70,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             var httpClient = serviceProvider.GetService<HttpClient>();
 
             // Resolve ILoggerFactory from DI to ensure loggers have proper lifetime; fall back to NullLogger when unavailable.
-            var loggerFactory = serviceProvider.GetService<ILoggerFactory>() ?? ObservabilityTracerProviderBuilderExtensions.FallbackConsoleLoggerFactory.Value;
+            var loggerFactory = serviceProvider.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance;
             var logger = serviceProvider.GetService<ILogger<Agent365Exporter>>() ?? loggerFactory.CreateLogger<Agent365Exporter>();
             var coreLogger = serviceProvider.GetService<ILogger<Agent365ExporterCore>>() ?? loggerFactory.CreateLogger<Agent365ExporterCore>();
             var formatterLogger = serviceProvider.GetService<ILogger<ExportFormatter>>() ?? loggerFactory.CreateLogger<ExportFormatter>();

@@ -296,6 +296,21 @@ And a successful Agent365 export:
 Received HTTP response headers after *ms - 200
 ```
 
+## Internal logging
+
+The distro's internal components (exporters, span processors) use `ILoggerFactory` from DI when available.
+In ASP.NET Core and hosted apps, this means internal diagnostics flow through the app's configured logging pipeline automatically.
+
+**Non-DI / console apps:** If your app does not register `ILoggerFactory` in DI, internal diagnostics are silently discarded (`NullLoggerFactory`). To see internal log output, add `Microsoft.Extensions.Logging.Console` and wire it up:
+
+```bash
+dotnet add package Microsoft.Extensions.Logging.Console
+```
+
+```csharp
+builder.Services.AddLogging(logging => logging.AddConsole());
+```
+
 ## Examples
 
 - [Azure.Monitor.OpenTelemetry.AspNetCore.Demo](examples/Azure.Monitor.OpenTelemetry.AspNetCore.Demo) — ASP.NET Core → Azure Monitor

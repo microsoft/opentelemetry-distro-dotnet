@@ -37,7 +37,7 @@ namespace Microsoft.Agents.A365.Observability.Hosting.Middleware
         /// <see cref="OutputScope"/> spans as children of an
         /// <see cref="InvokeAgentScope"/>.
         /// </summary>
-        public const string A365ParentTraceparentKey = "A365ParentTraceparent";
+        internal const string A365ParentTraceparentKey = "A365ParentTraceparent";
 
         /// <inheritdoc/>
         public async Task OnTurnAsync(ITurnContext turnContext, NextDelegate next, CancellationToken cancellationToken = default)

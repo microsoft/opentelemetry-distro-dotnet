@@ -206,7 +206,7 @@ internal static class SemanticKernelSpanProcessorHelper
         // For user messages, trim the "Message:" prefix
         if (string.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase))
         {
-            var idx = message.Content.IndexOf("Message:", StringComparison.OrdinalIgnoreCase);
+            var idx = message.Content!.IndexOf("Message:", StringComparison.OrdinalIgnoreCase);
             if (idx >= 0)
             {
                 message.Content = message.Content[(idx + "Message:".Length)..].Trim();
@@ -226,7 +226,7 @@ internal static class SemanticKernelSpanProcessorHelper
             return;
         }
 
-        var content = message.Content.Trim();
+        var content = message.Content!.Trim();
         if (!content.StartsWith("{", StringComparison.Ordinal) || !content.EndsWith("}", StringComparison.Ordinal))
         {
             return;
@@ -272,21 +272,21 @@ internal static class SemanticKernelSpanProcessorHelper
             {
                 try
                 {
-                    var userMsg = JsonSerializer.Deserialize<MessageContent>(content, JsonOptions);
+                    var userMsg = JsonSerializer.Deserialize<MessageContent>(content!, JsonOptions);
                     if (userMsg != null && userMsg.Role == "user" && !string.IsNullOrEmpty(userMsg.Content))
                     {
                         FilterMessageContent(userMsg);
-                        result[OpenTelemetryConstants.GenAiUserMessageEventName].Add(userMsg.Content);
+                        result[OpenTelemetryConstants.GenAiUserMessageEventName].Add(userMsg.Content!);
                     }
                 }
                 catch (JsonException)
                 {
-                    result[OpenTelemetryConstants.GenAiUserMessageEventName].Add(content);
+                    result[OpenTelemetryConstants.GenAiUserMessageEventName].Add(content!);
                 }
             }
             else if (activityEvent.Name == OpenTelemetryConstants.GenAiChoiceEventName)
             {
-                FilterAiChoiceMessageContent(content, result[OpenTelemetryConstants.GenAiChoiceEventName]);
+                FilterAiChoiceMessageContent(content!, result[OpenTelemetryConstants.GenAiChoiceEventName]);
             }
         }
         return result;

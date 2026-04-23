@@ -1,5 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
+
+#if !NETSTANDARD2_0
 namespace Microsoft.Agents.A365.Observability.Hosting
 {
     using System;
@@ -11,7 +13,7 @@ namespace Microsoft.Agents.A365.Observability.Hosting
     /// <summary>
     /// Provides extension methods for configuring Microsoft Agent 365 SDK with OpenTelemetry tracing.
     /// </summary>
-    public static class ObservabilityBuilderExtensions
+    internal static class ObservabilityBuilderExtensions
     {
         /// <summary>
         /// Adds the Microsoft Agent 365 SDK with OpenTelemetry tracing for AI agents and tools.
@@ -68,3 +70,4 @@ namespace Microsoft.Agents.A365.Observability.Hosting
         }
     }
 }
+#endif

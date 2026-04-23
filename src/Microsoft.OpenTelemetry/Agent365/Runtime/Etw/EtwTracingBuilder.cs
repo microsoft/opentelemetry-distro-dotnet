@@ -5,6 +5,7 @@ using Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using global::OpenTelemetry.Trace;
 using System;
 
@@ -17,7 +18,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
     {
         private readonly IServiceCollection _services;
         private bool _isBuilt = false;
-        private static readonly Lazy<ILoggerFactory> FallbackConsoleLoggerFactory = new Lazy<ILoggerFactory>(() => LoggerFactory.Create(b => b.AddConsole()));
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EtwTracingBuilder"/> class.
@@ -46,7 +46,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
             _services
                 .AddSingleton<ExportFormatter>(sp =>
                 {
-                    var logger = sp.GetService<ILogger<ExportFormatter>>() ?? FallbackConsoleLoggerFactory.Value.CreateLogger<ExportFormatter>();
+                    var logger = sp.GetService<ILogger<ExportFormatter>>() ?? NullLoggerFactory.Instance.CreateLogger<ExportFormatter>();
                     return new ExportFormatter(logger);
                 })
                 .AddOpenTelemetry()
@@ -57,7 +57,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
                         .AddProcessor(new ActivityProcessor())
                         .AddProcessor(sp =>
                         {
-                            return new EtwScopeEventProcessor(formatter: sp.GetRequiredService<ExportFormatter>(), logger: sp.GetService<ILogger<EtwScopeEventProcessor>>() ?? FallbackConsoleLoggerFactory.Value.CreateLogger<EtwScopeEventProcessor>());
+                            return new EtwScopeEventProcessor(formatter: sp.GetRequiredService<ExportFormatter>(), logger: sp.GetService<ILogger<EtwScopeEventProcessor>>() ?? NullLoggerFactory.Instance.CreateLogger<EtwScopeEventProcessor>());
                         });
 
                     if (EnvironmentUtils.IsDevelopmentEnvironment())

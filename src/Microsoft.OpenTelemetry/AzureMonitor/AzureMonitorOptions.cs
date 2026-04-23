@@ -1,8 +1,6 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-#nullable disable
-
 using System.Runtime.Serialization;
 using Azure.Core;
 using Azure.Monitor.OpenTelemetry.Exporter;
@@ -21,7 +19,7 @@ namespace Microsoft.OpenTelemetry
         /// <remarks>
         /// <see href="https://docs.microsoft.com/azure/azure-monitor/app/sdk-connection-string"/>.
         /// </remarks>
-        public string ConnectionString { get; set; }
+        public string? ConnectionString { get; set; }
 
         /// <summary>
         /// Get or sets the value of <see cref="TokenCredential" />.
@@ -31,7 +29,7 @@ namespace Microsoft.OpenTelemetry
         /// <remarks>
         /// <see href="https://learn.microsoft.com/en-us/azure/azure-monitor/app/sdk-connection-string?tabs=net#is-the-connection-string-a-secret"/>.
         /// </remarks>
-        public TokenCredential Credential { get; set; }
+        public TokenCredential? Credential { get; set; }
 
         /// <summary>
         /// Disable offline storage.
@@ -86,7 +84,7 @@ namespace Microsoft.OpenTelemetry
         /// <summary>
         /// Override the default directory for offline storage.
         /// </summary>
-        public string StorageDirectory { get; set; }
+        public string? StorageDirectory { get; set; }
 
         /// <summary>
         /// When true, skips exporter registration. Instrumentation is still added.

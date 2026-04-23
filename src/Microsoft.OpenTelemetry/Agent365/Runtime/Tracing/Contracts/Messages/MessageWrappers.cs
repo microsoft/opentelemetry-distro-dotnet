@@ -9,7 +9,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages
     /// <summary>
     /// Schema version embedded in serialized message payloads.
     /// </summary>
-    public static class MessageConstants
+    internal static class MessageConstants
     {
         /// <summary>
         /// The current schema version for structured message payloads.

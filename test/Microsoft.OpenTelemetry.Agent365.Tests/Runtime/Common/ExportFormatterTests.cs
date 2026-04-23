@@ -244,8 +244,9 @@ public partial class ExportFormatterTests : ActivityTest
     [TestMethod]
     public void Format_NullOrEmptyAttributes_AreOmitted()
     {
-        // Arrange
-        var act = CreateActivity(tags: new Dictionary<string, object>());
+        // Arrange - use a unique source name to avoid tags injected by globally registered ActivityProcessor
+        Activity.Current = null;
+        var act = CreateActivity(sourceName: "ExportFormatterTests", tags: new Dictionary<string, object>());
         var resource = CreateResource();
         var formatter = CreateFormatter();
 
@@ -398,8 +399,9 @@ public partial class ExportFormatterTests : ActivityTest
     [TestMethod]
     public void FormatSingle_Activity_NullOrEmptyAttributesAreOmitted()
     {
-        // Arrange
-        var act = CreateActivity(tags: new Dictionary<string, object>());
+        // Arrange - use a unique source name to avoid tags injected by globally registered ActivityProcessor
+        Activity.Current = null;
+        var act = CreateActivity(sourceName: "ExportFormatterTests", tags: new Dictionary<string, object>());
         var resource = CreateResource();
         var formatter = CreateFormatter();
 

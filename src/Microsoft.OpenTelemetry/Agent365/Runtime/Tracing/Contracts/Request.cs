@@ -1,4 +1,5 @@
 #pragma warning disable CS8604
+#pragma warning disable RS0026 // Multiple overloads with optional parameters — by design for string vs structured content
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 

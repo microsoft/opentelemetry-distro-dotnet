@@ -28,7 +28,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         /// <summary>
         /// The default endpoint host for Agent365 observability.
         /// </summary>
-        public const string DefaultEndpointHost = "agent365.svc.cloud.microsoft";
+        internal const string DefaultEndpointHost = "agent365.svc.cloud.microsoft";
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Agent365ExporterOptions"/> class with default settings.

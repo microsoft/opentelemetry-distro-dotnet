@@ -4,6 +4,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Nullable>enable</Nullable>
+    <!-- Use latest C# for all TFMs; language features are compiler-only, not runtime-dependent -->
+    <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Authors>Microsoft</Authors>

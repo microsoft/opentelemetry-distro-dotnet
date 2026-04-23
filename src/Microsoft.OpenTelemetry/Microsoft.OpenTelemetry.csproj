@@ -5,13 +5,12 @@
     <AssemblyTitle>Microsoft OpenTelemetry Distro</AssemblyTitle>
     <RootNamespace>Microsoft.OpenTelemetry</RootNamespace>
     <AssemblyName>Microsoft.OpenTelemetry</AssemblyName>
-    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
     <PackageTags>OpenTelemetry;Telemetry;Azure Monitor;OTLP;Agent365;AgentFramework;AI;Agents;Distro</PackageTags>
-    <NoWarn>$(NoWarn);SA1636;CS1591;NU1903;CS1574;RS0017;RS0026;RS0041</NoWarn>
 
     <!-- NuGet packaging -->
     <PackageId>Microsoft.OpenTelemetry</PackageId>
-    <Version>1.0.0-alpha.2</Version>
+    <Version>1.0.0-alpha.3</Version>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>See CHANGELOG.md for release notes.</PackageReleaseNotes>
@@ -52,8 +51,8 @@
     <!-- Azure Monitor exporter -->
     <PackageReference Include="Azure.Monitor.OpenTelemetry.Exporter" />
 
-    <!-- Agent365 extensions -->
-    <PackageReference Include="Microsoft.Agents.Builder" />
+    <!-- Agent365 extensions (PrivateAssets=all: compile-time only, not propagated to consumers) -->
+    <PackageReference Include="Microsoft.Agents.Builder" PrivateAssets="all" />
   </ItemGroup>
 
 </Project>
