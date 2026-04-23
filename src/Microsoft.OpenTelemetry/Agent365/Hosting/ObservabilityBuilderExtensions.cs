@@ -1,5 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
+
+#if !NETSTANDARD2_0
 namespace Microsoft.Agents.A365.Observability.Hosting
 {
     using System;
@@ -68,3 +70,4 @@ namespace Microsoft.Agents.A365.Observability.Hosting
         }
     }
 }
+#endif
