@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using global::OpenTelemetry;
 using global::OpenTelemetry.Trace;
 using global::OpenTelemetry.Metrics;
+using global::OpenTelemetry.Logs;
 
 namespace Microsoft.OpenTelemetry;
 
@@ -111,7 +112,7 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             o.EnableTraceBasedLogsSampler = options.AzureMonitor.EnableTraceBasedLogsSampler;
             o.SamplingRatio = options.AzureMonitor.SamplingRatio;
             o.TracesPerSecond = options.AzureMonitor.TracesPerSecond;
-        });
+        }, options.Instrumentation);
 
         // --- Agent365 (always: scopes + baggage + span processors; exporter gated by Exporters flag) ---
         builder.UseAgent365(o =>
@@ -124,30 +125,56 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             o.Exporter.ScheduledDelayMilliseconds = options.Agent365.Exporter.ScheduledDelayMilliseconds;
             o.Exporter.ExporterTimeoutMilliseconds = options.Agent365.Exporter.ExporterTimeoutMilliseconds;
             o.Exporter.MaxExportBatchSize = options.Agent365.Exporter.MaxExportBatchSize;
-        });
+        }, options.Instrumentation);
 
         // --- Microsoft Agent Framework (always: captures MAF spans + processor) ---
-        builder.UseAgentFramework();
+        builder.UseAgentFramework(options.Instrumentation);
 
         // --- OTLP exporter ---
         if (exporters.HasFlag(ExportTarget.Otlp))
         {
-            builder.WithTracing(tracing =>
+            if (options.Instrumentation.EnableTracing)
             {
-                tracing.AddOtlpExporter();
-            });
+                builder.WithTracing(tracing =>
+                {
+                    tracing.AddOtlpExporter();
+                });
+            }
 
-            builder.WithMetrics(metrics =>
+            if (options.Instrumentation.EnableMetrics)
             {
-                metrics.AddOtlpExporter();
-            });
+                builder.WithMetrics(metrics =>
+                {
+                    metrics.AddOtlpExporter();
+                });
+            }
+
+            if (options.Instrumentation.EnableLogging)
+            {
+                builder.WithLogging(logging =>
+                {
+                    logging.AddOtlpExporter();
+                });
+            }
         }
 
         // --- Console exporter ---
         if (exporters.HasFlag(ExportTarget.Console))
         {
-            builder.WithTracing(tracing => tracing.AddConsoleExporter());
-            builder.WithMetrics(metrics => metrics.AddConsoleExporter());
+            if (options.Instrumentation.EnableTracing)
+            {
+                builder.WithTracing(tracing => tracing.AddConsoleExporter());
+            }
+
+            if (options.Instrumentation.EnableMetrics)
+            {
+                builder.WithMetrics(metrics => metrics.AddConsoleExporter());
+            }
+
+            if (options.Instrumentation.EnableLogging)
+            {
+                builder.WithLogging(logging => logging.AddConsoleExporter());
+            }
         }
 
         return builder;

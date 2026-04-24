@@ -1,4 +1,29 @@
 #nullable enable
+Microsoft.OpenTelemetry.InstrumentationOptions
+Microsoft.OpenTelemetry.InstrumentationOptions.InstrumentationOptions() -> void
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableTracing.get -> bool
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableTracing.set -> void
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableMetrics.get -> bool
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableMetrics.set -> void
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableLogging.get -> bool
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableLogging.set -> void
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableAspNetCoreInstrumentation.get -> bool
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableAspNetCoreInstrumentation.set -> void
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableHttpClientInstrumentation.get -> bool
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableHttpClientInstrumentation.set -> void
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableSqlClientInstrumentation.get -> bool
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableSqlClientInstrumentation.set -> void
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableAzureSdkInstrumentation.get -> bool
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableAzureSdkInstrumentation.set -> void
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableOpenAIInstrumentation.get -> bool
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableOpenAIInstrumentation.set -> void
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableSemanticKernelInstrumentation.get -> bool
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableSemanticKernelInstrumentation.set -> void
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableAgentFrameworkInstrumentation.get -> bool
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableAgentFrameworkInstrumentation.set -> void
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableAgent365Instrumentation.get -> bool
+Microsoft.OpenTelemetry.InstrumentationOptions.EnableAgent365Instrumentation.set -> void
+Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions.Instrumentation.get -> Microsoft.OpenTelemetry.InstrumentationOptions!
 abstract Microsoft.Agents.A365.Observability.Runtime.DTOs.BaseData.Name.get -> string!
 abstract Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.BaseExporterAsync<T>.ExportAsync(System.Collections.Generic.IReadOnlyCollection<T!>! batch, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenCache

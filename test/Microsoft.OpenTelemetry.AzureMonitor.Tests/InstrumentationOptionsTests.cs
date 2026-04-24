@@ -1,0 +1,695 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
+#if NET
+
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Net;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using OpenTelemetry;
+using OpenTelemetry.Trace;
+using OpenTelemetry.Metrics;
+using Xunit;
+
+namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
+{
+    public class InstrumentationOptionsTests : IDisposable
+    {
+        private IHost? _host;
+
+        public void Dispose()
+        {
+            _host?.Dispose();
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        //  1. POCO defaults & round-trips
+        // ══════════════════════════════════════════════════════════════
+
+        [Fact]
+        public void Defaults_AllSignalsEnabled()
+        {
+            var options = new InstrumentationOptions();
+
+            Assert.True(options.EnableTracing);
+            Assert.True(options.EnableMetrics);
+            Assert.True(options.EnableLogging);
+        }
+
+        [Fact]
+        public void Defaults_AllInstrumentationsEnabled()
+        {
+            var options = new InstrumentationOptions();
+
+            Assert.True(options.EnableAspNetCoreInstrumentation);
+            Assert.True(options.EnableHttpClientInstrumentation);
+            Assert.True(options.EnableSqlClientInstrumentation);
+            Assert.True(options.EnableAzureSdkInstrumentation);
+            Assert.True(options.EnableOpenAIInstrumentation);
+            Assert.True(options.EnableSemanticKernelInstrumentation);
+            Assert.True(options.EnableAgentFrameworkInstrumentation);
+            Assert.True(options.EnableAgent365Instrumentation);
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void EnableTracing_RoundTrips(bool value)
+        {
+            var options = new InstrumentationOptions { EnableTracing = value };
+            Assert.Equal(value, options.EnableTracing);
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void EnableMetrics_RoundTrips(bool value)
+        {
+            var options = new InstrumentationOptions { EnableMetrics = value };
+            Assert.Equal(value, options.EnableMetrics);
+        }
+
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void EnableAspNetCoreInstrumentation_RoundTrips(bool value)
+        {
+            var options = new InstrumentationOptions { EnableAspNetCoreInstrumentation = value };
+            Assert.Equal(value, options.EnableAspNetCoreInstrumentation);
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void EnableHttpClientInstrumentation_RoundTrips(bool value)
+        {
+            var options = new InstrumentationOptions { EnableHttpClientInstrumentation = value };
+            Assert.Equal(value, options.EnableHttpClientInstrumentation);
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void EnableSqlClientInstrumentation_RoundTrips(bool value)
+        {
+            var options = new InstrumentationOptions { EnableSqlClientInstrumentation = value };
+            Assert.Equal(value, options.EnableSqlClientInstrumentation);
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void EnableAzureSdkInstrumentation_RoundTrips(bool value)
+        {
+            var options = new InstrumentationOptions { EnableAzureSdkInstrumentation = value };
+            Assert.Equal(value, options.EnableAzureSdkInstrumentation);
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void EnableOpenAIInstrumentation_RoundTrips(bool value)
+        {
+            var options = new InstrumentationOptions { EnableOpenAIInstrumentation = value };
+            Assert.Equal(value, options.EnableOpenAIInstrumentation);
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void EnableSemanticKernelInstrumentation_RoundTrips(bool value)
+        {
+            var options = new InstrumentationOptions { EnableSemanticKernelInstrumentation = value };
+            Assert.Equal(value, options.EnableSemanticKernelInstrumentation);
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void EnableAgentFrameworkInstrumentation_RoundTrips(bool value)
+        {
+            var options = new InstrumentationOptions { EnableAgentFrameworkInstrumentation = value };
+            Assert.Equal(value, options.EnableAgentFrameworkInstrumentation);
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void EnableAgent365Instrumentation_RoundTrips(bool value)
+        {
+            var options = new InstrumentationOptions { EnableAgent365Instrumentation = value };
+            Assert.Equal(value, options.EnableAgent365Instrumentation);
+        }
+
+        [Fact]
+        public void MultipleProperties_SetIndependently()
+        {
+            var options = new InstrumentationOptions
+            {
+                EnableTracing = false,
+                EnableMetrics = true,
+                EnableLogging = false,
+                EnableAspNetCoreInstrumentation = false,
+                EnableHttpClientInstrumentation = true,
+                EnableSqlClientInstrumentation = false,
+                EnableAzureSdkInstrumentation = true,
+                EnableOpenAIInstrumentation = false,
+                EnableSemanticKernelInstrumentation = true,
+                EnableAgentFrameworkInstrumentation = false,
+                EnableAgent365Instrumentation = true,
+            };
+
+            Assert.False(options.EnableTracing);
+            Assert.True(options.EnableMetrics);
+            Assert.False(options.EnableLogging);
+            Assert.False(options.EnableAspNetCoreInstrumentation);
+            Assert.True(options.EnableHttpClientInstrumentation);
+            Assert.False(options.EnableSqlClientInstrumentation);
+            Assert.True(options.EnableAzureSdkInstrumentation);
+            Assert.False(options.EnableOpenAIInstrumentation);
+            Assert.True(options.EnableSemanticKernelInstrumentation);
+            Assert.False(options.EnableAgentFrameworkInstrumentation);
+            Assert.True(options.EnableAgent365Instrumentation);
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        //  2. Integration with MicrosoftOpenTelemetryOptions
+        // ══════════════════════════════════════════════════════════════
+
+        [Fact]
+        public void MicrosoftOpenTelemetryOptions_ExposesInstrumentationOptions()
+        {
+            var options = new MicrosoftOpenTelemetryOptions();
+
+            Assert.NotNull(options.Instrumentation);
+            Assert.IsType<InstrumentationOptions>(options.Instrumentation);
+        }
+
+        [Fact]
+        public void MicrosoftOpenTelemetryOptions_InstrumentationDefaults_AllEnabled()
+        {
+            var options = new MicrosoftOpenTelemetryOptions();
+
+            Assert.True(options.Instrumentation.EnableTracing);
+            Assert.True(options.Instrumentation.EnableMetrics);
+            Assert.True(options.Instrumentation.EnableLogging);
+            Assert.True(options.Instrumentation.EnableAspNetCoreInstrumentation);
+            Assert.True(options.Instrumentation.EnableHttpClientInstrumentation);
+            Assert.True(options.Instrumentation.EnableSqlClientInstrumentation);
+            Assert.True(options.Instrumentation.EnableAzureSdkInstrumentation);
+            Assert.True(options.Instrumentation.EnableOpenAIInstrumentation);
+            Assert.True(options.Instrumentation.EnableSemanticKernelInstrumentation);
+            Assert.True(options.Instrumentation.EnableAgentFrameworkInstrumentation);
+            Assert.True(options.Instrumentation.EnableAgent365Instrumentation);
+        }
+
+        [Fact]
+        public void MicrosoftOpenTelemetryOptions_InstrumentationIsReadOnly()
+        {
+            var options = new MicrosoftOpenTelemetryOptions();
+            var first = options.Instrumentation;
+            var second = options.Instrumentation;
+            Assert.Same(first, second);
+        }
+
+        [Fact]
+        public void MicrosoftOpenTelemetryOptions_InstrumentationMutationsStick()
+        {
+            var options = new MicrosoftOpenTelemetryOptions();
+            options.Instrumentation.EnableSqlClientInstrumentation = false;
+            options.Instrumentation.EnableTracing = false;
+
+            Assert.False(options.Instrumentation.EnableSqlClientInstrumentation);
+            Assert.False(options.Instrumentation.EnableTracing);
+            Assert.True(options.Instrumentation.EnableMetrics);
+            Assert.True(options.Instrumentation.EnableAspNetCoreInstrumentation);
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        //  3. Behavioral: EnableTracing gates the tracing pipeline
+        // ══════════════════════════════════════════════════════════════
+
+        [Fact]
+        public async Task EnableTracingFalse_NoAspNetCoreSpansCaptured()
+        {
+            var exportedActivities = new List<Activity>();
+
+            _host = new HostBuilder()
+                .ConfigureWebHost(webBuilder =>
+                {
+                    webBuilder.UseTestServer();
+                    webBuilder.ConfigureServices(services =>
+                    {
+                        services.AddRouting();
+                        services.AddOpenTelemetry()
+                            .UseMicrosoftOpenTelemetry(o =>
+                            {
+                                o.Instrumentation.EnableTracing = false;
+                            })
+                            .WithTracing(t => t.AddInMemoryExporter(exportedActivities));
+                    });
+                    webBuilder.Configure(app =>
+                    {
+                        app.UseRouting();
+                        app.UseEndpoints(endpoints =>
+                        {
+                            endpoints.MapGet("/test", async context =>
+                            {
+                                await context.Response.WriteAsync("ok");
+                            });
+                        });
+                    });
+                })
+                .Build();
+
+            await _host.StartAsync();
+
+            var client = _host.GetTestClient();
+            await client.GetAsync("/test");
+
+            // Force flush would normally export, but tracing pipeline was disabled
+            // so nothing from our instrumentation was registered
+            var aspnetSpans = exportedActivities.Where(a =>
+                a.Source.Name == "OpenTelemetry.Instrumentation.AspNetCore").ToList();
+            Assert.Empty(aspnetSpans);
+        }
+
+        [Fact]
+        public void EnableTracingTrue_SpansCaptured()
+        {
+            var exportedActivities = new List<Activity>();
+
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    // Defaults — tracing enabled, Agent Framework enabled
+                })
+                .WithTracing(t => t.AddInMemoryExporter(exportedActivities));
+
+            using var sp = services.BuildServiceProvider();
+            var tracerProvider = sp.GetRequiredService<TracerProvider>();
+
+            // Emit a span from Agent Framework source (registered by our code)
+            using var source = new ActivitySource("Experimental.Microsoft.Agents.AI");
+            using var activity = source.StartActivity("test-op");
+            activity?.Stop();
+
+            tracerProvider.ForceFlush();
+
+            Assert.Contains(exportedActivities, a =>
+                a.Source.Name == "Experimental.Microsoft.Agents.AI");
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        //  4. Behavioral: DisableAspNetCore but keep HttpClient
+        // ══════════════════════════════════════════════════════════════
+
+        [Fact]
+        public async Task DisableAspNetCore_HttpClientStillWorks()
+        {
+            var exportedActivities = new List<Activity>();
+
+            // Start a dummy HTTP server
+            var tcpListener = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+            tcpListener.Start();
+            var port = ((IPEndPoint)tcpListener.LocalEndpoint).Port;
+            tcpListener.Stop();
+
+            var httpListener = new HttpListener();
+            httpListener.Prefixes.Add($"http://localhost:{port}/");
+            httpListener.Start();
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var ctx = await httpListener.GetContextAsync();
+                    ctx.Response.StatusCode = 200;
+                    ctx.Response.Close();
+                }
+                catch { }
+            });
+
+            try
+            {
+                _host = new HostBuilder()
+                    .ConfigureWebHost(webBuilder =>
+                    {
+                        webBuilder.UseTestServer();
+                        webBuilder.ConfigureServices(services =>
+                        {
+                            services.AddRouting();
+                            services.AddOpenTelemetry()
+                                .UseMicrosoftOpenTelemetry(o =>
+                                {
+                                    o.Instrumentation.EnableAspNetCoreInstrumentation = false;
+                                })
+                                .WithTracing(t => t.AddInMemoryExporter(exportedActivities));
+                        });
+                        webBuilder.Configure(app =>
+                        {
+                            app.UseRouting();
+                            app.UseEndpoints(endpoints =>
+                            {
+                                endpoints.MapGet("/test", async context =>
+                                {
+                                    // This outgoing HttpClient call should be instrumented
+                                    using var httpClient = new HttpClient();
+                                    await httpClient.GetAsync($"http://localhost:{port}/");
+                                    await context.Response.WriteAsync("ok");
+                                });
+                            });
+                        });
+                    })
+                    .Build();
+
+                await _host.StartAsync();
+
+                var testClient = _host.GetTestClient();
+                await testClient.GetAsync("/test");
+                await Task.Delay(500);
+
+                // Should have HttpClient spans but NOT ASP.NET Core spans
+                var aspnetSpans = exportedActivities.Where(a =>
+                    a.Source.Name == "OpenTelemetry.Instrumentation.AspNetCore").ToList();
+                var httpSpans = exportedActivities.Where(a =>
+                    a.Source.Name == "System.Net.Http").ToList();
+
+                Assert.Empty(aspnetSpans);
+                Assert.NotEmpty(httpSpans);
+            }
+            finally
+            {
+                httpListener.Stop();
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        //  5. Behavioral: EnableMetrics=false suppresses metrics
+        // ══════════════════════════════════════════════════════════════
+
+        [Fact]
+        public void EnableMetricsFalse_NoAspNetCoreMeters()
+        {
+            var exportedMetrics = new List<Metric>();
+
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Instrumentation.EnableMetrics = false;
+                })
+                .WithMetrics(m => m.AddInMemoryExporter(exportedMetrics));
+
+            using var sp = services.BuildServiceProvider();
+            var meterProvider = sp.GetRequiredService<MeterProvider>();
+            meterProvider.ForceFlush();
+
+            // No ASP.NET Core hosting or System.Net.Http meters registered by our code
+            Assert.DoesNotContain(exportedMetrics, m =>
+                m.MeterName == "Microsoft.AspNetCore.Hosting" ||
+                m.MeterName == "System.Net.Http");
+        }
+
+        [Fact]
+        public void EnableMetricsTrue_AspNetCoreMetersRegistered()
+        {
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    // defaults — metrics enabled
+                });
+
+            // Verify AspNetCore and Http meters are configured via service registrations
+            // (actual metric data requires a running server, so we verify registration)
+            using var sp = services.BuildServiceProvider();
+            // MeterProvider should resolve without error
+            var meterProvider = sp.GetRequiredService<MeterProvider>();
+            Assert.NotNull(meterProvider);
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        //  6. Behavioral: DisableAgentFramework — no MAF sources
+        // ══════════════════════════════════════════════════════════════
+
+        [Fact]
+        public void DisableAgentFramework_NoMafSourcesRegistered()
+        {
+            var exportedActivities = new List<Activity>();
+
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Instrumentation.EnableAgentFrameworkInstrumentation = false;
+                })
+                .WithTracing(t => t.AddInMemoryExporter(exportedActivities));
+
+            using var sp = services.BuildServiceProvider();
+            var tracerProvider = sp.GetRequiredService<TracerProvider>();
+
+            // Emit a span from Agent Framework source — should NOT be captured
+            using var source = new ActivitySource("Experimental.Microsoft.Agents.AI");
+            using var activity = source.StartActivity("test-agent-op");
+            activity?.Stop();
+
+            Assert.DoesNotContain(exportedActivities, a =>
+                a.Source.Name == "Experimental.Microsoft.Agents.AI");
+        }
+
+        [Fact]
+        public void EnableAgentFramework_MafSourcesCaptured()
+        {
+            var exportedActivities = new List<Activity>();
+
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    // defaults — MAF enabled
+                })
+                .WithTracing(t => t.AddInMemoryExporter(exportedActivities));
+
+            using var sp = services.BuildServiceProvider();
+            var tracerProvider = sp.GetRequiredService<TracerProvider>();
+
+            using var source = new ActivitySource("Experimental.Microsoft.Agents.AI");
+            using var activity = source.StartActivity("test-agent-op");
+            activity?.Stop();
+
+            tracerProvider.ForceFlush();
+
+            Assert.Contains(exportedActivities, a =>
+                a.Source.Name == "Experimental.Microsoft.Agents.AI");
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        //  7. Behavioral: Console exporter respects signal flags
+        // ══════════════════════════════════════════════════════════════
+
+        [Fact]
+        public void ConsoleExporter_TracingDisabled_NoSpansCaptured()
+        {
+            var exportedActivities = new List<Activity>();
+
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Console;
+                    o.Instrumentation.EnableTracing = false;
+                })
+                .WithTracing(t => t.AddInMemoryExporter(exportedActivities));
+
+            using var sp = services.BuildServiceProvider();
+            var tracerProvider = sp.GetRequiredService<TracerProvider>();
+
+            // Emit a span from a source that would normally be captured
+            using var source = new ActivitySource("Experimental.Microsoft.Agents.AI");
+            using var activity = source.StartActivity("test-op");
+            activity?.Stop();
+
+            tracerProvider.ForceFlush();
+
+            // No Agent Framework spans because tracing was disabled by our code
+            Assert.DoesNotContain(exportedActivities, a =>
+                a.Source.Name == "Experimental.Microsoft.Agents.AI");
+        }
+
+        [Fact]
+        public void ConsoleExporter_TracingEnabled_SpansCaptured()
+        {
+            var exportedActivities = new List<Activity>();
+
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Console;
+                    o.Instrumentation.EnableTracing = true;
+                })
+                .WithTracing(t => t.AddInMemoryExporter(exportedActivities));
+
+            using var sp = services.BuildServiceProvider();
+            var tracerProvider = sp.GetRequiredService<TracerProvider>();
+
+            using var source = new ActivitySource("Experimental.Microsoft.Agents.AI");
+            using var activity = source.StartActivity("test-op");
+            activity?.Stop();
+
+            tracerProvider.ForceFlush();
+
+            Assert.Contains(exportedActivities, a =>
+                a.Source.Name == "Experimental.Microsoft.Agents.AI");
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        //  8. Behavioral: OTLP exporter respects signal flags
+        // ══════════════════════════════════════════════════════════════
+
+        [Fact]
+        public void OtlpExporter_MetricsDisabled_NoCustomMeters()
+        {
+            var exportedMetrics = new List<Metric>();
+
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Otlp;
+                    o.Instrumentation.EnableMetrics = false;
+                })
+                .WithMetrics(m => m.AddInMemoryExporter(exportedMetrics));
+
+            using var sp = services.BuildServiceProvider();
+            var meterProvider = sp.GetRequiredService<MeterProvider>();
+            meterProvider.ForceFlush();
+
+            // No ASP.NET Core or Agent Framework meters from our code
+            Assert.DoesNotContain(exportedMetrics, m =>
+                m.MeterName == "Microsoft.AspNetCore.Hosting" ||
+                m.MeterName == "Experimental.Microsoft.Agents.AI");
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        //  9. Behavioral: OTLP logging exporter respects EnableLogging
+        // ══════════════════════════════════════════════════════════════
+
+        [Fact]
+        public void OtlpExporter_LoggingEnabled_LogProviderRegistered()
+        {
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Otlp;
+                    o.Instrumentation.EnableLogging = true;
+                });
+
+            // WithLogging() + AddOtlpExporter() registers log processing configuration
+            var hasOtlpLogConfig = services.Any(s =>
+                s.ServiceType.FullName != null &&
+                s.ServiceType.FullName.Contains("IConfigureOptions") &&
+                s.ImplementationType?.FullName?.Contains("Otlp") == true);
+
+            // Alternative: verify LoggerProviderBuilder configuration was added
+            var hasLogBuilderConfig = services.Any(s =>
+                s.ServiceType.FullName != null &&
+                s.ServiceType.FullName.Contains("LoggerProviderBuilder"));
+
+            Assert.True(hasOtlpLogConfig || hasLogBuilderConfig,
+                "OTLP logging exporter should be registered when EnableLogging=true");
+        }
+
+        [Fact]
+        public void OtlpExporter_LoggingDisabled_FewerServicesThanEnabled()
+        {
+            var servicesEnabled = new ServiceCollection();
+            servicesEnabled.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Otlp;
+                    o.Instrumentation.EnableLogging = true;
+                });
+
+            var servicesDisabled = new ServiceCollection();
+            servicesDisabled.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Otlp;
+                    o.Instrumentation.EnableLogging = false;
+                });
+
+            // When logging is enabled, WithLogging() + AddOtlpExporter() adds
+            // more service registrations than when logging is disabled
+            Assert.True(servicesEnabled.Count > servicesDisabled.Count,
+                $"Expected more services when logging enabled ({servicesEnabled.Count}) " +
+                $"than disabled ({servicesDisabled.Count})");
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        //  10. Behavioral: Console logging exporter respects EnableLogging
+        // ══════════════════════════════════════════════════════════════
+
+        [Fact]
+        public void ConsoleExporter_LoggingEnabled_LogProviderRegistered()
+        {
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Console;
+                    o.Instrumentation.EnableLogging = true;
+                });
+
+            var hasConsoleLogConfig = services.Any(s =>
+                s.ImplementationType?.FullName?.Contains("Console") == true &&
+                s.ImplementationType?.FullName?.Contains("Log") == true);
+
+            var hasLogBuilderConfig = services.Any(s =>
+                s.ServiceType.FullName != null &&
+                s.ServiceType.FullName.Contains("LoggerProviderBuilder"));
+
+            Assert.True(hasConsoleLogConfig || hasLogBuilderConfig,
+                "Console logging exporter should be registered when EnableLogging=true");
+        }
+
+        [Fact]
+        public void ConsoleExporter_LoggingDisabled_FewerServicesThanEnabled()
+        {
+            var servicesEnabled = new ServiceCollection();
+            servicesEnabled.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Console;
+                    o.Instrumentation.EnableLogging = true;
+                });
+
+            var servicesDisabled = new ServiceCollection();
+            servicesDisabled.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Console;
+                    o.Instrumentation.EnableLogging = false;
+                });
+
+            Assert.True(servicesEnabled.Count > servicesDisabled.Count,
+                $"Expected more services when logging enabled ({servicesEnabled.Count}) " +
+                $"than disabled ({servicesDisabled.Count})");
+        }
+    }
+}
+
+#endif

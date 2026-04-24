@@ -34,24 +34,44 @@ internal static class AgentFrameworkOpenTelemetryBuilderExtensions
     /// </remarks>
     internal static IOpenTelemetryBuilder UseAgentFramework(this IOpenTelemetryBuilder builder)
     {
-        builder.WithTracing(tracing =>
-        {
-            // Default Microsoft Agent Framework activity sources
-            tracing
-                .AddSource(AgentFrameworkConstants.DefaultSource)
-                .AddSource(AgentFrameworkConstants.AgentSource)
-                .AddSource(AgentFrameworkConstants.ChatClientSource)
-                .AddProcessor(new AgentFrameworkSpanProcessor());
-        });
+        return builder.UseAgentFramework(new InstrumentationOptions());
+    }
 
-        // Also capture metrics from the same sources
-        builder.WithMetrics(metrics =>
+    /// <summary>
+    /// Configures the distro to capture telemetry from Microsoft Agent Framework
+    /// with instrumentation options controlling which signals are active.
+    /// </summary>
+    internal static IOpenTelemetryBuilder UseAgentFramework(this IOpenTelemetryBuilder builder, InstrumentationOptions instrumentationOptions)
+    {
+        if (!instrumentationOptions.EnableAgentFrameworkInstrumentation)
         {
-            metrics
-                .AddMeter(AgentFrameworkConstants.DefaultSource)
-                .AddMeter(AgentFrameworkConstants.AgentSource)
-                .AddMeter(AgentFrameworkConstants.ChatClientSource);
-        });
+            return builder;
+        }
+
+        if (instrumentationOptions.EnableTracing)
+        {
+            builder.WithTracing(tracing =>
+            {
+                // Default Microsoft Agent Framework activity sources
+                tracing
+                    .AddSource(AgentFrameworkConstants.DefaultSource)
+                    .AddSource(AgentFrameworkConstants.AgentSource)
+                    .AddSource(AgentFrameworkConstants.ChatClientSource)
+                    .AddProcessor(new AgentFrameworkSpanProcessor());
+            });
+        }
+
+        if (instrumentationOptions.EnableMetrics)
+        {
+            // Also capture metrics from the same sources
+            builder.WithMetrics(metrics =>
+            {
+                metrics
+                    .AddMeter(AgentFrameworkConstants.DefaultSource)
+                    .AddMeter(AgentFrameworkConstants.AgentSource)
+                    .AddMeter(AgentFrameworkConstants.ChatClientSource);
+            });
+        }
 
         return builder;
     }
