@@ -131,6 +131,9 @@ internal static class Agent365OpenTelemetryBuilderExtensions
                     // Token cache is populated by agent middleware (e.g. via RegisterObservability).
                     builder.Services.AddAgenticTracingExporter();
                 }
+
+                // Register span filter options so ConfigureInternal can wrap the exporter
+                builder.Services.AddSingleton(options.SpanFilter);
                 tracing.AddAgent365Exporter();
             }
             });

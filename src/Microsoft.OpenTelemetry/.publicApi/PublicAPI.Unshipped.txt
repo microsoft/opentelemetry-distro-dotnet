@@ -1,4 +1,8 @@
 #nullable enable
+Microsoft.OpenTelemetry.Agent365SpanFilterOptions
+Microsoft.OpenTelemetry.Agent365SpanFilterOptions.Agent365SpanFilterOptions() -> void
+Microsoft.OpenTelemetry.Agent365SpanFilterOptions.IncludeSources.get -> System.Collections.Generic.IList<string!>!
+Microsoft.OpenTelemetry.Agent365Options.SpanFilter.get -> Microsoft.OpenTelemetry.Agent365SpanFilterOptions!
 Microsoft.OpenTelemetry.InstrumentationOptions
 Microsoft.OpenTelemetry.InstrumentationOptions.InstrumentationOptions() -> void
 Microsoft.OpenTelemetry.InstrumentationOptions.EnableTracing.get -> bool

@@ -16,6 +16,12 @@ public class Agent365Options
     public Agent365ExporterOptions Exporter { get; } = new();
 
     /// <summary>
+    /// Gets the span filter that controls which activity sources are exported
+    /// to the Agent365 backend. By default, only GenAI and agent spans are exported.
+    /// </summary>
+    public Agent365SpanFilterOptions SpanFilter { get; } = new();
+
+    /// <summary>
     /// When true, skips exporter registration. Instrumentation is still added.
     /// Used internally by <see cref="MicrosoftOpenTelemetryBuilderExtensions.UseMicrosoftOpenTelemetry"/>.
     /// </summary>

@@ -164,6 +164,12 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             o.Exporter.ScheduledDelayMilliseconds = options.Agent365.Exporter.ScheduledDelayMilliseconds;
             o.Exporter.ExporterTimeoutMilliseconds = options.Agent365.Exporter.ExporterTimeoutMilliseconds;
             o.Exporter.MaxExportBatchSize = options.Agent365.Exporter.MaxExportBatchSize;
+
+            // Forward user-specified span filter sources
+            foreach (var source in options.Agent365.SpanFilter.IncludeSources)
+            {
+                o.SpanFilter.IncludeSources.Add(source);
+            }
         }, effectiveInstrumentation);
 
         // --- Microsoft Agent Framework (always: captures MAF spans + processor) ---

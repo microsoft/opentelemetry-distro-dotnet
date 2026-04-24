@@ -5,6 +5,7 @@ using Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.OpenTelemetry;
 using global::OpenTelemetry;
 using global::OpenTelemetry.Trace;
 using System;
@@ -68,6 +69,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             // Ensure required services are registered
             var exporterOptions = serviceProvider.GetRequiredService<Agent365ExporterOptions>();
             var httpClient = serviceProvider.GetService<HttpClient>();
+            var spanFilterOptions = serviceProvider.GetService<Agent365SpanFilterOptions>();
 
             // Resolve ILoggerFactory from DI to ensure loggers have proper lifetime; fall back to NullLogger when unavailable.
             var loggerFactory = serviceProvider.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance;
@@ -82,20 +84,26 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             switch (exporterType)
             {
                 case Agent365ExporterType.Agent365ExporterAsync:
-                    builder.AddProcessor(new BatchActivityExportProcessorAsync(
+                    var asyncProcessor = new BatchActivityExportProcessorAsync(
                         new Agent365ExporterAsync(core: exporterCore, logger: logger, options: exporterOptions, resource: null, httpClient: httpClient),
                         maxQueueSize: exporterOptions.MaxQueueSize,
                         scheduledDelayMilliseconds: exporterOptions.ScheduledDelayMilliseconds,
-                        maxExportBatchSize: exporterOptions.MaxExportBatchSize));
+                        maxExportBatchSize: exporterOptions.MaxExportBatchSize);
+                    builder.AddProcessor(spanFilterOptions != null
+                        ? new Agent365SpanFilterProcessor(asyncProcessor, spanFilterOptions)
+                        : (BaseProcessor<System.Diagnostics.Activity>)asyncProcessor);
                     break;
 
                 case Agent365ExporterType.Agent365Exporter:
-                    builder.AddProcessor(new BatchActivityExportProcessor(
+                    var syncProcessor = new BatchActivityExportProcessor(
                         new Agent365Exporter(core: exporterCore, logger: logger, options: exporterOptions, resource: null, httpClient: httpClient),
                         maxQueueSize: exporterOptions.MaxQueueSize,
                         scheduledDelayMilliseconds: exporterOptions.ScheduledDelayMilliseconds,
                         exporterTimeoutMilliseconds: exporterOptions.ExporterTimeoutMilliseconds,
-                        maxExportBatchSize: exporterOptions.MaxExportBatchSize));
+                        maxExportBatchSize: exporterOptions.MaxExportBatchSize);
+                    builder.AddProcessor(spanFilterOptions != null
+                        ? new Agent365SpanFilterProcessor(syncProcessor, spanFilterOptions)
+                        : (BaseProcessor<System.Diagnostics.Activity>)syncProcessor);
                     break;
 
                 default:
