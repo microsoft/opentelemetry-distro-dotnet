@@ -295,7 +295,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
             services.AddOpenTelemetry()
                 .UseMicrosoftOpenTelemetry(o =>
                 {
-                    // Defaults — tracing enabled, Agent Framework enabled
+                    o.Exporters = ExportTarget.Console;
                 })
                 .WithTracing(t => t.AddInMemoryExporter(exportedActivities));
 
@@ -355,6 +355,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
                             services.AddOpenTelemetry()
                                 .UseMicrosoftOpenTelemetry(o =>
                                 {
+                                    o.Exporters = ExportTarget.Console;
                                     o.Instrumentation.EnableAspNetCoreInstrumentation = false;
                                 })
                                 .WithTracing(t => t.AddInMemoryExporter(exportedActivities));
@@ -431,7 +432,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
             services.AddOpenTelemetry()
                 .UseMicrosoftOpenTelemetry(o =>
                 {
-                    // defaults — metrics enabled
+                    o.Exporters = ExportTarget.Console;
                 });
 
             // Verify AspNetCore and Http meters are configured via service registrations
@@ -480,6 +481,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
             services.AddOpenTelemetry()
                 .UseMicrosoftOpenTelemetry(o =>
                 {
+                    o.Exporters = ExportTarget.Console;
                     // defaults — MAF enabled
                 })
                 .WithTracing(t => t.AddInMemoryExporter(exportedActivities));
