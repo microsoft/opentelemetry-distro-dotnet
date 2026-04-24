@@ -15,9 +15,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Trace;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Logs;
 using Xunit;
 
 namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
@@ -688,6 +690,125 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
             Assert.True(servicesEnabled.Count > servicesDisabled.Count,
                 $"Expected more services when logging enabled ({servicesEnabled.Count}) " +
                 $"than disabled ({servicesDisabled.Count})");
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        //  11. E2E: EnableLogging kill switch suppresses log records
+        // ══════════════════════════════════════════════════════════════
+
+        [Fact]
+        public void EnableLoggingFalse_NoLogRecordsExported()
+        {
+            var exportedLogs = new List<LogRecord>();
+
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Instrumentation.EnableLogging = false;
+                    o.Exporters = ExportTarget.Console;
+                })
+                .WithLogging(logging => logging.AddInMemoryExporter(exportedLogs));
+
+            using var sp = services.BuildServiceProvider();
+
+            // Emit a log via ILogger
+            var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("TestCategory");
+            logger.LogInformation("This log should be suppressed");
+            logger.LogError("This error should also be suppressed");
+            logger.LogWarning("This warning too");
+
+            // Force flush the log provider
+            var loggerProvider = sp.GetRequiredService<LoggerProvider>();
+            loggerProvider.ForceFlush();
+
+            Assert.Empty(exportedLogs);
+        }
+
+        [Fact]
+        public void EnableLoggingTrue_LogRecordsExported()
+        {
+            var exportedLogs = new List<LogRecord>();
+
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Instrumentation.EnableLogging = true;
+                    o.Exporters = ExportTarget.Console;
+                })
+                .WithLogging(logging => logging.AddInMemoryExporter(exportedLogs));
+
+            using var sp = services.BuildServiceProvider();
+
+            var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("TestCategory");
+            logger.LogInformation("This log should be captured");
+
+            var loggerProvider = sp.GetRequiredService<LoggerProvider>();
+            loggerProvider.ForceFlush();
+
+            Assert.NotEmpty(exportedLogs);
+            Assert.Contains(exportedLogs, r => r.Body?.ToString()?.Contains("captured") == true);
+        }
+
+        [Fact]
+        public void EnableLoggingFalse_OtherLoggersNotAffected()
+        {
+            var otlpLogs = new List<LogRecord>();
+            var capturedByCustomLogger = new List<string>();
+
+            var services = new ServiceCollection();
+            services.AddLogging(logging =>
+            {
+                // Add a custom logging provider to verify it still works
+                logging.AddProvider(new TestLoggerProvider(capturedByCustomLogger));
+            });
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Instrumentation.EnableLogging = false;
+                    o.Exporters = ExportTarget.Console;
+                })
+                .WithLogging(logging => logging.AddInMemoryExporter(otlpLogs));
+
+            using var sp = services.BuildServiceProvider();
+
+            var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("TestCategory");
+            logger.LogInformation("Should reach custom logger but not OTel");
+
+            var loggerProvider = sp.GetRequiredService<LoggerProvider>();
+            loggerProvider.ForceFlush();
+
+            // OTel logs suppressed
+            Assert.Empty(otlpLogs);
+            // Custom logger still received the log
+            Assert.NotEmpty(capturedByCustomLogger);
+            Assert.Contains(capturedByCustomLogger, m => m.Contains("custom logger"));
+        }
+
+        /// <summary>
+        /// Minimal ILoggerProvider for testing that non-OTel loggers are not affected.
+        /// </summary>
+        private sealed class TestLoggerProvider : ILoggerProvider
+        {
+            private readonly List<string> _messages;
+            public TestLoggerProvider(List<string> messages) => _messages = messages;
+            public ILogger CreateLogger(string categoryName) => new TestLogger(_messages);
+            public void Dispose() { }
+
+            private sealed class TestLogger : ILogger
+            {
+                private readonly List<string> _messages;
+                public TestLogger(List<string> messages) => _messages = messages;
+                public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+                public bool IsEnabled(LogLevel logLevel) => true;
+                public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+                {
+                    _messages.Add(formatter(state, exception));
+                }
+            }
         }
     }
 }
