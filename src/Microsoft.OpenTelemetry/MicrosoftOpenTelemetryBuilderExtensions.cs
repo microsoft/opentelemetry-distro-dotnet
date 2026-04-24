@@ -4,6 +4,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using global::OpenTelemetry;
 using global::OpenTelemetry.Trace;
 using global::OpenTelemetry.Metrics;
@@ -175,6 +176,18 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             {
                 builder.WithLogging(logging => logging.AddConsoleExporter());
             }
+        }
+
+        // --- Logging kill switch ---
+        // When EnableLogging is false, suppress all log records from reaching
+        // OpenTelemetryLoggerProvider (affects Azure Monitor, OTLP, Console, etc.).
+        // This is a provider-scoped ILogger filter — other loggers are not affected.
+        if (!options.Instrumentation.EnableLogging)
+        {
+            builder.Services.AddLogging(logging =>
+            {
+                logging.AddFilter<OpenTelemetryLoggerProvider>(null, LogLevel.None);
+            });
         }
 
         return builder;

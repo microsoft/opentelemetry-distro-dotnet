@@ -25,10 +25,12 @@ public class InstrumentationOptions
     public bool EnableMetrics { get; set; } = true;
 
     /// <summary>
-    /// Gets or sets a value indicating whether the logging pipeline is enabled
-    /// for OTLP and Console exporters. When <c>false</c>, log exporters are not
-    /// registered for these targets. Does not affect Azure Monitor logging, which
-    /// is controlled by the Azure Monitor Exporter package. Default: <c>true</c>.
+    /// Gets or sets a value indicating whether OpenTelemetry log export is enabled.
+    /// When <c>false</c>, a provider-scoped <see cref="Microsoft.Extensions.Logging.LogLevel.None"/>
+    /// filter is added to <c>OpenTelemetryLoggerProvider</c>, suppressing all log records
+    /// from reaching any OpenTelemetry exporter (Azure Monitor, OTLP, Console).
+    /// Other logging providers (console logger, file logger, etc.) are not affected.
+    /// Default: <c>true</c>.
     /// </summary>
     public bool EnableLogging { get; set; } = true;
 
