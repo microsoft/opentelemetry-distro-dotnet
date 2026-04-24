@@ -81,6 +81,15 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         this IOpenTelemetryBuilder builder,
         Action<MicrosoftOpenTelemetryOptions> configure)
     {
+        // Guard against duplicate calls
+        if (builder.Services.Any(s => s.ImplementationInstance is UseMicrosoftOpenTelemetryRegistration))
+        {
+            throw new NotSupportedException(
+                "Multiple calls to UseMicrosoftOpenTelemetry on the same IServiceCollection are not supported.");
+        }
+
+        builder.Services.AddSingleton(UseMicrosoftOpenTelemetryRegistration.Instance);
+
         var options = new MicrosoftOpenTelemetryOptions();
         configure(options);
 
