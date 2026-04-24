@@ -80,6 +80,16 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
             Assert.Equal(value, options.EnableMetrics);
         }
 
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void EnableLogging_RoundTrips(bool value)
+        {
+            var options = new InstrumentationOptions { EnableLogging = value };
+            Assert.Equal(value, options.EnableLogging);
+        }
+
+        // ── Library toggles ──
 
         [Theory]
         [InlineData(true)]
