@@ -4,9 +4,11 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using global::OpenTelemetry;
 using global::OpenTelemetry.Trace;
 using global::OpenTelemetry.Metrics;
+using global::OpenTelemetry.Logs;
 
 namespace Microsoft.OpenTelemetry;
 
@@ -79,6 +81,15 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         this IOpenTelemetryBuilder builder,
         Action<MicrosoftOpenTelemetryOptions> configure)
     {
+        // Guard against duplicate calls
+        if (builder.Services.Any(s => s.ImplementationInstance is UseMicrosoftOpenTelemetryRegistration))
+        {
+            throw new NotSupportedException(
+                "Multiple calls to UseMicrosoftOpenTelemetry on the same IServiceCollection are not supported.");
+        }
+
+        builder.Services.AddSingleton(UseMicrosoftOpenTelemetryRegistration.Instance);
+
         var options = new MicrosoftOpenTelemetryOptions();
         configure(options);
 
@@ -97,6 +108,35 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             
         }
 
+        // Determine which signals have at least one exporter destination.
+        // Agent365 only exports traces — metrics and logs sent to it would go nowhere.
+        var hasTracingExporter = exporters != ExportTarget.None; // all exporters support traces
+        var hasMetricsExporter = exporters.HasFlag(ExportTarget.AzureMonitor)
+                              || exporters.HasFlag(ExportTarget.Otlp)
+                              || exporters.HasFlag(ExportTarget.Console);
+        var hasLoggingExporter = hasMetricsExporter; // same set supports logs
+
+        // Effective signal flags: user intent AND exporter availability
+        var effectiveTracing = options.Instrumentation.EnableTracing && hasTracingExporter;
+        var effectiveMetrics = options.Instrumentation.EnableMetrics && hasMetricsExporter;
+        var effectiveLogging = options.Instrumentation.EnableLogging && hasLoggingExporter;
+
+        // Build an effective InstrumentationOptions that subsystems will use
+        var effectiveInstrumentation = new InstrumentationOptions
+        {
+            EnableTracing = effectiveTracing,
+            EnableMetrics = effectiveMetrics,
+            EnableLogging = effectiveLogging,
+            EnableAspNetCoreInstrumentation = options.Instrumentation.EnableAspNetCoreInstrumentation,
+            EnableHttpClientInstrumentation = options.Instrumentation.EnableHttpClientInstrumentation,
+            EnableSqlClientInstrumentation = options.Instrumentation.EnableSqlClientInstrumentation,
+            EnableAzureSdkInstrumentation = options.Instrumentation.EnableAzureSdkInstrumentation,
+            EnableOpenAIInstrumentation = options.Instrumentation.EnableOpenAIInstrumentation,
+            EnableSemanticKernelInstrumentation = options.Instrumentation.EnableSemanticKernelInstrumentation,
+            EnableAgentFrameworkInstrumentation = options.Instrumentation.EnableAgentFrameworkInstrumentation,
+            EnableAgent365Instrumentation = options.Instrumentation.EnableAgent365Instrumentation,
+        };
+
         // --- Azure Monitor (always: instrumentation; exporter gated by Exporters flag) ---
         builder.UseAzureMonitor(o =>
         {
@@ -111,7 +151,7 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             o.EnableTraceBasedLogsSampler = options.AzureMonitor.EnableTraceBasedLogsSampler;
             o.SamplingRatio = options.AzureMonitor.SamplingRatio;
             o.TracesPerSecond = options.AzureMonitor.TracesPerSecond;
-        });
+        }, effectiveInstrumentation);
 
         // --- Agent365 (always: scopes + baggage + span processors; exporter gated by Exporters flag) ---
         builder.UseAgent365(o =>
@@ -124,30 +164,68 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             o.Exporter.ScheduledDelayMilliseconds = options.Agent365.Exporter.ScheduledDelayMilliseconds;
             o.Exporter.ExporterTimeoutMilliseconds = options.Agent365.Exporter.ExporterTimeoutMilliseconds;
             o.Exporter.MaxExportBatchSize = options.Agent365.Exporter.MaxExportBatchSize;
-        });
+        }, effectiveInstrumentation);
 
         // --- Microsoft Agent Framework (always: captures MAF spans + processor) ---
-        builder.UseAgentFramework();
+        builder.UseAgentFramework(effectiveInstrumentation);
 
         // --- OTLP exporter ---
         if (exporters.HasFlag(ExportTarget.Otlp))
         {
-            builder.WithTracing(tracing =>
+            if (effectiveInstrumentation.EnableTracing)
             {
-                tracing.AddOtlpExporter();
-            });
+                builder.WithTracing(tracing =>
+                {
+                    tracing.AddOtlpExporter();
+                });
+            }
 
-            builder.WithMetrics(metrics =>
+            if (effectiveInstrumentation.EnableMetrics)
             {
-                metrics.AddOtlpExporter();
-            });
+                builder.WithMetrics(metrics =>
+                {
+                    metrics.AddOtlpExporter();
+                });
+            }
+
+            if (effectiveInstrumentation.EnableLogging)
+            {
+                builder.WithLogging(logging =>
+                {
+                    logging.AddOtlpExporter();
+                });
+            }
         }
 
         // --- Console exporter ---
         if (exporters.HasFlag(ExportTarget.Console))
         {
-            builder.WithTracing(tracing => tracing.AddConsoleExporter());
-            builder.WithMetrics(metrics => metrics.AddConsoleExporter());
+            if (effectiveInstrumentation.EnableTracing)
+            {
+                builder.WithTracing(tracing => tracing.AddConsoleExporter());
+            }
+
+            if (effectiveInstrumentation.EnableMetrics)
+            {
+                builder.WithMetrics(metrics => metrics.AddConsoleExporter());
+            }
+
+            if (effectiveInstrumentation.EnableLogging)
+            {
+                builder.WithLogging(logging => logging.AddConsoleExporter());
+            }
+        }
+
+        // --- Logging kill switch ---
+        // When effective logging is disabled, suppress all log records from reaching
+        // OpenTelemetryLoggerProvider (affects Azure Monitor, OTLP, Console, etc.).
+        // This is a provider-scoped ILogger filter — other loggers are not affected.
+        if (!effectiveInstrumentation.EnableLogging)
+        {
+            builder.Services.AddLogging(logging =>
+            {
+                logging.AddFilter<OpenTelemetryLoggerProvider>(null, LogLevel.None);
+            });
         }
 
         return builder;

@@ -43,4 +43,10 @@ public class MicrosoftOpenTelemetryOptions
     /// Only exporter is gated by <see cref="Exporters"/>; instrumentation (scopes, baggage) is always active.
     /// </summary>
     public Agent365Options Agent365 { get; } = new();
+
+    /// <summary>
+    /// Gets the instrumentation configuration that controls which telemetry signals
+    /// and auto-instrumentation libraries are active.
+    /// </summary>
+    public InstrumentationOptions Instrumentation { get; } = new();
 }

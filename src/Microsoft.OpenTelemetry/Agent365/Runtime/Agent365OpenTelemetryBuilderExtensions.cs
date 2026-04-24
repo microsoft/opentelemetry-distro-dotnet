@@ -29,7 +29,7 @@ internal static class Agent365OpenTelemetryBuilderExtensions
     /// <returns>The supplied <see cref="IOpenTelemetryBuilder"/> for chaining calls.</returns>
     internal static IOpenTelemetryBuilder UseAgent365(this IOpenTelemetryBuilder builder)
     {
-        return builder.UseAgent365(o => { });
+        return builder.UseAgent365(o => { }, new InstrumentationOptions());
     }
 
     /// <summary>
@@ -57,16 +57,30 @@ internal static class Agent365OpenTelemetryBuilderExtensions
     /// </remarks>
     internal static IOpenTelemetryBuilder UseAgent365(this IOpenTelemetryBuilder builder, Action<Agent365Options> configure)
     {
+        return builder.UseAgent365(configure, new InstrumentationOptions());
+    }
+
+    /// <summary>
+    /// Configures Agent365 observability with instrumentation options.
+    /// </summary>
+    internal static IOpenTelemetryBuilder UseAgent365(this IOpenTelemetryBuilder builder, Action<Agent365Options> configure, InstrumentationOptions instrumentationOptions)
+    {
         var options = new Agent365Options();
         configure?.Invoke(options);
 
         // Enable Azure SDK activity sources
         AppContext.SetSwitch("Azure.Experimental.EnableActivitySource", true);
-        AppContext.SetSwitch("Microsoft.SemanticKernel.Experimental.GenAI.EnableOTelDiagnosticsSensitive", true);
+
+        if (instrumentationOptions.EnableSemanticKernelInstrumentation)
+        {
+            AppContext.SetSwitch("Microsoft.SemanticKernel.Experimental.GenAI.EnableOTelDiagnosticsSensitive", true);
+        }
 
         // --- Core tracing: Agent365 scopes + baggage processor + framework span processors ---
-        builder.WithTracing(tracing =>
+        if (instrumentationOptions.EnableTracing)
         {
+            builder.WithTracing(tracing =>
+            {
             // Match the Agent365 SDK sampler: ParentBasedSampler with AlwaysOnSampler
             // for all cases. The Bot Framework returns HTTP 202 immediately and processes
             // LLM calls on async continuations with no parent Activity. Without this,
@@ -76,17 +90,32 @@ internal static class Agent365OpenTelemetryBuilderExtensions
                 .SetSampler(new global::OpenTelemetry.Trace.ParentBasedSampler(
                     rootSampler: new global::OpenTelemetry.Trace.AlwaysOnSampler(),
                     localParentNotSampled: new global::OpenTelemetry.Trace.AlwaysOnSampler(),
-                    remoteParentNotSampled: new global::OpenTelemetry.Trace.AlwaysOnSampler()))
-                .AddSource(OpenTelemetryConstants.SourceName)
-                .AddSource(SemanticKernelTelemetryConstants.SemanticKernelSourceWildcard)
-                .AddSource("Azure.AI.OpenAI*")
-                .AddSource("OpenAI.*")
-                .AddSource("Experimental.Microsoft.Extensions.AI")
-                .AddSource("Experimental.Microsoft.Agents.AI")
-                .AddSource("Experimental.Microsoft.Agents.AI.Agent")
-                .AddSource("Experimental.Microsoft.Agents.AI.ChatClient")
-                .AddProcessor<ActivityProcessor>()
-                .AddProcessor(new SemanticKernelSpanProcessor());
+                    remoteParentNotSampled: new global::OpenTelemetry.Trace.AlwaysOnSampler()));
+
+            // Agent365 scopes + baggage processor
+            if (instrumentationOptions.EnableAgent365Instrumentation)
+            {
+                tracing
+                    .AddSource(OpenTelemetryConstants.SourceName)
+                    .AddProcessor<ActivityProcessor>();
+            }
+
+            // Semantic Kernel
+            if (instrumentationOptions.EnableSemanticKernelInstrumentation)
+            {
+                tracing
+                    .AddSource(SemanticKernelTelemetryConstants.SemanticKernelSourceWildcard)
+                    .AddProcessor(new SemanticKernelSpanProcessor());
+            }
+
+            // OpenAI / Azure OpenAI
+            if (instrumentationOptions.EnableOpenAIInstrumentation)
+            {
+                tracing
+                    .AddSource("Azure.AI.OpenAI*")
+                    .AddSource("OpenAI.*")
+                    .AddSource("Experimental.Microsoft.Extensions.AI");
+            }
 
             // Agent365 Exporter (enabled when not skipped)
             if (!options.SkipExporter)
@@ -104,7 +133,8 @@ internal static class Agent365OpenTelemetryBuilderExtensions
                 }
                 tracing.AddAgent365Exporter();
             }
-        });
+            });
+        }
 
         return builder;
     }
