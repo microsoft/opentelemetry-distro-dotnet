@@ -12,214 +12,148 @@ dotnet add package Microsoft.OpenTelemetry
 
 ## Quick Start
 
-Send Agent Framework traces to Agent365 in one call:
+### ASP.NET Core / Worker Services (hosted)
 
 ```csharp
 using Microsoft.OpenTelemetry;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenTelemetry()
-    .UseMicrosoftOpenTelemetry(o =>
-    {
-        // Agent365 auto-enables when the Microsoft.Agents.A365.Observability.Hosting
-        // token cache is registered by your app, OR when you set a TokenResolver:
-        o.Agent365.Exporter.TokenResolver = (agentId, tenantId)
-            => tokenProvider.GetTokenAsync(agentId, tenantId);
-    });
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.AzureMonitor;
+});
 
 var app = builder.Build();
-app.MapPost("/api/messages", () => Results.Ok());
 app.Run();
 ```
 
-> A shorthand `builder.UseMicrosoftOpenTelemetry(...)` extension on `WebApplicationBuilder` is also available and is equivalent to the form above.
+### Console / non-hosted apps
 
-Not using Agent Framework / Agent365? Jump to [Azure Monitor](#3-azure-monitor-aspnet-core--worker--console) or the [Options reference](#options-reference).
+```csharp
+using Microsoft.OpenTelemetry;
+using OpenTelemetry;
+
+var sdk = OpenTelemetrySdk.Create(otel =>
+{
+    otel.UseMicrosoftOpenTelemetry(o =>
+    {
+        o.Exporters = ExportTarget.AzureMonitor;
+    });
+});
+
+// Your application logic here.
+// The SDK must stay alive for the lifetime of the app.
+// Disposing the SDK flushes pending telemetry and shuts down all providers.
+
+sdk.Dispose();
+```
+
+> **Important:** Do not dispose the SDK until your application is shutting down. Disposing it early stops all telemetry collection and export — you will lose data.
+
+> `UseMicrosoftOpenTelemetry()` works on any `IOpenTelemetryBuilder` — both the host-integrated and `OpenTelemetrySdk.Create()` paths are supported.
 
 ## Signals & destinations
 
-| Signal | Azure Monitor | Agent365 | OTLP |
-|---|:---:|:---:|:---:|
-| Traces | ✅ | ✅ | ✅ |
-| Metrics | ✅ | — | ✅ |
-| Logs | ✅ | — | ✅ |
+| Signal | Azure Monitor | Agent365 | OTLP | Console |
+|---|:---:|:---:|:---:|:---:|
+| Traces | ✅ | ✅ | ✅ | ✅ |
+| Metrics | ✅ | — | ✅ | ✅ |
+| Logs | ✅ | — | ✅ | ✅ |
 
 Exporters auto-detect when `Exporters` isn't set:
 - **Azure Monitor** — enabled when `ConnectionString` is set (code, env var `APPLICATIONINSIGHTS_CONNECTION_STRING`, or `IConfiguration`).
 - **Agent365** — enabled when `TokenResolver` is set (or when the DI token cache is registered by `Microsoft.Agents.A365.Observability.Hosting`).
-- **OTLP** — enabled when `OtlpEndpoint` is set.
+
+Set explicitly to override auto-detection: `o.Exporters = ExportTarget.AzureMonitor | ExportTarget.Agent365;`
 
 ## Instrumentation (always active)
 
 - ASP.NET Core incoming HTTP requests
 - HTTP client outbound calls (with Azure SDK dedup filter)
 - SQL client queries
+- Azure SDK client calls
 - Resource detection (Azure App Service, VM, Container Apps)
 - Agent365 scopes (`InvokeAgentScope`, `InferenceScope`, `ExecuteToolScope`, `OutputScope`) and baggage propagation
-- Microsoft Agent Framework — `Experimental.Microsoft.Agents.AI` activity source
+- Microsoft Agent Framework — `Experimental.Microsoft.Agents.AI` activity sources
+- Semantic Kernel — `Microsoft.SemanticKernel*` activity sources
+- OpenAI / Azure OpenAI — `Azure.AI.OpenAI*`, `OpenAI.*`, `Experimental.Microsoft.Extensions.AI`
 - Azure SDK EventSource → `ILogger` log forwarding
 - Metrics — `Microsoft.AspNetCore.Hosting`, `System.Net.Http`
 
 ## Onboarding by scenario
 
-Pick the section that matches your workload. All three can be combined in the same app.
+Pick the section that matches your workload. All can be combined in the same app.
 
 ---
 
-### 1. Agent365
+### 1. Azure Monitor
 
-Send agent telemetry (invoke agent, inference, tool execution, output) to the [Agent365](https://learn.microsoft.com/en-us/microsoft-agent-365/) observability backend.
-
-**Prerequisites**
-- An Agent365 tenant and agent identity — see the [Agent365 developer docs](https://learn.microsoft.com/en-us/microsoft-agent-365/developer/).
-- Either:
-  - **Auto-managed tokens (recommended for Agent Framework apps):** the `Microsoft.Agents.A365.Observability.Hosting` package registers a token cache via DI — no code needed on your side.
-  - **Custom token resolver:** an async function that returns a bearer token for `(agentId, tenantId)`.
-- NuGet packages: `Microsoft.OpenTelemetry`, `Microsoft.Agents.Builder`.
-
-**Setup**
+Send traces, metrics, and logs to Application Insights / Azure Monitor.
 
 ```csharp
-using Microsoft.OpenTelemetry;
-
-var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddOpenTelemetry()
-    .UseMicrosoftOpenTelemetry(o =>
-    {
-        // Custom token resolver (skip if using auto-managed tokens)
-        o.Agent365.Exporter.TokenResolver = (agentId, tenantId)
-            => tokenProvider.GetTokenAsync(agentId, tenantId);
-    });
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.AzureMonitor;
+    o.AzureMonitor.ConnectionString = "InstrumentationKey=...";
+});
 ```
 
-**What you get**
-- **Scopes**: `InvokeAgentScope`, `InferenceScope`, `ExecuteToolScope`, `OutputScope`
-- **Baggage**: per-request tenant / agent / session context propagation
-- **Exporter**: authenticated export to Agent365 endpoint
+**Configuration sources** — the connection string can be set via code, `appsettings.json`, or the `APPLICATIONINSIGHTS_CONNECTION_STRING` environment variable.
 
-**Composable alternative**
-
-```csharp
-builder.Services.AddOpenTelemetry()
-    .UseAgent365(o =>
-    {
-        o.Exporter.TokenResolver = (agentId, tenantId) => tokenProvider.GetTokenAsync(agentId, tenantId);
-    });
-```
-
-See [examples/Microsoft.OpenTelemetry.Agent365.Demo](examples/Microsoft.OpenTelemetry.Agent365.Demo).
+📖 **Full guide:** [Azure Monitor Getting Started](docs/azure-monitor-getting-started.md)
 
 ---
 
 ### 2. Microsoft Agent Framework
 
-Capture activity from the `Experimental.Microsoft.Agents.AI` activity source and export to your backend of choice.
-
-**Prerequisites**
-- An app that uses `Microsoft.Agents.AI` (Agent Framework).
-- An export destination (Azure Monitor connection string, OTLP collector, or Agent365 identity).
-- NuGet package: `Microsoft.OpenTelemetry`.
-
-**Setup — Agent Framework → Azure Monitor**
+Capture activity from Agent Framework agents and export to Azure Monitor, OTLP, or both.
 
 ```csharp
-builder.Services.AddOpenTelemetry()
-    .UseMicrosoftOpenTelemetry(o =>
-    {
-        o.AzureMonitor.ConnectionString = "InstrumentationKey=...";
-        // Agent Framework activity source is already captured — no extra flag needed.
-    });
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.AzureMonitor | ExportTarget.Otlp;
+});
 ```
 
-**Setup — Agent Framework → OTLP (Aspire Dashboard, Jaeger, Grafana Tempo)**
+Agent Framework activity sources are captured automatically — no extra configuration needed.
 
-```csharp
-builder.Services.AddOpenTelemetry()
-    .UseMicrosoftOpenTelemetry(o =>
-    {
-        o.OtlpEndpoint = new Uri("http://localhost:4317");
-    });
-```
-
-**Setup — Agent Framework → Agent365**
-
-```csharp
-builder.Services.AddOpenTelemetry()
-    .UseMicrosoftOpenTelemetry(o =>
-    {
-        o.Agent365.Exporter.TokenResolver = (agentId, tenantId)
-            => tokenProvider.GetTokenAsync(agentId, tenantId);
-    });
-```
-
-**Composable alternative**
-
-```csharp
-builder.Services.AddOpenTelemetry()
-    .UseAgentFramework();
-```
-
-See [examples/Microsoft.OpenTelemetry.AgentFramework.Demo](examples/Microsoft.OpenTelemetry.AgentFramework.Demo).
+📖 **Full guide:** [Agent Framework Getting Started](docs/agent-framework-getting-started.md)
 
 ---
 
-### 3. Azure Monitor (ASP.NET Core / Worker / Console)
+### 3. Agent365
 
-Send traces, metrics, and logs to Application Insights / Azure Monitor.
-
-**Prerequisites**
-- An Application Insights resource — copy its **Connection String** from the Azure portal.
-- NuGet package: `Microsoft.OpenTelemetry`.
-
-**Setup**
+Send agent telemetry (invoke agent, inference, tool execution, output) to the [Agent365](https://learn.microsoft.com/en-us/microsoft-agent-365/) observability backend.
 
 ```csharp
-using Microsoft.OpenTelemetry;
-
-var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddOpenTelemetry()
-    .UseMicrosoftOpenTelemetry(o =>
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.Agent365;
+    o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
     {
-        o.AzureMonitor.ConnectionString =
-            builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
-    });
+        return await MyTokenService.GetTokenAsync(agentId, tenantId);
+    };
+});
 ```
 
-**Configuration sources**
-
-| Source | Key |
-|---|---|
-| Environment variable | `APPLICATIONINSIGHTS_CONNECTION_STRING` |
-| `appsettings.json` | `"APPLICATIONINSIGHTS_CONNECTION_STRING": "..."` |
-| Code | `o.AzureMonitor.ConnectionString = "..."` |
-
-**Composable alternative**
-
-```csharp
-builder.Services.AddOpenTelemetry()
-    .UseAzureMonitor(o => o.ConnectionString = "InstrumentationKey=...");
-```
-
-See [examples/Azure.Monitor.OpenTelemetry.AspNetCore.Demo](examples/Azure.Monitor.OpenTelemetry.AspNetCore.Demo).
+📖 **Full guide:** [Agent365 Getting Started](docs/agent365-getting-started.md)
 
 ---
 
 ### Combining destinations
 
 ```csharp
-builder.Services.AddOpenTelemetry()
-    .UseMicrosoftOpenTelemetry(o =>
-    {
-        o.Exporters = ExportTarget.AzureMonitor | ExportTarget.Agent365 | ExportTarget.Otlp;
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.AzureMonitor | ExportTarget.Agent365 | ExportTarget.Otlp;
 
-        o.AzureMonitor.ConnectionString = "InstrumentationKey=...";
-        o.Agent365.Exporter.TokenResolver = (agentId, tenantId)
-            => tokenProvider.GetTokenAsync(agentId, tenantId);
-        o.OtlpEndpoint = new Uri("http://localhost:4317");
-    });
+    o.AzureMonitor.ConnectionString = "InstrumentationKey=...";
+    o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
+    {
+        return await MyTokenService.GetTokenAsync(agentId, tenantId);
+    };
+});
 ```
 
 ## Options reference
@@ -227,48 +161,63 @@ builder.Services.AddOpenTelemetry()
 Full surface of `MicrosoftOpenTelemetryOptions`. Everything is opt-in; values shown are defaults.
 
 ```csharp
-builder.Services.AddOpenTelemetry()
-    .UseMicrosoftOpenTelemetry(o =>
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    // --- Export targets (pick one or combine with |) ---
+    o.Exporters = ExportTarget.Console         // Console output (dev)
+                | ExportTarget.Agent365        // Agent365 observability platform
+                | ExportTarget.AzureMonitor    // Application Insights
+                | ExportTarget.Otlp;           // OTLP (Aspire, Jaeger, Grafana)
+
+    // --- Azure Monitor settings ---
+    o.AzureMonitor.ConnectionString = "InstrumentationKey=...";
+    o.AzureMonitor.Credential = new DefaultAzureCredential(); // Optional AAD auth
+    o.AzureMonitor.SamplingRatio = 1.0f;
+    o.AzureMonitor.TracesPerSecond = 5.0;     // Rate-limited sampling (default)
+    o.AzureMonitor.EnableLiveMetrics = true;
+    o.AzureMonitor.EnableStandardMetrics = true;
+    o.AzureMonitor.EnablePerfCounters = true;
+    o.AzureMonitor.EnableTraceBasedLogsSampler = true;
+    o.AzureMonitor.DisableOfflineStorage = false;
+    o.AzureMonitor.StorageDirectory = null;
+
+    // --- Agent365 exporter settings ---
+
+    // Option A: Auto-managed tokens via DI (recommended for Agent Framework apps).
+    // The Microsoft.Agents.A365.Observability.Hosting package registers
+    // IExporterTokenCache<AgenticTokenStruct>. No TokenResolver needed.
+
+    // Option B: Custom token resolver (non-agent apps, S2S, custom auth)
+    o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
     {
-        // --- Export targets (pick one or combine with |) ---
-        o.Exporters = ExportTarget.Console         // Console output (dev)
-                    | ExportTarget.Agent365        // Agent365 observability platform
-                    | ExportTarget.AzureMonitor    // Application Insights
-                    | ExportTarget.Otlp;           // OTLP (Aspire, Jaeger, Grafana)
+        return await MyTokenService.GetTokenAsync(agentId, tenantId);
+    };
 
-        // --- Agent365 exporter settings ---
+    // Optional: custom domain resolver (default: agent365.svc.cloud.microsoft)
+    o.Agent365.Exporter.DomainResolver = tenantId => "agent365.svc.cloud.microsoft";
 
-        // Option A: Auto-managed tokens via DI (recommended for Agent Framework apps).
-        // The Microsoft.Agents.A365.Observability.Hosting package registers
-        // IExporterTokenCache<AgenticTokenStruct>. Tokens are exchanged
-        // per request via ExchangeTurnTokenAsync — no TokenResolver needed.
+    // Optional: use S2S endpoint path
+    o.Agent365.Exporter.UseS2SEndpoint = false;
 
-        // Option B: Custom token resolver (non-agent apps, S2S, custom auth)
-        o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
-        {
-            return await MyTokenService.GetTokenAsync(agentId, tenantId);
-        };
+    // Optional: batch export tuning
+    o.Agent365.Exporter.MaxQueueSize = 2048;
+    o.Agent365.Exporter.MaxExportBatchSize = 512;
+    o.Agent365.Exporter.ScheduledDelayMilliseconds = 5000;
+    o.Agent365.Exporter.ExporterTimeoutMilliseconds = 30000;
 
-        // Optional: custom domain resolver (default: agent365.svc.cloud.microsoft)
-        o.Agent365.Exporter.DomainResolver = tenantId => "agent365.svc.cloud.microsoft";
-
-        // Optional: use S2S endpoint path
-        o.Agent365.Exporter.UseS2SEndpoint = false;
-
-        // Optional: batch export tuning
-        o.Agent365.Exporter.MaxQueueSize = 2048;
-        o.Agent365.Exporter.MaxExportBatchSize = 512;
-        o.Agent365.Exporter.ScheduledDelayMilliseconds = 5000;
-        o.Agent365.Exporter.ExporterTimeoutMilliseconds = 30000;
-
-        // --- Azure Monitor settings ---
-        o.AzureMonitor.ConnectionString = "InstrumentationKey=...";
-        o.AzureMonitor.SamplingRatio = 1.0f;
-        o.AzureMonitor.EnableLiveMetrics = true;
-
-        // --- OTLP settings ---
-        o.OtlpEndpoint = new Uri("http://localhost:4317");
-    });
+    // --- Instrumentation options (all default to true) ---
+    o.Instrumentation.EnableTracing = true;
+    o.Instrumentation.EnableMetrics = true;
+    o.Instrumentation.EnableLogging = true;
+    o.Instrumentation.EnableAspNetCoreInstrumentation = true;
+    o.Instrumentation.EnableHttpClientInstrumentation = true;
+    o.Instrumentation.EnableSqlClientInstrumentation = true;
+    o.Instrumentation.EnableAzureSdkInstrumentation = true;
+    o.Instrumentation.EnableOpenAIInstrumentation = true;
+    o.Instrumentation.EnableSemanticKernelInstrumentation = true;
+    o.Instrumentation.EnableAgentFrameworkInstrumentation = true;
+    o.Instrumentation.EnableAgent365Instrumentation = true;
+});
 ```
 
 ### Token resolver: auto vs custom
@@ -313,8 +262,11 @@ builder.Services.AddLogging(logging => logging.AddConsole());
 
 ## Documentation
 
-- [Agent 365 Getting Started](docs/agent365-getting-started.md) — Comprehensive guide for adding Agent365 observability using the distro
-- [Agent 365 Migration Guide](docs/agent365-migration.md) — Migrating from the standalone Agent365 SDK to the distro
+- [Azure Monitor Getting Started](docs/azure-monitor-getting-started.md) — Send traces, metrics, and logs to Application Insights
+- [Agent Framework Getting Started](docs/agent-framework-getting-started.md) — Instrument Agent Framework agents with Azure Monitor and OTLP
+- [Customization Guide](docs/customization.md) — Resource configuration, enrichment, filtering, and OTLP exporter tuning
+- [Agent 365 Getting Started](docs/agent365-getting-started.md) — Add Agent365 observability using the distro
+- [Agent 365 Migration Guide](docs/agent365-migration.md) — Migrate from the standalone Agent365 SDK to the distro
 - [Agent 365 Migration Testing](docs/testing-agent365.md) — Detailed migration checklist with auto-instrumentation, env vars, and span comparison
 
 ## Examples

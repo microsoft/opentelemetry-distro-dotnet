@@ -151,7 +151,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
 // --- OTel setup (non-DI) ---
-using var sdk = OpenTelemetrySdk.Create(otel =>
+var sdk = OpenTelemetrySdk.Create(otel =>
 {
     otel.ConfigureResource(r => r.AddService("my-agent-app"));
 
