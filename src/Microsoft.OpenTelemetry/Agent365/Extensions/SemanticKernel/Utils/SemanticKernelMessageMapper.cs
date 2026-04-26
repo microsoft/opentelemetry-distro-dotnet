@@ -38,19 +38,19 @@ internal static class SemanticKernelMessageMapper
             {
                 case "gen_ai.system.message":
                 case "gen_ai.tool.developer":
-                    MapSystemMessage(content, chatMessages);
+                    MapSystemMessage(content!, chatMessages);
                     break;
 
                 case "gen_ai.user.message":
-                    MapUserMessage(content, chatMessages);
+                    MapUserMessage(content!, chatMessages);
                     break;
 
                 case "gen_ai.assistant.message":
-                    MapAssistantMessage(content, chatMessages);
+                    MapAssistantMessage(content!, chatMessages);
                     break;
 
                 case "gen_ai.tool.message":
-                    MapToolMessage(content, chatMessages);
+                    MapToolMessage(content!, chatMessages);
                     break;
             }
         }
@@ -80,7 +80,7 @@ internal static class SemanticKernelMessageMapper
             if (string.IsNullOrEmpty(content))
                 continue;
 
-            MapChoiceMessage(content, outputMessages);
+            MapChoiceMessage(content!, outputMessages);
         }
 
         if (outputMessages.Count == 0)
@@ -101,7 +101,7 @@ internal static class SemanticKernelMessageMapper
 
             messages.Add(new ChatMessage(
                 MessageRole.System,
-                new IMessagePart[] { new TextPart(textContent) },
+                new IMessagePart[] { new TextPart(textContent!) },
                 GetStringProperty(root, "name")));
         }
         catch (JsonException) { }
@@ -119,7 +119,7 @@ internal static class SemanticKernelMessageMapper
 
             messages.Add(new ChatMessage(
                 MessageRole.User,
-                new IMessagePart[] { new TextPart(textContent) },
+                new IMessagePart[] { new TextPart(textContent!) },
                 GetStringProperty(root, "name")));
         }
         catch (JsonException) { }
@@ -139,7 +139,7 @@ internal static class SemanticKernelMessageMapper
             var textContent = GetStringProperty(root, "content");
             if (!string.IsNullOrEmpty(textContent))
             {
-                parts.Add(new TextPart(textContent));
+                parts.Add(new TextPart(textContent!));
             }
 
             if (root.TryGetProperty("tool_calls", out var toolCallsElement)
@@ -164,7 +164,7 @@ internal static class SemanticKernelMessageMapper
 
                     if (!string.IsNullOrEmpty(functionName))
                     {
-                        parts.Add(new ToolCallRequestPart(functionName, toolCallId, arguments));
+                        parts.Add(new ToolCallRequestPart(functionName!, toolCallId, arguments));
                     }
                 }
             }
@@ -215,7 +215,7 @@ internal static class SemanticKernelMessageMapper
             var textContent = GetStringProperty(msgElement, "content");
             if (!string.IsNullOrEmpty(textContent))
             {
-                parts.Add(new TextPart(textContent));
+                parts.Add(new TextPart(textContent!));
             }
 
             if (msgElement.TryGetProperty("tool_calls", out var toolCallsElement)
@@ -240,7 +240,7 @@ internal static class SemanticKernelMessageMapper
 
                     if (!string.IsNullOrEmpty(functionName))
                     {
-                        parts.Add(new ToolCallRequestPart(functionName, toolCallId, arguments));
+                        parts.Add(new ToolCallRequestPart(functionName!, toolCallId, arguments));
                     }
                 }
             }
@@ -261,10 +261,10 @@ internal static class SemanticKernelMessageMapper
         if (string.IsNullOrEmpty(role))
             return defaultRole;
 
-        if (role.Equals("system", System.StringComparison.OrdinalIgnoreCase)) return MessageRole.System;
-        if (role.Equals("user", System.StringComparison.OrdinalIgnoreCase)) return MessageRole.User;
-        if (role.Equals("assistant", System.StringComparison.OrdinalIgnoreCase)) return MessageRole.Assistant;
-        if (role.Equals("tool", System.StringComparison.OrdinalIgnoreCase)) return MessageRole.Tool;
+        if (role!.Equals("system", System.StringComparison.OrdinalIgnoreCase)) return MessageRole.System;
+        if (role!.Equals("user", System.StringComparison.OrdinalIgnoreCase)) return MessageRole.User;
+        if (role!.Equals("assistant", System.StringComparison.OrdinalIgnoreCase)) return MessageRole.Assistant;
+        if (role!.Equals("tool", System.StringComparison.OrdinalIgnoreCase)) return MessageRole.Tool;
 
         return defaultRole;
     }
@@ -274,10 +274,10 @@ internal static class SemanticKernelMessageMapper
         if (string.IsNullOrEmpty(skFinishReason))
             return null;
 
-        if (skFinishReason.Equals("Stop", System.StringComparison.OrdinalIgnoreCase)) return "stop";
-        if (skFinishReason.Equals("Length", System.StringComparison.OrdinalIgnoreCase)) return "length";
-        if (skFinishReason.Equals("ContentFilter", System.StringComparison.OrdinalIgnoreCase)) return "content_filter";
-        if (skFinishReason.Equals("ToolCalls", System.StringComparison.OrdinalIgnoreCase)) return "tool_calls";
+        if (skFinishReason!.Equals("Stop", System.StringComparison.OrdinalIgnoreCase)) return "stop";
+        if (skFinishReason!.Equals("Length", System.StringComparison.OrdinalIgnoreCase)) return "length";
+        if (skFinishReason!.Equals("ContentFilter", System.StringComparison.OrdinalIgnoreCase)) return "content_filter";
+        if (skFinishReason!.Equals("ToolCalls", System.StringComparison.OrdinalIgnoreCase)) return "tool_calls";
 
         return skFinishReason.ToLowerInvariant();
     }

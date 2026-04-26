@@ -1,10 +1,8 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System.Diagnostics;
 using System.Text.Json;
-using Microsoft.Agents.A365.Observability.Extensions.SemanticKernel;
 using Microsoft.Agents.A365.Observability.Extensions.SemanticKernel.Models;
 using Microsoft.Agents.A365.Observability.Extensions.SemanticKernel.Utils;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
@@ -15,22 +13,29 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Extensions
     public class SemanticKernelSpanProcessorHelperTests
     {
         [TestMethod]
-        public void ProcessInvocationInputOutputTag_RemovesSystemRoleMessages()
+        public void ProcessInvocationInputOutputTag_MapsMessagesToStructuredInputFormat()
         {
             var activity = new Activity("test");
             var messages = new List<string>
-        {
-            JsonSerializer.Serialize(new MessageContent { Role = "system", Content = "System message" }),
-            JsonSerializer.Serialize(new MessageContent { Role = "user", Content = "Message:User message" })
-        };
+            {
+                JsonSerializer.Serialize(new MessageContent { Role = "system", Content = "System message" }),
+                JsonSerializer.Serialize(new MessageContent { Role = "user", Content = "Message:User message" })
+            };
             activity.SetTag(OpenTelemetryConstants.GenAiAgentInvocationInputKey, JsonSerializer.Serialize(messages));
 
             SemanticKernelSpanProcessorHelper.ProcessInvocationInputOutputTag(activity);
 
-            var filtered = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiAgentInvocationInputKey).Value as string;
-            Assert.IsNotNull(filtered);
-            Assert.IsFalse(filtered.Contains("System message"));
-            Assert.IsTrue(filtered.Contains("User message"));
+            var invocationTag = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiAgentInvocationInputKey).Value;
+            Assert.IsNull(invocationTag, "Invocation input key should be removed");
+
+            var result = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiInputMessagesKey).Value as string;
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.Contains("\"version\":\"0.1.0\""), "Should contain version");
+            Assert.IsTrue(result.Contains("\"role\":\"system\""), "System messages should be preserved");
+            Assert.IsTrue(result.Contains("\"role\":\"user\""), "Should contain user role");
+            Assert.IsTrue(result.Contains("System message"), "System message content should be preserved");
+            Assert.IsTrue(result.Contains("User message"), "User message content should be preserved");
+            Assert.IsTrue(result.Contains("\"type\":\"text\""), "Should contain text part type");
         }
 
         [TestMethod]
@@ -38,17 +43,21 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Extensions
         {
             var activity = new Activity("test");
 
-            // JSON array of objects directly (not wrapped in strings)
             var jsonArrayOfObjects = @"[{""role"":""system"",""name"":""Agent365Agent"",""content"":""You are a friendly assistant."",""tool_calls"":[]},{""role"":""user"",""name"":null,""content"":""hi"",""tool_calls"":[]}]";
 
             activity.SetTag(OpenTelemetryConstants.GenAiAgentInvocationInputKey, jsonArrayOfObjects);
 
             SemanticKernelSpanProcessorHelper.ProcessInvocationInputOutputTag(activity);
 
-            var filtered = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiAgentInvocationInputKey).Value as string;
-            Assert.IsNotNull(filtered);
-            Assert.IsFalse(filtered.Contains("You are a friendly assistant"), "System message should be filtered out");
-            Assert.IsTrue(filtered.Contains("hi"), "User message should be preserved");
+            var invocationTag = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiAgentInvocationInputKey).Value;
+            Assert.IsNull(invocationTag, "Invocation input key should be removed");
+
+            var result = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiInputMessagesKey).Value as string;
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.Contains("\"version\":\"0.1.0\""), "Should contain version");
+            Assert.IsTrue(result.Contains("\"role\":\"system\""), "System message should be preserved");
+            Assert.IsTrue(result.Contains("\"role\":\"user\""), "Should contain user role");
+            Assert.IsTrue(result.Contains("hi"), "User message should be preserved");
         }
 
         [TestMethod]
@@ -65,7 +74,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Extensions
             {
                 JsonSerializer.Serialize(new MessageContent { Role = "assistant", Content = "Output message" })
             };
-            
+
             activity.SetTag(OpenTelemetryConstants.GenAiAgentInvocationInputKey, JsonSerializer.Serialize(agentMessages));
             activity.SetTag(OpenTelemetryConstants.GenAiInputMessagesKey, inputMessages);
             activity.SetTag(OpenTelemetryConstants.GenAiAgentInvocationOutputKey, JsonSerializer.Serialize(outputMessages));
@@ -74,19 +83,22 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Extensions
 
             var removedAgentInput = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiAgentInvocationInputKey).Value;
             var removedInputMessages = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiInputMessagesKey).Value;
-            var output = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiAgentInvocationOutputKey).Value as string;
-            
-            Assert.IsNull(removedAgentInput);
-            Assert.IsNull(removedInputMessages);
-            Assert.IsNotNull(output);
-            Assert.IsTrue(output.Contains("Output message"));
+            var removedInvocationOutput = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiAgentInvocationOutputKey).Value;
+            var output = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiOutputMessagesKey).Value as string;
+
+            Assert.IsNull(removedAgentInput, "Invocation input key should be removed");
+            Assert.IsNull(removedInputMessages, "Input messages key should be removed");
+            Assert.IsNull(removedInvocationOutput, "Invocation output key should be removed");
+            Assert.IsNotNull(output, "Output should be on gen_ai.output.messages");
+            Assert.IsTrue(output.Contains("\"version\":\"0.1.0\""), "Output should be in structured format");
+            Assert.IsTrue(output.Contains("\"role\":\"assistant\""), "Should contain assistant role");
+            Assert.IsTrue(output.Contains("Output message"), "Output content should be preserved");
         }
 
         [TestMethod]
         public void ProcessInvocationInputOutputTag_SuppressInvocationInput_HandlesMissingTags()
         {
             var activity = new Activity("test");
-            // GenAiInputMessagesKey and GenAiAgentInvocationInputKey intentionally not set
 
             SemanticKernelSpanProcessorHelper.ProcessInvocationInputOutputTag(activity, suppressInvocationInput: true);
 
@@ -114,46 +126,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Extensions
         }
 
         [TestMethod]
-        public void GetGenAiUserAndChoiceMessageContent_ExtractsUserAndChoiceMessages()
-        {
-            var activity = new Activity("test");
-            var userMsg = new MessageContent { Role = "user", Content = "Message:Hello user" };
-            var choiceMsg = new AiChoice
-            {
-                Message = new AiChoiceMessage
-                {
-                    Role = "Assistant",
-                    ToolCalls = new List<AiChoiceToolCall>
-                {
-                    new AiChoiceToolCall
-                    {
-                        Function = new AiChoiceFunction
-                        {
-                            Arguments = new AiChoiceArguments { MessageBody = "Choice message body" }
-                        }
-                    }
-                }
-                }
-            };
-
-            activity.AddEvent(new ActivityEvent(OpenTelemetryConstants.GenAiUserMessageEventName, tags: new ActivityTagsCollection
-        {
-            { SemanticKernelTelemetryConstants.EventContentTag, JsonSerializer.Serialize(userMsg) }
-        }));
-            activity.AddEvent(new ActivityEvent(OpenTelemetryConstants.GenAiChoiceEventName, tags: new ActivityTagsCollection
-        {
-            { SemanticKernelTelemetryConstants.EventContentTag, JsonSerializer.Serialize(choiceMsg) }
-        }));
-
-            var result = SemanticKernelSpanProcessorHelper.GetGenAiUserAndChoiceMessageContent(activity);
-
-            Assert.AreEqual(1, result[OpenTelemetryConstants.GenAiUserMessageEventName].Count);
-            Assert.AreEqual("Hello user", result[OpenTelemetryConstants.GenAiUserMessageEventName][0]);
-            Assert.AreEqual(1, result[OpenTelemetryConstants.GenAiChoiceEventName].Count);
-            Assert.AreEqual("Choice message body", result[OpenTelemetryConstants.GenAiChoiceEventName][0]);
-        }
-
-        [TestMethod]
         public void TryDeserializeMessageContent_HandlesUnquotedPropertyValues()
         {
             var unquotedJson = "{\u0022role\u0022: \u0022Assistant\u0022, \u0022content\u0022: \u0022\\u003Cp\\u003EHello Jian Han,\\u003C/p\\u003E\\n\\u003Cp\\u003EHow may I assist you today?\\u003C/p\\u003E\u0022, \u0022name\u0022: ShippingAgent1efe6ed@a365preview005.onmicrosoft.com}";
@@ -167,123 +139,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Extensions
         }
 
         [TestMethod]
-        public void FilterAiChoiceMessageContent_FallbacksToOriginalOnInvalidJson()
-        {
-            var choiceMessages = new List<string>();
-            var invalidJson = "not a json";
-            typeof(SemanticKernelSpanProcessorHelper)
-                .GetMethod("FilterAiChoiceMessageContent", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
-                ?.Invoke(null, new object[] { invalidJson, choiceMessages });
-
-            Assert.AreEqual(1, choiceMessages.Count);
-            Assert.AreEqual("not a json", choiceMessages[0]);
-        }
-
-        [TestMethod]
-        public void FilterAiChoiceMessageContent_ExtractsDirectContentFromAssistantMessage()
-        {
-            var choiceMessages = new List<string>();
-            var choiceJson = JsonSerializer.Serialize(new AiChoice
-            {
-                Message = new AiChoiceMessage
-                {
-                    Role = "Assistant",
-                    Content = "The answer is 42."
-                }
-            });
-
-            typeof(SemanticKernelSpanProcessorHelper)
-                .GetMethod("FilterAiChoiceMessageContent", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
-                ?.Invoke(null, new object[] { choiceJson, choiceMessages });
-
-            Assert.AreEqual(1, choiceMessages.Count);
-            Assert.AreEqual("The answer is 42.", choiceMessages[0]);
-        }
-
-        [TestMethod]
-        public void FilterAiChoiceMessageContent_UnwrapsNestedContentFromAssistantMessage()
-        {
-            var nestedContent = @"{""contentType"":""Text"",""content"":""3 modulus 29 is 3.""}";
-            var choiceJson = JsonSerializer.Serialize(new AiChoice
-            {
-                Message = new AiChoiceMessage
-                {
-                    Role = "Assistant",
-                    Content = nestedContent
-                }
-            });
-
-            var choiceMessages = new List<string>();
-            typeof(SemanticKernelSpanProcessorHelper)
-                .GetMethod("FilterAiChoiceMessageContent", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
-                ?.Invoke(null, new object[] { choiceJson, choiceMessages });
-
-            Assert.AreEqual(1, choiceMessages.Count);
-            Assert.AreEqual("3 modulus 29 is 3.", choiceMessages[0]);
-        }
-
-        [TestMethod]
-        public void FilterAiChoiceMessageContent_ExtractsBothDirectContentAndToolCalls()
-        {
-            var choiceJson = JsonSerializer.Serialize(new AiChoice
-            {
-                Message = new AiChoiceMessage
-                {
-                    Role = "Assistant",
-                    Content = "Here is the result.",
-                    ToolCalls = new List<AiChoiceToolCall>
-                    {
-                        new AiChoiceToolCall
-                        {
-                            Function = new AiChoiceFunction
-                            {
-                                Arguments = new AiChoiceArguments { MessageBody = "Tool output" }
-                            }
-                        }
-                    }
-                }
-            });
-
-            var choiceMessages = new List<string>();
-            typeof(SemanticKernelSpanProcessorHelper)
-                .GetMethod("FilterAiChoiceMessageContent", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
-                ?.Invoke(null, new object[] { choiceJson, choiceMessages });
-
-            Assert.AreEqual(2, choiceMessages.Count);
-            Assert.AreEqual("Here is the result.", choiceMessages[0]);
-            Assert.AreEqual("Tool output", choiceMessages[1]);
-        }
-
-        [TestMethod]
-        public void GetGenAiUserAndChoiceMessageContent_ExtractsDirectContentFromChoiceEvent()
-        {
-            var activity = new Activity("test");
-            var choiceMsg = new AiChoice
-            {
-                Message = new AiChoiceMessage
-                {
-                    Role = "Assistant",
-                    Content = @"{""contentType"":""Text"",""content"":""Hello from the assistant.""}"
-                }
-            };
-
-            activity.AddEvent(new ActivityEvent(OpenTelemetryConstants.GenAiChoiceEventName, tags: new ActivityTagsCollection
-            {
-                { SemanticKernelTelemetryConstants.EventContentTag, JsonSerializer.Serialize(choiceMsg) }
-            }));
-
-            var result = SemanticKernelSpanProcessorHelper.GetGenAiUserAndChoiceMessageContent(activity);
-
-            Assert.AreEqual(1, result[OpenTelemetryConstants.GenAiChoiceEventName].Count);
-            Assert.AreEqual("Hello from the assistant.", result[OpenTelemetryConstants.GenAiChoiceEventName][0]);
-        }
-
-        [TestMethod]
         public void ProcessInvocationInputOutputTag_ExtractsNestedContentFromAssistantMessages()
         {
             var activity = new Activity("test");
 
-            // JSON array with an assistant message containing nested content structure
             var nestedContentJson = @"{""contentType"": ""'Text'"", ""content"": ""Hello! Before I can assist you, you must accept the terms and conditions.""}";
             var jsonArrayOfObjects = $@"[{{""role"":""Assistant"",""name"":""Agent365Agent"",""content"":{JsonSerializer.Serialize(nestedContentJson)}}}]";
 
@@ -291,7 +150,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Extensions
 
             SemanticKernelSpanProcessorHelper.ProcessInvocationInputOutputTag(activity);
 
-            var filtered = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiAgentInvocationOutputKey).Value as string;
+            var invocationTag = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiAgentInvocationOutputKey).Value;
+            Assert.IsNull(invocationTag, "Invocation output key should be removed");
+
+            var filtered = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiOutputMessagesKey).Value as string;
             Assert.IsNotNull(filtered);
             Assert.IsTrue(filtered.Contains("Hello! Before I can assist you, you must accept the terms and conditions."), "Nested content should be extracted");
             Assert.IsFalse(filtered.Contains("contentType"), "contentType property should be removed");
@@ -302,14 +164,16 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Extensions
         {
             var activity = new Activity("test");
 
-            // JSON array with a user message that has simple string content (not nested)
             var jsonArrayOfObjects = @"[{""role"":""user"",""name"":null,""content"":""Message:Simple text message""}]";
 
             activity.SetTag(OpenTelemetryConstants.GenAiAgentInvocationInputKey, jsonArrayOfObjects);
 
             SemanticKernelSpanProcessorHelper.ProcessInvocationInputOutputTag(activity);
 
-            var filtered = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiAgentInvocationInputKey).Value as string;
+            var invocationTag = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiAgentInvocationInputKey).Value;
+            Assert.IsNull(invocationTag, "Invocation input key should be removed");
+
+            var filtered = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiInputMessagesKey).Value as string;
             Assert.IsNotNull(filtered);
             Assert.IsTrue(filtered.Contains("Simple text message"), "Simple content should be preserved after Message: trimming");
         }
@@ -319,7 +183,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Extensions
         {
             var activity = new Activity("test");
 
-            // JSON array with a user message containing nested content structure AND Message: prefix
             var nestedContentJson = @"{""contentType"": ""'Text'"", ""content"": ""Message:User query with nested structure""}";
             var jsonArrayOfObjects = $@"[{{""role"":""user"",""name"":null,""content"":{JsonSerializer.Serialize(nestedContentJson)}}}]";
 
@@ -327,7 +190,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Extensions
 
             SemanticKernelSpanProcessorHelper.ProcessInvocationInputOutputTag(activity);
 
-            var filtered = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiAgentInvocationInputKey).Value as string;
+            var invocationTag = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiAgentInvocationInputKey).Value;
+            Assert.IsNull(invocationTag, "Invocation input key should be removed");
+
+            var filtered = activity.Tags.FirstOrDefault(t => t.Key == OpenTelemetryConstants.GenAiInputMessagesKey).Value as string;
             Assert.IsNotNull(filtered);
             Assert.IsTrue(filtered.Contains("User query with nested structure"), "Nested content should be extracted and Message: prefix trimmed");
             Assert.IsFalse(filtered.Contains("contentType"), "contentType property should be removed");

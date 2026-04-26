@@ -31,7 +31,7 @@ internal static class AgentFrameworkMessageMapper
 
         try
         {
-            using var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json!);
             if (doc.RootElement.ValueKind != JsonValueKind.Array)
                 return null;
 
@@ -72,7 +72,7 @@ internal static class AgentFrameworkMessageMapper
 
         try
         {
-            using var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json!);
             if (doc.RootElement.ValueKind != JsonValueKind.Array)
                 return null;
 
@@ -117,7 +117,7 @@ internal static class AgentFrameworkMessageMapper
             if (string.IsNullOrEmpty(partType))
                 continue;
 
-            var part = MapSinglePart(partType, partElement);
+            var part = MapSinglePart(partType!, partElement);
             if (part != null)
             {
                 parts.Add(part);
@@ -133,11 +133,11 @@ internal static class AgentFrameworkMessageMapper
         {
             case "text":
                 var textContent = GetStringProperty(partElement, "content");
-                return !string.IsNullOrEmpty(textContent) ? new TextPart(textContent) : null;
+                return !string.IsNullOrEmpty(textContent) ? new TextPart(textContent!) : null;
 
             case "reasoning":
                 var reasoningContent = GetStringProperty(partElement, "content");
-                return !string.IsNullOrEmpty(reasoningContent) ? new ReasoningPart(reasoningContent) : null;
+                return !string.IsNullOrEmpty(reasoningContent) ? new ReasoningPart(reasoningContent!) : null;
 
             case "tool_call":
                 return MapToolCallPart(partElement);
@@ -180,7 +180,7 @@ internal static class AgentFrameworkMessageMapper
                 : argsEl.ToString();
         }
 
-        return new ToolCallRequestPart(name, id, arguments);
+        return new ToolCallRequestPart(name!, id, arguments);
     }
 
     private static IMessagePart? MapToolCallResponsePart(JsonElement el)
@@ -205,7 +205,7 @@ internal static class AgentFrameworkMessageMapper
             return null;
 
         var mimeType = GetStringProperty(el, "mime_type");
-        return new BlobPart(modality, content, mimeType);
+        return new BlobPart(modality!, content!, mimeType);
     }
 
     private static IMessagePart? MapFilePart(JsonElement el)
@@ -216,7 +216,7 @@ internal static class AgentFrameworkMessageMapper
             return null;
 
         var mimeType = GetStringProperty(el, "mime_type");
-        return new FilePart(modality, fileId, mimeType);
+        return new FilePart(modality!, fileId!, mimeType);
     }
 
     private static IMessagePart? MapUriPart(JsonElement el)
@@ -227,7 +227,7 @@ internal static class AgentFrameworkMessageMapper
             return null;
 
         var mimeType = GetStringProperty(el, "mime_type");
-        return new UriPart(modality, uri, mimeType);
+        return new UriPart(modality!, uri!, mimeType);
     }
 
     private static IMessagePart? MapServerToolCallPart(JsonElement el)
@@ -243,7 +243,7 @@ internal static class AgentFrameworkMessageMapper
             payload["server_tool_call"] = stcEl.ToString();
         }
 
-        return new ServerToolCallPart(name, payload, id);
+        return new ServerToolCallPart(name!, payload, id);
     }
 
     private static IMessagePart? MapServerToolCallResponsePart(JsonElement el)
@@ -279,10 +279,10 @@ internal static class AgentFrameworkMessageMapper
         if (string.IsNullOrEmpty(role))
             return defaultRole;
 
-        if (role.Equals("system", StringComparison.OrdinalIgnoreCase)) return MessageRole.System;
-        if (role.Equals("user", StringComparison.OrdinalIgnoreCase)) return MessageRole.User;
-        if (role.Equals("assistant", StringComparison.OrdinalIgnoreCase)) return MessageRole.Assistant;
-        if (role.Equals("tool", StringComparison.OrdinalIgnoreCase)) return MessageRole.Tool;
+        if (role!.Equals("system", StringComparison.OrdinalIgnoreCase)) return MessageRole.System;
+        if (role!.Equals("user", StringComparison.OrdinalIgnoreCase)) return MessageRole.User;
+        if (role!.Equals("assistant", StringComparison.OrdinalIgnoreCase)) return MessageRole.Assistant;
+        if (role!.Equals("tool", StringComparison.OrdinalIgnoreCase)) return MessageRole.Tool;
 
         return defaultRole;
     }

@@ -123,11 +123,11 @@ internal static class SemanticKernelSpanProcessorHelper
 
                 try
                 {
-                    messageArray = JsonSerializer.Deserialize<List<MessageContent>>(jsonString, JsonOptions);
+                    messageArray = JsonSerializer.Deserialize<List<MessageContent>>(jsonString!, JsonOptions);
                 }
                 catch (JsonException)
                 {
-                    var strList = JsonSerializer.Deserialize<List<string>>(jsonString, JsonOptions);
+                    var strList = JsonSerializer.Deserialize<List<string>>(jsonString!, JsonOptions);
                     if (strList != null)
                     {
                         messageArray = new List<MessageContent>();
@@ -157,7 +157,7 @@ internal static class SemanticKernelSpanProcessorHelper
                         FilterMessageContent(msg);
                         if (string.IsNullOrEmpty(msg.Content)) continue;
                         var role = SemanticKernelMessageMapper.MapRole(msg.Role, MessageRole.Assistant);
-                        outputMessages.Add(new OutputMessage(role, new IMessagePart[] { new TextPart(msg.Content) }));
+                        outputMessages.Add(new OutputMessage(role, new IMessagePart[] { new TextPart(msg.Content!) }));
                     }
 
                     if (outputMessages.Count > 0)
@@ -173,7 +173,7 @@ internal static class SemanticKernelSpanProcessorHelper
                         FilterMessageContent(msg);
                         if (string.IsNullOrEmpty(msg.Content)) continue;
                         var role = SemanticKernelMessageMapper.MapRole(msg.Role, MessageRole.User);
-                        chatMessages.Add(new ChatMessage(role, new IMessagePart[] { new TextPart(msg.Content) }, msg.Name));
+                        chatMessages.Add(new ChatMessage(role, new IMessagePart[] { new TextPart(msg.Content!) }, msg.Name));
                     }
 
                     if (chatMessages.Count > 0)
@@ -242,10 +242,10 @@ internal static class SemanticKernelSpanProcessorHelper
         // For user messages, trim the "Message:" prefix
         if (string.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase))
         {
-            var idx = message.Content.IndexOf("Message:", StringComparison.OrdinalIgnoreCase);
+            var idx = message.Content!.IndexOf("Message:", StringComparison.OrdinalIgnoreCase);
             if (idx >= 0)
             {
-                message.Content = message.Content[(idx + "Message:".Length)..].Trim();
+                message.Content = message.Content![(idx + "Message:".Length)..].Trim();
             }
         }
     }
@@ -262,7 +262,7 @@ internal static class SemanticKernelSpanProcessorHelper
             return;
         }
 
-        var content = message.Content.Trim();
+        var content = message.Content!.Trim();
         if (!content.StartsWith("{", StringComparison.Ordinal) || !content.EndsWith("}", StringComparison.Ordinal))
         {
             return;
