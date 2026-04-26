@@ -1,5 +1,7 @@
 # Agent 365 Observability
 
+> **Migration quick-reference** — before/after code, span attributes, and troubleshooting for migrating from the standalone Agent365 SDK to the `Microsoft.OpenTelemetry` distro. For the full standalone guide (no migration context), see [Agent 365 Observability Guide](agent365-observability.md).
+
 > **Important:** You need to be part of the [Frontier preview program](https://adoption.microsoft.com/copilot/frontier-program/) to get **early access** to Microsoft Agent 365.
 
 To participate in the Agent 365 ecosystem, add Agent 365 Observability capabilities to your agent. Agent 365 Observability builds on [OpenTelemetry (OTel)](https://opentelemetry.io/docs/specs/otel/protocol/) and provides a unified framework for capturing telemetry consistently and securely across all agent platforms. By implementing this required component, you enable IT admins to monitor your agent's activity in Microsoft admin center and allow security teams to use Defender and Purview for compliance and threat detection.
