@@ -313,9 +313,9 @@ builder.Services.AddLogging(logging => logging.AddConsole());
 
 ## Documentation
 
-- [Agent 365 Observability Guide](docs/agent365-observability.md) — Comprehensive guide for adding Agent365 observability using the distro
-- [Migrating from Agent365 SDK](docs/testing-agent365.md) — Migration guide from the standalone Agent365 SDK to the distro
-- [Agent365 Observability Reference](docs/observability-agent365.md) — Quick-reference with before/after code, span attributes, and troubleshooting
+- [Agent 365 Getting Started](docs/agent365-getting-started.md) — Comprehensive guide for adding Agent365 observability using the distro
+- [Agent 365 Migration Guide](docs/agent365-migration.md) — Migrating from the standalone Agent365 SDK to the distro
+- [Agent 365 Migration Testing](docs/testing-agent365.md) — Detailed migration checklist with auto-instrumentation, env vars, and span comparison
 
 ## Examples
 

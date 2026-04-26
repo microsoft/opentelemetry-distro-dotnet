@@ -1,6 +1,6 @@
 # Agent 365 Observability (.NET)
 
-> **Standalone guide** — covers everything you need to add Agent365 observability using the `Microsoft.OpenTelemetry` distro. For migrating from the standalone Agent365 SDK, see [Migrating from Agent365 SDK](testing-agent365.md). For a quick before/after reference, see [Agent365 Observability Reference](observability-agent365.md).
+> **Standalone guide** — covers everything you need to add Agent365 observability using the `Microsoft.OpenTelemetry` distro. For migrating from the standalone Agent365 SDK, see [Migrating from Agent365 SDK](agent365-migration.md).
 
 > **Important:** You need to be part of the [Frontier preview program](https://adoption.microsoft.com/copilot/frontier-program/) to get **early access** to Microsoft Agent 365. Frontier connects you directly with Microsoft's latest AI innovations.
 

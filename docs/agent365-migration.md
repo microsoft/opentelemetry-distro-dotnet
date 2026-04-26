@@ -1,6 +1,6 @@
 # Agent 365 Observability
 
-> **Migration quick-reference** — before/after code, span attributes, and troubleshooting for migrating from the standalone Agent365 SDK to the `Microsoft.OpenTelemetry` distro. For the full standalone guide (no migration context), see [Agent 365 Observability Guide](agent365-observability.md).
+> **Migration quick-reference** — before/after code, span attributes, and troubleshooting for migrating from the standalone Agent365 SDK to the `Microsoft.OpenTelemetry` distro. For the full standalone guide (no migration context), see [Agent 365 Getting Started](agent365-getting-started.md).
 
 > **Important:** You need to be part of the [Frontier preview program](https://adoption.microsoft.com/copilot/frontier-program/) to get **early access** to Microsoft Agent 365.
 
