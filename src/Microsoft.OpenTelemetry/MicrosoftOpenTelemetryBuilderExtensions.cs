@@ -239,11 +239,12 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             {
                 builder.WithLogging(logging => logging.AddConsoleExporter());
             }
+        }
 
-            if (a365OnlyMode)
-            {
-                LogConsoleTracesOnlyMessage(builder.Services);
-            }
+        // --- A365-only mode startup message ---
+        if (a365OnlyMode)
+        {
+            LogA365OnlyModeMessage(builder.Services);
         }
 
         // --- Logging kill switch ---
@@ -301,23 +302,22 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
     }
 
     /// <summary>
-    /// Registers a one-time startup log message explaining that console exporter
-    /// is limited to traces because Agent365 only supports trace telemetry.
+    /// Registers a one-time startup log message explaining that Agent365-only mode
+    /// has disabled infrastructure instrumentation.
     /// </summary>
-    private static void LogConsoleTracesOnlyMessage(IServiceCollection services)
+    private static void LogA365OnlyModeMessage(IServiceCollection services)
     {
-        services.AddHostedService<ConsoleTracesOnlyStartupLogger>();
+        services.AddHostedService<A365OnlyModeStartupLogger>();
     }
 
     /// <summary>
-    /// Logs a one-time informational message at startup when console exporter
-    /// is restricted to traces only.
+    /// Logs a one-time informational message at startup when Agent365-only mode is active.
     /// </summary>
-    private sealed class ConsoleTracesOnlyStartupLogger : Microsoft.Extensions.Hosting.IHostedService
+    private sealed class A365OnlyModeStartupLogger : Microsoft.Extensions.Hosting.IHostedService
     {
-        private readonly ILogger<ConsoleTracesOnlyStartupLogger> _logger;
+        private readonly ILogger<A365OnlyModeStartupLogger> _logger;
 
-        public ConsoleTracesOnlyStartupLogger(ILogger<ConsoleTracesOnlyStartupLogger> logger)
+        public A365OnlyModeStartupLogger(ILogger<A365OnlyModeStartupLogger> logger)
         {
             _logger = logger;
         }
