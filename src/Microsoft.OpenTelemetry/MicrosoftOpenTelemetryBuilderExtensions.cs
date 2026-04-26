@@ -202,13 +202,29 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         {
             // When the only "real" exporter is Agent365 (which only supports traces),
             // limit console to traces only so metrics/logs noise doesn't flood the output.
+            // Additionally, filter traces to gen_ai/agent spans only — HTTP, ASP.NET,
+            // and SQL spans are suppressed from console to reduce noise.
             var consoleTracesOnly = exporters.HasFlag(ExportTarget.Agent365)
                                 && !exporters.HasFlag(ExportTarget.AzureMonitor)
                                 && !exporters.HasFlag(ExportTarget.Otlp);
 
             if (effectiveInstrumentation.EnableTracing)
             {
-                builder.WithTracing(tracing => tracing.AddConsoleExporter());
+                if (consoleTracesOnly)
+                {
+                    // Wrap the console exporter in a filter that only passes gen_ai/agent spans.
+                    builder.WithTracing(tracing =>
+                    {
+                        var consoleExporter = new global::OpenTelemetry.Exporter.ConsoleActivityExporter(
+                            new global::OpenTelemetry.Exporter.ConsoleExporterOptions());
+                        var simpleProcessor = new SimpleActivityExportProcessor(consoleExporter);
+                        tracing.AddProcessor(new GenAiConsoleFilterProcessor(simpleProcessor));
+                    });
+                }
+                else
+                {
+                    builder.WithTracing(tracing => tracing.AddConsoleExporter());
+                }
             }
 
             if (effectiveInstrumentation.EnableMetrics && !consoleTracesOnly)
@@ -306,9 +322,10 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         public Task StartAsync(CancellationToken cancellationToken)
         {
             _logger.LogInformation(
-                "Microsoft.OpenTelemetry: Console exporter is enabled for traces only. " +
-                "Agent365 exporter supports traces only, so console metrics and logs have been suppressed to reduce noise. " +
-                "To export all three signals (traces, metrics, and logs), use OTLP (ExportTarget.Otlp) or Azure Monitor (ExportTarget.AzureMonitor).");
+                "Microsoft.OpenTelemetry: Console exporter is showing gen_ai and agent spans only. " +
+                "Agent365 exporter supports traces only, so console metrics and logs have been suppressed. " +
+                "HTTP, ASP.NET, and SQL spans are also filtered out to reduce noise. " +
+                "To export all signals and spans, use OTLP (ExportTarget.Otlp) or Azure Monitor (ExportTarget.AzureMonitor).");
             return Task.CompletedTask;
         }
 
