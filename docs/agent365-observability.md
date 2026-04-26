@@ -157,14 +157,16 @@ When using the Agent 365 exporter, you must provide a token resolver function th
 
 ### Auto (DI) — recommended for Agent Framework apps
 
-The distro automatically registers `IExporterTokenCache<AgenticTokenStruct>` via DI when you call `AddAgenticTracingExporter()`. Your agent calls `RegisterObservability()` at runtime to supply credentials, and the cache handles token acquisition and refresh.
+When no custom `TokenResolver` is set, the distro automatically calls `AddAgenticTracingExporter()` internally, registering `IExporterTokenCache<AgenticTokenStruct>` and `Agent365ExporterOptions` via DI. Your agent calls `RegisterObservability()` at runtime to supply credentials, and the cache handles token acquisition and refresh.
 
 **Setup in `Program.cs`:**
 
 ```csharp
-using Microsoft.Agents.A365.Observability.Hosting;
-
-builder.Services.AddAgenticTracingExporter();
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.Agent365;
+    // No TokenResolver needed — the distro registers the agentic token cache automatically.
+});
 ```
 
 **In your agent class:**

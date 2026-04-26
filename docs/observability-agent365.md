@@ -369,7 +369,7 @@ builder.Services.AddOpenTelemetry()
 
 | Approach | When to use | How it works |
 |---|---|---|
-| **Auto (DI)** — default | Agent Framework apps with `UserAuthorization` | Distro registers `IExporterTokenCache<AgenticTokenStruct>`. Your `A365OtelWrapper` calls `RegisterObservability()`. Token exchange happens via `ExchangeTurnTokenAsync`. |
+| **Auto (DI)** — default | Agent Framework apps with `UserAuthorization` | Distro internally calls `AddAgenticTracingExporter()`, registering `IExporterTokenCache<AgenticTokenStruct>`. Your agent calls `RegisterObservability()`. Token exchange happens via `ExchangeTurnTokenAsync`. |
 | **Custom resolver** | Non-agent apps, service-to-service, or custom auth | Set `o.Agent365.Exporter.TokenResolver` directly. You own token acquisition. |
 
 ## Validate locally
