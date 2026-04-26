@@ -631,7 +631,7 @@ After implementing observability, verify telemetry capture:
 
 **Resolution:**
 
-- Verify the token audience matches the observability endpoint scope (default: `https://api.powerplatform.com/.default`).
+- Verify the token audience matches the observability endpoint scope (default: `api://9b975845-388f-4429-889e-eab1ef63949c/Agent365.Observability.OtelWrite`).
 - Ensure the identity has Agent 365 observability permissions.
 - The `Agent365.Observability.OtelWrite` permission is required for .NET `0.3-beta` and newer.
 

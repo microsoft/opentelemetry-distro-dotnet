@@ -35,7 +35,7 @@ In `Program.cs`, call `UseMicrosoftOpenTelemetry()` to enable observability:
 
 ```csharp
 using Microsoft.OpenTelemetry;
-using OpenTelemetry;
+using Microsoft.Agents.A365.Observability.Hosting.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -65,6 +65,8 @@ app.Run();
 If you need to add your own application-specific activity sources, use the longer form:
 
 ```csharp
+using Microsoft.OpenTelemetry;
+
 builder.Services.AddOpenTelemetry()
     .UseMicrosoftOpenTelemetry(o =>
     {
@@ -84,7 +86,7 @@ The `ExportTarget` flags enum controls where telemetry is sent:
 
 | Value | Description |
 |---|---|
-| `ExportTarget.None` | No exporters enabled. Instrumentation is still active. |
+| `ExportTarget.None` | No exporters enabled. Distro-managed telemetry pipelines are disabled unless you configure your own providers separately. |
 | `ExportTarget.Console` | Console output (development only). |
 | `ExportTarget.Agent365` | Agent365 observability platform. |
 | `ExportTarget.AzureMonitor` | Application Insights (auto-detected via `APPLICATIONINSIGHTS_CONNECTION_STRING`). |
@@ -101,8 +103,7 @@ Customize the Agent365 exporter behavior via `o.Agent365.Exporter`:
 | `TokenResolver` | `AsyncAuthTokenResolver` delegate: `Task<string?>(string agentId, string tenantId)` | `null` |
 | `DomainResolver` | `TenantDomainResolver` delegate: `string(string tenantId)` | `tenantId => "agent365.svc.cloud.microsoft"` |
 | `UseS2SEndpoint` | When `true`, uses the service-to-service endpoint path. | `false` |
-| `ClusterCategory` | Cluster category for exporter routing. | `"production"` |
-| `MaxQueueSize` | Maximum queue size for the batch processor. | `2048` |
+| `MaxQueueSize`| Maximum queue size for the batch processor. | `2048` |
 | `MaxExportBatchSize` | Maximum batch size for export operations. | `512` |
 | `ScheduledDelayMilliseconds` | Delay in milliseconds between export batches. | `5000` |
 | `ExporterTimeoutMilliseconds` | Timeout in milliseconds for the export operation. | `30000` |
@@ -243,6 +244,7 @@ For agents that acquire tokens outside the Agent Framework hosting pipeline (e.g
 
 ```csharp
 using Microsoft.Agents.A365.Observability.Hosting.Caching;
+using Microsoft.Agents.A365.Observability.Runtime.Common;
 
 var cache = new ServiceTokenCache(
     defaultExpiration: TimeSpan.FromMinutes(30),
@@ -379,7 +381,7 @@ Auto-instrumentation requires `BaggageBuilder` to set agent ID and tenant ID. En
 ```csharp
 using Microsoft.Agents.A365.Observability.Runtime.Common;
 
-public async Task<string> ProcessUserRequest(string userInput)
+public async Task ProcessUserRequest(string userInput)
 {
     using var baggageScope = new BaggageBuilder()
         .AgentId("agent-456")
@@ -393,13 +395,16 @@ public async Task<string> ProcessUserRequest(string userInput)
     };
 
     // Semantic Kernel calls are automatically traced
-    return await chatCompletionAgent.InvokeAsync(userInput);
+    await foreach (var response in chatCompletionAgent.InvokeAsync(userInput))
+    {
+        // Process response.Content
+    }
 }
 ```
 
 ### OpenAI
 
-Auto-instrumentation requires `BaggageBuilder`. For tool calls, start a trace using `Trace()` on a `ChatToolCall` instance:
+Auto-instrumentation requires `BaggageBuilder`. OpenAI calls are automatically traced when `EnableOpenAIInstrumentation` is `true` (default):
 
 ```csharp
 using Microsoft.Agents.A365.Observability.Runtime.Common;
@@ -414,8 +419,16 @@ public async Task<string> ProcessUserRequest(string userInput)
     // OpenAI calls are automatically traced
     var response = await openAIClient.GetChatCompletionsAsync(...);
 
-    // For tool calls, start a manual trace:
-    using var scope = chatToolCall.Trace(agentId: "agent-456", "tenant-123");
+    // For tool calls, use ExecuteToolScope for manual tracing:
+    var toolDetails = new ToolCallDetails(
+        toolName: "search",
+        arguments: "{\"query\": \"...\"}",
+        toolCallId: "tc-001",
+        toolType: "function");
+
+    using var toolScope = ExecuteToolScope.Start(request, toolDetails, agentDetails);
+    var result = await RunToolAsync();
+    toolScope.RecordResponse(result);
 }
 ```
 
@@ -877,7 +890,7 @@ After implementing observability, verify telemetry capture:
 
 **Resolution:**
 
-- Verify the token audience matches the observability endpoint scope (default: `https://api.powerplatform.com/.default`).
+- Verify the token audience matches the observability endpoint scope (default: `api://9b975845-388f-4429-889e-eab1ef63949c/Agent365.Observability.OtelWrite`).
 - Ensure the identity has Agent 365 observability permissions.
 - The `Agent365.Observability.OtelWrite` permission is required for `.NET 0.3-beta` and newer.
 
