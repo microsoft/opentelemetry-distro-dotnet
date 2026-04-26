@@ -7,11 +7,16 @@
     <IsTestProject>true</IsTestProject>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <NoWarn>$(NoWarn);SA1636;CS1591;CS1574;ASPDEPR004</NoWarn>
+    <NoWarn>$(NoWarn);SA1636;CS1591;CS1574;ASPDEPR004;MSB3277</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Force CPM pin for transitive vulnerability -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Bcl.Memory" />
   </ItemGroup>
 
   <ItemGroup>
