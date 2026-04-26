@@ -567,10 +567,7 @@ Instrument AI model inference calls to capture token usage, model details, and r
 var inferenceDetails = new InferenceCallDetails(
     operationName: InferenceOperationType.Chat,
     model: "gpt-4o-mini",
-    providerName: "Azure OpenAI",
-    inputTokens: 123,
-    outputTokens: 456,
-    finishReasons: new[] { "stop" });
+    providerName: "Azure OpenAI");
 
 using var scope = InferenceScope.Start(
     request: request,
@@ -602,8 +599,11 @@ scope.RecordOutputTokens(456);
 Use this scope for asynchronous scenarios where `InvokeAgentScope`, `ExecuteToolScope`, or `InferenceScope` can't capture output data synchronously. Start `OutputScope` as a child span to record the final output messages after the parent scope finishes.
 
 ```csharp
-// Get the parent context from the originating scope
-var parentContext = invokeScope.GetActivityContext();
+// OutputScope is a child span — capture the parent context while InvokeAgentScope is still active.
+// Example: save parentContext before disposing the InvokeAgentScope.
+//   var parentContext = invokeScope.GetActivityContext();
+
+var parentContext = savedParentContext; // ActivityContext from InvokeAgentScope.GetActivityContext()
 
 var response = new Response(new[] { "Here is your organized inbox with 15 urgent emails." });
 

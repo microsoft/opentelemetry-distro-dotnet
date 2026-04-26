@@ -169,7 +169,7 @@ Use `BaggageBuilder` to set contextual information that flows through all spans 
 // These usings still work — namespaces are identical to the Agent365 SDK
 using Microsoft.Agents.A365.Observability.Runtime.Common;
 
-BaggageBuilder.Create()
+new BaggageBuilder()
     .TenantId("tenant-123")
     .AgentId("agent-456")
     .ConversationId("conv-789")
@@ -287,10 +287,7 @@ Use this scope to instrument AI model inference calls with observability trackin
 var inferenceDetails = new InferenceCallDetails(
     operationName: InferenceOperationType.Chat,
     model: "gpt-4o-mini",
-    providerName: "azure-openai",
-    inputTokens: 123,
-    outputTokens: 456,
-    finishReasons: new[] { "stop" });
+    providerName: "azure-openai");
 
 using (var scope = InferenceScope.Start(request, inferenceDetails, agentDetails))
 {
@@ -306,8 +303,11 @@ using (var scope = InferenceScope.Start(request, inferenceDetails, agentDetails)
 Use this scope for asynchronous scenarios where `InvokeAgentScope`, `ExecuteToolScope`, or `InferenceScope` can't capture output data synchronously. Start `OutputScope` as a child span to record the final output messages after the parent scope finishes.
 
 ```csharp
-// Get the parent context from the originating scope
-var parentContext = invokeScope.GetActivityContext();
+// OutputScope is a child span — capture the parent context while InvokeAgentScope is still active.
+// Example: save parentContext before disposing the InvokeAgentScope.
+//   var parentContext = invokeScope.GetActivityContext();
+
+var parentContext = savedParentContext; // ActivityContext from InvokeAgentScope.GetActivityContext()
 
 var response = new Response(new[] { "Here is your organized inbox with 15 urgent emails." });
 
