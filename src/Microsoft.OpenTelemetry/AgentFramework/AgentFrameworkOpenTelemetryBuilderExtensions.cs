@@ -5,6 +5,7 @@ using Microsoft.OpenTelemetry.AgentFramework;
 using Microsoft.Extensions.DependencyInjection;
 using global::OpenTelemetry;
 using global::OpenTelemetry.Trace;
+using Microsoft.Agents.A365.Observability.Extensions.AgentFramework;
 
 namespace Microsoft.OpenTelemetry;
 
