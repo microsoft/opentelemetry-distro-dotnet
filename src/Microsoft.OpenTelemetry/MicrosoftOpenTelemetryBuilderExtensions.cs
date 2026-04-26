@@ -200,19 +200,30 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         // --- Console exporter ---
         if (exporters.HasFlag(ExportTarget.Console))
         {
+            // When the only "real" exporter is Agent365 (which only supports traces),
+            // limit console to traces only so metrics/logs noise doesn't flood the output.
+            var consoleTracesOnly = exporters.HasFlag(ExportTarget.Agent365)
+                                && !exporters.HasFlag(ExportTarget.AzureMonitor)
+                                && !exporters.HasFlag(ExportTarget.Otlp);
+
             if (effectiveInstrumentation.EnableTracing)
             {
                 builder.WithTracing(tracing => tracing.AddConsoleExporter());
             }
 
-            if (effectiveInstrumentation.EnableMetrics)
+            if (effectiveInstrumentation.EnableMetrics && !consoleTracesOnly)
             {
                 builder.WithMetrics(metrics => metrics.AddConsoleExporter());
             }
 
-            if (effectiveInstrumentation.EnableLogging)
+            if (effectiveInstrumentation.EnableLogging && !consoleTracesOnly)
             {
                 builder.WithLogging(logging => logging.AddConsoleExporter());
+            }
+
+            if (consoleTracesOnly)
+            {
+                LogConsoleTracesOnlyMessage(builder.Services);
             }
         }
 
@@ -268,5 +279,39 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         // Fallback: check raw environment variable (for non-host DI apps without IConfiguration)
         var envConnStr = Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING");
         return !string.IsNullOrWhiteSpace(envConnStr);
+    }
+
+    /// <summary>
+    /// Registers a one-time startup log message explaining that console exporter
+    /// is limited to traces because Agent365 only supports trace telemetry.
+    /// </summary>
+    private static void LogConsoleTracesOnlyMessage(IServiceCollection services)
+    {
+        services.AddHostedService<ConsoleTracesOnlyStartupLogger>();
+    }
+
+    /// <summary>
+    /// Logs a one-time informational message at startup when console exporter
+    /// is restricted to traces only.
+    /// </summary>
+    private sealed class ConsoleTracesOnlyStartupLogger : Microsoft.Extensions.Hosting.IHostedService
+    {
+        private readonly ILogger<ConsoleTracesOnlyStartupLogger> _logger;
+
+        public ConsoleTracesOnlyStartupLogger(ILogger<ConsoleTracesOnlyStartupLogger> logger)
+        {
+            _logger = logger;
+        }
+
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            _logger.LogInformation(
+                "Microsoft.OpenTelemetry: Console exporter is enabled for traces only. " +
+                "Agent365 exporter supports traces only, so console metrics and logs have been suppressed to reduce noise. " +
+                "To export all three signals (traces, metrics, and logs), use OTLP (ExportTarget.Otlp) or Azure Monitor (ExportTarget.AzureMonitor).");
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }
