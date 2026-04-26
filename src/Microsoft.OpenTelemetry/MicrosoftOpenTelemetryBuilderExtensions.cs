@@ -119,11 +119,13 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
 
         // Determine which signals have at least one exporter destination.
         // Agent365 only exports traces — metrics and logs sent to it would go nowhere.
-        // Console metrics/logs are also suppressed when consoleTracesOnly is true.
+        // Note: Console is included here even when consoleTracesOnly is true, because
+        // the global flags affect ALL exporters (including any the caller chains after us).
+        // Console-specific suppression is handled later by skipping AddConsoleExporter() calls.
         var hasTracingExporter = exporters != ExportTarget.None; // all exporters support traces
         var hasMetricsExporter = exporters.HasFlag(ExportTarget.AzureMonitor)
                               || exporters.HasFlag(ExportTarget.Otlp)
-                              || (exporters.HasFlag(ExportTarget.Console) && !consoleTracesOnly);
+                              || exporters.HasFlag(ExportTarget.Console);
         var hasLoggingExporter = hasMetricsExporter; // same set supports logs
 
         // Effective signal flags: user intent AND exporter availability

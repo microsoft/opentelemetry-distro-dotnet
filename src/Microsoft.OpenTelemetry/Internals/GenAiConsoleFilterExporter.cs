@@ -35,7 +35,7 @@ internal sealed class GenAiConsoleFilterExporter : BaseExporter<Activity>
             : null;
 
     private readonly ConsoleActivityExporter _inner;
-    private bool _parentProviderPropagated;
+    private volatile bool _parentProviderPropagated;
 
     public GenAiConsoleFilterExporter()
     {
@@ -58,6 +58,12 @@ internal sealed class GenAiConsoleFilterExporter : BaseExporter<Activity>
 
         return ExportResult.Success;
     }
+
+    /// <inheritdoc/>
+    protected override bool OnShutdown(int timeoutMilliseconds) => _inner.Shutdown(timeoutMilliseconds);
+
+    /// <inheritdoc/>
+    protected override bool OnForceFlush(int timeoutMilliseconds) => _inner.ForceFlush(timeoutMilliseconds);
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
