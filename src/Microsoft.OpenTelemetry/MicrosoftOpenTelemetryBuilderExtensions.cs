@@ -3,8 +3,10 @@
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using global::OpenTelemetry;
 using global::OpenTelemetry.Trace;
 using global::OpenTelemetry.Metrics;
@@ -90,7 +92,24 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
 
         builder.Services.AddSingleton(UseMicrosoftOpenTelemetryRegistration.Instance);
 
+        // Register IConfigureOptions<MicrosoftOpenTelemetryOptions> so that
+        // runtime IOptions<MicrosoftOpenTelemetryOptions> resolution picks up appsettings.json.
+        // TryAddEnumerable checks the implementation type, not just the service type,
+        // so a prior services.Configure<T>() call won't suppress this registration.
+        builder.Services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IConfigureOptions<MicrosoftOpenTelemetryOptions>,
+                DefaultMicrosoftOpenTelemetryConfigureOptions>());
+
+        // Register the caller's Action<> as PostConfigure so it runs after IConfiguration binding
+        // and any services.Configure<MicrosoftOpenTelemetryOptions>() calls at runtime.
+        builder.Services.PostConfigure(configure);
+
+        // Build-time: eagerly resolve options from IConfiguration + Action<> callback.
+        // DI options infrastructure is not available yet, so we manually apply the same
+        // IConfiguration binding followed by the caller's callback.
+        var config = FindConfiguration(builder.Services);
         var options = new MicrosoftOpenTelemetryOptions();
+        DefaultMicrosoftOpenTelemetryConfigureOptions.BindFromConfiguration(config, options);
         configure(options);
 
         // Auto-detect exporters from configuration if not explicitly set
@@ -101,11 +120,10 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
 
             // Check code-provided, IConfiguration, and raw env var for connection string
             if (!string.IsNullOrWhiteSpace(options.AzureMonitor.ConnectionString)
-                || HasAzureMonitorConnectionString(builder.Services))
+                || HasAzureMonitorConnectionString(config))
                 exporters |= ExportTarget.AzureMonitor;
             if (options.Agent365.Exporter.TokenResolver != null)
                 exporters |= ExportTarget.Agent365;
-            
         }
 
         // When A365 is the only real exporter (with or without Console), suppress noisy
@@ -160,20 +178,20 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         };
 
         // --- Azure Monitor (always: instrumentation; exporter gated by Exporters flag) ---
-        builder.UseAzureMonitor(o =>
-        {
-            o.SkipExporter = !exporters.HasFlag(ExportTarget.AzureMonitor);
-            o.ConnectionString = options.AzureMonitor.ConnectionString;
-            o.Credential = options.AzureMonitor.Credential;
-            o.DisableOfflineStorage = options.AzureMonitor.DisableOfflineStorage;
-            o.StorageDirectory = options.AzureMonitor.StorageDirectory;
-            o.EnableLiveMetrics = options.AzureMonitor.EnableLiveMetrics;
-            o.EnableStandardMetrics = options.AzureMonitor.EnableStandardMetrics;
-            o.EnablePerfCounters = options.AzureMonitor.EnablePerfCounters;
-            o.EnableTraceBasedLogsSampler = options.AzureMonitor.EnableTraceBasedLogsSampler;
-            o.SamplingRatio = options.AzureMonitor.SamplingRatio;
-            o.TracesPerSecond = options.AzureMonitor.TracesPerSecond;
-        }, effectiveInstrumentation);
+        //builder.UseAzureMonitor(o =>
+        //{
+        //    o.SkipExporter = !exporters.HasFlag(ExportTarget.AzureMonitor);
+        //    o.ConnectionString = options.AzureMonitor.ConnectionString;
+        //    o.Credential = options.AzureMonitor.Credential;
+        //    o.DisableOfflineStorage = options.AzureMonitor.DisableOfflineStorage;
+        //    o.StorageDirectory = options.AzureMonitor.StorageDirectory;
+        //    o.EnableLiveMetrics = options.AzureMonitor.EnableLiveMetrics;
+        //    o.EnableStandardMetrics = options.AzureMonitor.EnableStandardMetrics;
+        //    o.EnablePerfCounters = options.AzureMonitor.EnablePerfCounters;
+        //    o.EnableTraceBasedLogsSampler = options.AzureMonitor.EnableTraceBasedLogsSampler;
+        //    o.SamplingRatio = options.AzureMonitor.SamplingRatio;
+        //    o.TracesPerSecond = options.AzureMonitor.TracesPerSecond;
+        //}, effectiveInstrumentation);
 
         // --- Agent365 (always: scopes + baggage + span processors; exporter gated by Exporters flag) ---
         builder.UseAgent365(o =>
@@ -263,25 +281,30 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
     }
 
     /// <summary>
-    /// Checks if an Azure Monitor connection string is available from IConfiguration
-    /// (appsettings.json, env var provider, Key Vault, etc.) or raw environment variable.
-    /// Does NOT call BuildServiceProvider().
+    /// Finds an <see cref="IConfiguration"/> instance from the service descriptors without
+    /// calling <c>BuildServiceProvider()</c>. Returns <c>null</c> when not found.
     /// </summary>
-    private static bool HasAzureMonitorConnectionString(IServiceCollection services)
+    private static IConfiguration? FindConfiguration(IServiceCollection services)
     {
-        // Try to find IConfiguration from service descriptors (registered as singleton instance
-        // by HostApplicationBuilder, WebApplicationBuilder, and Host.CreateDefaultBuilder)
-        IConfiguration? config = null;
         for (int i = services.Count - 1; i >= 0; i--)
         {
             if (services[i].ServiceType == typeof(IConfiguration)
                 && services[i].ImplementationInstance is IConfiguration c)
             {
-                config = c;
-                break;
+                return c;
             }
         }
 
+        return null;
+    }
+
+    /// <summary>
+    /// Checks if an Azure Monitor connection string is available from IConfiguration
+    /// (appsettings.json, env var provider, Key Vault, etc.) or raw environment variable.
+    /// Does NOT call BuildServiceProvider().
+    /// </summary>
+    private static bool HasAzureMonitorConnectionString(IConfiguration? config)
+    {
         if (config != null)
         {
             // Check "AzureMonitor" config section (appsettings.json)

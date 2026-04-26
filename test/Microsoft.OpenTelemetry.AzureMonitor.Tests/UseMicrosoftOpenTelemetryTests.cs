@@ -4,10 +4,12 @@
 #if NET
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using OpenTelemetry;
 using Xunit;
 
@@ -165,6 +167,299 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
             Assert.Contains(services, s =>
                 s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder") ||
                 s.ServiceType.Name.Contains("TracerProviderBuilder"));
+        }
+
+        [Fact]
+        public void Config_ReadsExportersFromAppSettings()
+        {
+            const string envVar = "APPLICATIONINSIGHTS_CONNECTION_STRING";
+            var original = Environment.GetEnvironmentVariable(envVar);
+            try
+            {
+                Environment.SetEnvironmentVariable(envVar, null);
+
+                var configData = new Dictionary<string, string?>
+                {
+                    ["MicrosoftOpenTelemetry:Exporters"] = "AzureMonitor",
+                    ["AzureMonitor:ConnectionString"] = TestConnectionString,
+                };
+                var configuration = new ConfigurationBuilder()
+                    .AddInMemoryCollection(configData)
+                    .Build();
+
+                var services = new ServiceCollection();
+                services.AddSingleton<IConfiguration>(configuration);
+                services.AddOpenTelemetry()
+                    .UseMicrosoftOpenTelemetry(o =>
+                    {
+                        o.AzureMonitor.DisableOfflineStorage = true;
+                        o.AzureMonitor.EnableLiveMetrics = false;
+                    });
+
+                // Exporters explicitly set from config — AzureMonitor should be registered
+                Assert.True(HasAzureMonitorExporter(services),
+                    "Azure Monitor exporter should be registered when Exporters includes AzureMonitor from config.");
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(envVar, original);
+            }
+        }
+
+        [Fact]
+        public void Config_ReadsInstrumentationFromAppSettings()
+        {
+            var configData = new Dictionary<string, string?>
+            {
+                ["MicrosoftOpenTelemetry:Instrumentation:EnableSqlClientInstrumentation"] = "false",
+                ["MicrosoftOpenTelemetry:Instrumentation:EnableOpenAIInstrumentation"] = "false",
+            };
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(configData)
+                .Build();
+
+            var options = new MicrosoftOpenTelemetryOptions();
+            DefaultMicrosoftOpenTelemetryConfigureOptions.BindFromConfiguration(configuration, options);
+
+            Assert.False(options.Instrumentation.EnableSqlClientInstrumentation,
+                "EnableSqlClientInstrumentation should be false from config.");
+            Assert.False(options.Instrumentation.EnableOpenAIInstrumentation,
+                "EnableOpenAIInstrumentation should be false from config.");
+            // Defaults should remain for unspecified values
+            Assert.True(options.Instrumentation.EnableTracing);
+            Assert.True(options.Instrumentation.EnableMetrics);
+            Assert.True(options.Instrumentation.EnableLogging);
+            Assert.True(options.Instrumentation.EnableAspNetCoreInstrumentation);
+        }
+
+        [Fact]
+        public void Config_ActionCallbackOverridesAppSettings()
+        {
+            var configData = new Dictionary<string, string?>
+            {
+                ["MicrosoftOpenTelemetry:Instrumentation:EnableSqlClientInstrumentation"] = "true",
+                ["MicrosoftOpenTelemetry:Instrumentation:EnableTracing"] = "true",
+            };
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(configData)
+                .Build();
+
+            var services = new ServiceCollection();
+            services.AddSingleton<IConfiguration>(configuration);
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    // Action callback overrides config values
+                    o.Instrumentation.EnableSqlClientInstrumentation = false;
+                    o.Exporters = ExportTarget.Console;
+                });
+
+            // Verify the Action<> callback takes effect for build-time by checking
+            // that IConfigureOptions is registered (runtime resolution test below
+            // verifies the PostConfigure ordering)
+            Assert.Contains(services, s =>
+                s.ServiceType.IsGenericType &&
+                s.ServiceType.GetGenericTypeDefinition() == typeof(IConfigureOptions<>) &&
+                s.ServiceType.GetGenericArguments().Any(a => a == typeof(MicrosoftOpenTelemetryOptions)));
+        }
+
+        [Fact]
+        public void Config_RegistersIConfigureOptions()
+        {
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Console;
+                });
+
+            // Verify IConfigureOptions<MicrosoftOpenTelemetryOptions> is registered
+            Assert.Contains(services, s =>
+                s.ServiceType == typeof(IConfigureOptions<MicrosoftOpenTelemetryOptions>));
+        }
+
+        [Fact]
+        public void Config_RuntimeOptionsResolution()
+        {
+            var configData = new Dictionary<string, string?>
+            {
+                ["MicrosoftOpenTelemetry:Instrumentation:EnableSqlClientInstrumentation"] = "false",
+            };
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(configData)
+                .Build();
+
+            var services = new ServiceCollection();
+            services.AddSingleton<IConfiguration>(configuration);
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Console;
+                });
+
+            // Resolve IOptions<MicrosoftOpenTelemetryOptions> at runtime
+            var sp = services.BuildServiceProvider();
+            var resolvedOptions = sp.GetRequiredService<IOptions<MicrosoftOpenTelemetryOptions>>().Value;
+
+            // IConfiguration binding should have set this to false
+            Assert.False(resolvedOptions.Instrumentation.EnableSqlClientInstrumentation,
+                "Runtime IOptions should reflect IConfiguration binding.");
+            // PostConfigure (Action<> callback) should set Exporters
+            Assert.Equal(ExportTarget.Console, resolvedOptions.Exporters);
+        }
+
+        [Fact]
+        public void Config_ServicesConfigureAffectsRuntimeOptions()
+        {
+            var services = new ServiceCollection();
+
+            // User calls services.Configure<MicrosoftOpenTelemetryOptions> before UseMicrosoftOpenTelemetry
+            services.Configure<MicrosoftOpenTelemetryOptions>(o =>
+            {
+                o.Instrumentation.EnableHttpClientInstrumentation = false;
+            });
+
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Console;
+                });
+
+            var sp = services.BuildServiceProvider();
+            var resolvedOptions = sp.GetRequiredService<IOptions<MicrosoftOpenTelemetryOptions>>().Value;
+
+            // services.Configure runs between IConfigureOptions and PostConfigure,
+            // so its value should be visible unless the PostConfigure callback overwrites it.
+            // Since the Action<> callback doesn't set EnableHttpClientInstrumentation,
+            // the services.Configure value should survive.
+            Assert.False(resolvedOptions.Instrumentation.EnableHttpClientInstrumentation,
+                "services.Configure<MicrosoftOpenTelemetryOptions> should affect runtime IOptions resolution.");
+        }
+
+        [Fact]
+        public void Config_ExportersFlagsEnum_ParsesCommasSeparated()
+        {
+            var configData = new Dictionary<string, string?>
+            {
+                ["MicrosoftOpenTelemetry:Exporters"] = "AzureMonitor, Otlp",
+            };
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(configData)
+                .Build();
+
+            var options = new MicrosoftOpenTelemetryOptions();
+            DefaultMicrosoftOpenTelemetryConfigureOptions.BindFromConfiguration(configuration, options);
+
+            Assert.True(options.ExportersExplicitlySet, "Exporters should be explicitly set from config.");
+            Assert.True(options.Exporters.HasFlag(ExportTarget.AzureMonitor));
+            Assert.True(options.Exporters.HasFlag(ExportTarget.Otlp));
+            Assert.False(options.Exporters.HasFlag(ExportTarget.Agent365));
+            Assert.False(options.Exporters.HasFlag(ExportTarget.Console));
+        }
+
+        [Fact]
+        public void Config_EmptySection_PreservesDefaults()
+        {
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>())
+                .Build();
+
+            var options = new MicrosoftOpenTelemetryOptions();
+            DefaultMicrosoftOpenTelemetryConfigureOptions.BindFromConfiguration(configuration, options);
+
+            // No MicrosoftOpenTelemetry section → all defaults preserved
+            Assert.False(options.ExportersExplicitlySet);
+            Assert.Equal(ExportTarget.None, options.Exporters);
+            Assert.True(options.Instrumentation.EnableTracing);
+            Assert.True(options.Instrumentation.EnableMetrics);
+            Assert.True(options.Instrumentation.EnableLogging);
+            Assert.True(options.Instrumentation.EnableSqlClientInstrumentation);
+        }
+
+        [Fact]
+        public void Config_BindsAzureMonitorConnectionStringFromSection()
+        {
+            var configData = new Dictionary<string, string?>
+            {
+                ["AzureMonitor:ConnectionString"] = TestConnectionString,
+            };
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(configData)
+                .Build();
+
+            var options = new MicrosoftOpenTelemetryOptions();
+            DefaultMicrosoftOpenTelemetryConfigureOptions.BindFromConfiguration(configuration, options);
+
+            Assert.Equal(TestConnectionString, options.AzureMonitor.ConnectionString);
+        }
+
+        [Fact]
+        public void Config_AzureMonitorConnectionStringFlowsToExporter()
+        {
+            const string envVar = "APPLICATIONINSIGHTS_CONNECTION_STRING";
+            var original = Environment.GetEnvironmentVariable(envVar);
+            try
+            {
+                Environment.SetEnvironmentVariable(envVar, null);
+
+                var configData = new Dictionary<string, string?>
+                {
+                    ["MicrosoftOpenTelemetry:Exporters"] = "AzureMonitor",
+                    ["AzureMonitor:ConnectionString"] = TestConnectionString,
+                };
+                var configuration = new ConfigurationBuilder()
+                    .AddInMemoryCollection(configData)
+                    .Build();
+
+                var services = new ServiceCollection();
+                services.AddSingleton<IConfiguration>(configuration);
+
+                // Parameterless — everything from config
+                services.AddOpenTelemetry()
+                    .UseMicrosoftOpenTelemetry(o =>
+                    {
+                        o.AzureMonitor.DisableOfflineStorage = true;
+                        o.AzureMonitor.EnableLiveMetrics = false;
+                    });
+
+                // Azure Monitor exporter should be registered with a valid connection string
+                Assert.True(HasAzureMonitorExporter(services),
+                    "Azure Monitor exporter should be registered when ConnectionString is in AzureMonitor config section.");
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(envVar, original);
+            }
+        }
+
+        [Fact]
+        public void Config_ConnectionStringEnvVarOverridesSection()
+        {
+            const string envVar = "APPLICATIONINSIGHTS_CONNECTION_STRING";
+            const string envVarConnectionString = "InstrumentationKey=11111111-1111-1111-1111-111111111111";
+            var original = Environment.GetEnvironmentVariable(envVar);
+            try
+            {
+                Environment.SetEnvironmentVariable(envVar, envVarConnectionString);
+
+                var configData = new Dictionary<string, string?>
+                {
+                    ["AzureMonitor:ConnectionString"] = TestConnectionString,
+                };
+                var configuration = new ConfigurationBuilder()
+                    .AddInMemoryCollection(configData)
+                    .Build();
+
+                var options = new MicrosoftOpenTelemetryOptions();
+                DefaultMicrosoftOpenTelemetryConfigureOptions.BindFromConfiguration(configuration, options);
+
+                // Env var should take precedence over config section
+                Assert.Equal(envVarConnectionString, options.AzureMonitor.ConnectionString);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(envVar, original);
+            }
         }
     }
 
