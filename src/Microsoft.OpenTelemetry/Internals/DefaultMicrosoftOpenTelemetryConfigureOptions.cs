@@ -81,10 +81,11 @@ internal class DefaultMicrosoftOpenTelemetryConfigureOptions : IConfigureOptions
                 options.AzureMonitor.ConnectionString = connectionStringFromEnvVar;
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // Configuration binding errors should not crash the application.
             // The distro will fall back to code defaults.
+            AzureMonitorAspNetCoreEventSource.Log.ConfigurationBindingFailed(ex);
         }
     }
 
@@ -95,12 +96,20 @@ internal class DefaultMicrosoftOpenTelemetryConfigureOptions : IConfigureOptions
     /// </summary>
     internal static void BindFromConfiguration(IConfiguration? configuration, MicrosoftOpenTelemetryOptions options)
     {
-        if (configuration == null)
+        if (configuration != null)
         {
-            return;
+            var configureOptions = new DefaultMicrosoftOpenTelemetryConfigureOptions(configuration);
+            configureOptions.Configure(options);
         }
-
-        var configureOptions = new DefaultMicrosoftOpenTelemetryConfigureOptions(configuration);
-        configureOptions.Configure(options);
+        else
+        {
+            // No IConfiguration available — still check the raw environment variable
+            // so env-var-only scenarios (no host builder) auto-detect Azure Monitor.
+            var connectionStringFromEnvVar = Environment.GetEnvironmentVariable(ConnectionStringEnvVar);
+            if (!string.IsNullOrEmpty(connectionStringFromEnvVar))
+            {
+                options.AzureMonitor.ConnectionString = connectionStringFromEnvVar;
+            }
+        }
     }
 }

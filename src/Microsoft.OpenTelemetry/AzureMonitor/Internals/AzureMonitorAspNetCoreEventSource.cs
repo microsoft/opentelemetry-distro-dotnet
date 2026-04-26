@@ -126,5 +126,17 @@ namespace Microsoft.OpenTelemetry
 
         [Event(15, Message = "Invalid sampler argument '{1}' for sampler '{0}'. Ignoring.", Level = EventLevel.Warning)]
         public void InvalidSamplerArgument(string samplerType, string samplerArg) => WriteEvent(15, samplerType, samplerArg);
+
+        [NonEvent]
+        public void ConfigurationBindingFailed(System.Exception ex)
+        {
+            if (IsEnabled(EventLevel.Warning))
+            {
+                ConfigurationBindingFailed(ex.FlattenException().ToInvariantString());
+            }
+        }
+
+        [Event(16, Message = "Failed to bind MicrosoftOpenTelemetryOptions from IConfiguration. Falling back to code defaults. {0}", Level = EventLevel.Warning)]
+        public void ConfigurationBindingFailed(string exceptionMessage) => WriteEvent(16, exceptionMessage);
     }
 }

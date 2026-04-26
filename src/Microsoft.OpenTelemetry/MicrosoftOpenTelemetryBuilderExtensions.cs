@@ -118,9 +118,9 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         {
             exporters = ExportTarget.None;
 
-            // Check code-provided, IConfiguration, and raw env var for connection string
-            if (!string.IsNullOrWhiteSpace(options.AzureMonitor.ConnectionString)
-                || HasAzureMonitorConnectionString(config))
+            // Use the layered options value only — the callback has already had a chance
+            // to clear or set ConnectionString, so re-reading raw config would bypass that.
+            if (!string.IsNullOrWhiteSpace(options.AzureMonitor.ConnectionString))
                 exporters |= ExportTarget.AzureMonitor;
             if (options.Agent365.Exporter.TokenResolver != null)
                 exporters |= ExportTarget.Agent365;
@@ -178,20 +178,20 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         };
 
         // --- Azure Monitor (always: instrumentation; exporter gated by Exporters flag) ---
-        //builder.UseAzureMonitor(o =>
-        //{
-        //    o.SkipExporter = !exporters.HasFlag(ExportTarget.AzureMonitor);
-        //    o.ConnectionString = options.AzureMonitor.ConnectionString;
-        //    o.Credential = options.AzureMonitor.Credential;
-        //    o.DisableOfflineStorage = options.AzureMonitor.DisableOfflineStorage;
-        //    o.StorageDirectory = options.AzureMonitor.StorageDirectory;
-        //    o.EnableLiveMetrics = options.AzureMonitor.EnableLiveMetrics;
-        //    o.EnableStandardMetrics = options.AzureMonitor.EnableStandardMetrics;
-        //    o.EnablePerfCounters = options.AzureMonitor.EnablePerfCounters;
-        //    o.EnableTraceBasedLogsSampler = options.AzureMonitor.EnableTraceBasedLogsSampler;
-        //    o.SamplingRatio = options.AzureMonitor.SamplingRatio;
-        //    o.TracesPerSecond = options.AzureMonitor.TracesPerSecond;
-        //}, effectiveInstrumentation);
+        builder.UseAzureMonitor(o =>
+        {
+            o.SkipExporter = !exporters.HasFlag(ExportTarget.AzureMonitor);
+            o.ConnectionString = options.AzureMonitor.ConnectionString;
+            o.Credential = options.AzureMonitor.Credential;
+            o.DisableOfflineStorage = options.AzureMonitor.DisableOfflineStorage;
+            o.StorageDirectory = options.AzureMonitor.StorageDirectory;
+            o.EnableLiveMetrics = options.AzureMonitor.EnableLiveMetrics;
+            o.EnableStandardMetrics = options.AzureMonitor.EnableStandardMetrics;
+            o.EnablePerfCounters = options.AzureMonitor.EnablePerfCounters;
+            o.EnableTraceBasedLogsSampler = options.AzureMonitor.EnableTraceBasedLogsSampler;
+            o.SamplingRatio = options.AzureMonitor.SamplingRatio;
+            o.TracesPerSecond = options.AzureMonitor.TracesPerSecond;
+        }, effectiveInstrumentation);
 
         // --- Agent365 (always: scopes + baggage + span processors; exporter gated by Exporters flag) ---
         builder.UseAgent365(o =>
