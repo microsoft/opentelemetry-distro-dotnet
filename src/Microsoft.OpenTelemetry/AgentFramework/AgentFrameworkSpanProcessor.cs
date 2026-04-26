@@ -1,13 +1,15 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
+using Microsoft.Agents.A365.Observability.Extensions.AgentFramework.Utils;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
-using global::OpenTelemetry;
+using OpenTelemetry;
 using System.Diagnostics;
 
-namespace Microsoft.OpenTelemetry.AgentFramework
+namespace Microsoft.Agents.A365.Observability.Extensions.AgentFramework
 {
     internal class AgentFrameworkSpanProcessor : BaseProcessor<Activity>
     {
+        private const string AgentFrameworkSource = "Experimental.Microsoft.Agents.AI";
         private const string InvokeAgentOperation = "invoke_agent";
         private const string ChatOperation = "chat";
         private const string ExecuteToolOperation = "execute_tool";
@@ -38,7 +40,17 @@ namespace Microsoft.OpenTelemetry.AgentFramework
                     {
                         case InvokeAgentOperation:
                         case ChatOperation:
-                            AgentFrameworkSpanProcessorHelper.ProcessInputOutputMessages(activity);
+                            var inputMessages = AgentFrameworkMessageMapper.MapInputMessages(activity);
+                            if (inputMessages != null)
+                            {
+                                activity.SetTag(OpenTelemetryConstants.GenAiInputMessagesKey, inputMessages);
+                            }
+
+                            var outputMessages = AgentFrameworkMessageMapper.MapOutputMessages(activity);
+                            if (outputMessages != null)
+                            {
+                                activity.SetTag(OpenTelemetryConstants.GenAiOutputMessagesKey, outputMessages);
+                            }
                             break;
 
                         case ExecuteToolOperation:
@@ -52,7 +64,7 @@ namespace Microsoft.OpenTelemetry.AgentFramework
 
         private bool IsTrackedSource(string sourceName)
         {
-            if (sourceName.StartsWith(AgentFrameworkConstants.DefaultSource))
+            if (sourceName.StartsWith(AgentFrameworkSource))
             {
                 return true;
             }
