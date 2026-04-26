@@ -217,13 +217,11 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             {
                 if (consoleTracesOnly)
                 {
-                    // Wrap the console exporter in a filter that only passes gen_ai/agent spans.
+                    // Use a filtering exporter that only passes gen_ai/agent spans to console.
+                    // Registered via the normal SDK path so ParentProvider/Resource propagates correctly.
                     builder.WithTracing(tracing =>
                     {
-                        var consoleExporter = new global::OpenTelemetry.Exporter.ConsoleActivityExporter(
-                            new global::OpenTelemetry.Exporter.ConsoleExporterOptions());
-                        var simpleProcessor = new SimpleActivityExportProcessor(consoleExporter);
-                        tracing.AddProcessor(new GenAiConsoleFilterProcessor(simpleProcessor));
+                        tracing.AddProcessor(new SimpleActivityExportProcessor(new GenAiConsoleFilterExporter()));
                     });
                 }
                 else
