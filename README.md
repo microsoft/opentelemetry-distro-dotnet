@@ -311,6 +311,12 @@ dotnet add package Microsoft.Extensions.Logging.Console
 builder.Services.AddLogging(logging => logging.AddConsole());
 ```
 
+## Documentation
+
+- [Agent 365 Observability Guide](docs/agent365-observability.md) — Comprehensive guide for adding Agent365 observability using the distro
+- [Migrating from Agent365 SDK](docs/testing-agent365.md) — Migration guide from the standalone Agent365 SDK to the distro
+- [Agent365 Observability Reference](docs/observability-agent365.md) — Quick-reference with before/after code, span attributes, and troubleshooting
+
 ## Examples
 
 - [Azure.Monitor.OpenTelemetry.AspNetCore.Demo](examples/Azure.Monitor.OpenTelemetry.AspNetCore.Demo) — ASP.NET Core → Azure Monitor
