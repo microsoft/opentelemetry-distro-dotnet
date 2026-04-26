@@ -108,12 +108,22 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             
         }
 
+        // When console is paired only with A365 (no AzureMonitor/OTLP), console is limited
+        // to gen_ai traces only — metrics and logs exporters are suppressed.
+        // NOTE: This is scoped to built-in exporters selected via ExportTarget. If a caller
+        // chains additional exporters directly on the returned builder, those are not considered.
+        var consoleTracesOnly = exporters.HasFlag(ExportTarget.Console)
+                             && exporters.HasFlag(ExportTarget.Agent365)
+                             && !exporters.HasFlag(ExportTarget.AzureMonitor)
+                             && !exporters.HasFlag(ExportTarget.Otlp);
+
         // Determine which signals have at least one exporter destination.
         // Agent365 only exports traces — metrics and logs sent to it would go nowhere.
+        // Console metrics/logs are also suppressed when consoleTracesOnly is true.
         var hasTracingExporter = exporters != ExportTarget.None; // all exporters support traces
         var hasMetricsExporter = exporters.HasFlag(ExportTarget.AzureMonitor)
                               || exporters.HasFlag(ExportTarget.Otlp)
-                              || exporters.HasFlag(ExportTarget.Console);
+                              || (exporters.HasFlag(ExportTarget.Console) && !consoleTracesOnly);
         var hasLoggingExporter = hasMetricsExporter; // same set supports logs
 
         // Effective signal flags: user intent AND exporter availability
@@ -200,14 +210,9 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         // --- Console exporter ---
         if (exporters.HasFlag(ExportTarget.Console))
         {
-            // When the only "real" exporter is Agent365 (which only supports traces),
-            // limit console to traces only so metrics/logs noise doesn't flood the output.
-            // Additionally, filter traces to gen_ai/agent spans only — HTTP, ASP.NET,
-            // and SQL spans are suppressed from console to reduce noise.
-            var consoleTracesOnly = exporters.HasFlag(ExportTarget.Agent365)
-                                && !exporters.HasFlag(ExportTarget.AzureMonitor)
-                                && !exporters.HasFlag(ExportTarget.Otlp);
-
+            // When consoleTracesOnly is true, limit console to gen_ai/agent traces only —
+            // HTTP, ASP.NET, and SQL spans are suppressed from console to reduce noise.
+            // Metrics and logs were already disabled above via the hasMetricsExporter/hasLoggingExporter flags.
             if (effectiveInstrumentation.EnableTracing)
             {
                 if (consoleTracesOnly)

@@ -41,6 +41,12 @@ internal sealed class GenAiConsoleFilterProcessor : BaseProcessor<Activity>
     }
 
     /// <inheritdoc/>
+    protected override bool OnForceFlush(int timeoutMilliseconds) => _inner.ForceFlush(timeoutMilliseconds);
+
+    /// <inheritdoc/>
+    protected override bool OnShutdown(int timeoutMilliseconds) => _inner.Shutdown(timeoutMilliseconds);
+
+    /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
         if (disposing)
