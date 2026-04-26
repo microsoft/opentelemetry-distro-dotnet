@@ -167,5 +167,389 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
                 s.ServiceType.Name.Contains("TracerProviderBuilder"));
         }
     }
+
+    [Collection("EnvironmentVariableTests")]
+    public class InstrumentationSuppressTests
+    {
+        [Fact]
+        public void SuppressDefault_AllDefaults_AllDisabled()
+        {
+            var options = new InstrumentationOptions();
+            options.SuppressDefaultInfraInstrumentation();
+
+            Assert.False(options.EnableAspNetCoreInstrumentation);
+            Assert.False(options.EnableHttpClientInstrumentation);
+            Assert.False(options.EnableSqlClientInstrumentation);
+            Assert.False(options.EnableAzureSdkInstrumentation);
+        }
+
+        [Fact]
+        public void SuppressDefault_UserSetOneTrue_OnlyThatStaysEnabled()
+        {
+            var options = new InstrumentationOptions();
+            options.EnableHttpClientInstrumentation = true; // explicit
+
+            options.SuppressDefaultInfraInstrumentation();
+
+            Assert.False(options.EnableAspNetCoreInstrumentation);
+            Assert.True(options.EnableHttpClientInstrumentation); // user set
+            Assert.False(options.EnableSqlClientInstrumentation);
+            Assert.False(options.EnableAzureSdkInstrumentation);
+        }
+
+        [Fact]
+        public void SuppressDefault_UserSetOneFalse_StaysFalse()
+        {
+            var options = new InstrumentationOptions();
+            options.EnableSqlClientInstrumentation = false; // explicit false
+
+            options.SuppressDefaultInfraInstrumentation();
+
+            Assert.False(options.EnableAspNetCoreInstrumentation);
+            Assert.False(options.EnableHttpClientInstrumentation);
+            Assert.False(options.EnableSqlClientInstrumentation); // user's explicit false preserved
+            Assert.False(options.EnableAzureSdkInstrumentation);
+        }
+
+        [Fact]
+        public void SuppressDefault_UserSetAllTrue_NoneDisabled()
+        {
+            var options = new InstrumentationOptions();
+            options.EnableAspNetCoreInstrumentation = true;
+            options.EnableHttpClientInstrumentation = true;
+            options.EnableSqlClientInstrumentation = true;
+            options.EnableAzureSdkInstrumentation = true;
+
+            options.SuppressDefaultInfraInstrumentation();
+
+            Assert.True(options.EnableAspNetCoreInstrumentation);
+            Assert.True(options.EnableHttpClientInstrumentation);
+            Assert.True(options.EnableSqlClientInstrumentation);
+            Assert.True(options.EnableAzureSdkInstrumentation);
+        }
+
+        [Fact]
+        public void SuppressDefault_MixedOverride_CorrectResult()
+        {
+            var options = new InstrumentationOptions();
+            options.EnableAspNetCoreInstrumentation = true;  // explicit true
+            options.EnableHttpClientInstrumentation = false; // explicit false
+            // SQL and Azure SDK left at default
+
+            options.SuppressDefaultInfraInstrumentation();
+
+            Assert.True(options.EnableAspNetCoreInstrumentation);  // user true
+            Assert.False(options.EnableHttpClientInstrumentation); // user false
+            Assert.False(options.EnableSqlClientInstrumentation);  // suppressed
+            Assert.False(options.EnableAzureSdkInstrumentation);   // suppressed
+        }
+
+        [Fact]
+        public void Defaults_AllTrue_BeforeSuppress()
+        {
+            var options = new InstrumentationOptions();
+
+            Assert.True(options.EnableAspNetCoreInstrumentation);
+            Assert.True(options.EnableHttpClientInstrumentation);
+            Assert.True(options.EnableSqlClientInstrumentation);
+            Assert.True(options.EnableAzureSdkInstrumentation);
+        }
+
+        [Fact]
+        public void GenAiInstrumentation_NotAffectedBySuppress()
+        {
+            var options = new InstrumentationOptions();
+            options.SuppressDefaultInfraInstrumentation();
+
+            Assert.True(options.EnableOpenAIInstrumentation);
+            Assert.True(options.EnableSemanticKernelInstrumentation);
+            Assert.True(options.EnableAgentFrameworkInstrumentation);
+            Assert.True(options.EnableAgent365Instrumentation);
+        }
+
+        [Fact]
+        public void SuppressDefault_CalledTwice_Idempotent()
+        {
+            var options = new InstrumentationOptions();
+            options.SuppressDefaultInfraInstrumentation();
+            options.SuppressDefaultInfraInstrumentation(); // second call
+
+            Assert.False(options.EnableAspNetCoreInstrumentation);
+            Assert.False(options.EnableHttpClientInstrumentation);
+            Assert.False(options.EnableSqlClientInstrumentation);
+            Assert.False(options.EnableAzureSdkInstrumentation);
+        }
+
+        [Fact]
+        public void SuppressDefault_SignalFlags_Unaffected()
+        {
+            var options = new InstrumentationOptions();
+            options.SuppressDefaultInfraInstrumentation();
+
+            Assert.True(options.EnableTracing);
+            Assert.True(options.EnableMetrics);
+            Assert.True(options.EnableLogging);
+        }
+    }
+
+    [Collection("EnvironmentVariableTests")]
+    public class A365OnlyModeTests
+    {
+        [Fact]
+        public void Agent365Only_InfraDisabledByDefault()
+        {
+            var services = new ServiceCollection();
+            InstrumentationOptions? captured = null;
+
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365 | ExportTarget.Console;
+                    captured = o.Instrumentation;
+                });
+
+            Assert.NotNull(captured);
+            Assert.False(captured!.EnableAspNetCoreInstrumentation);
+            Assert.False(captured.EnableHttpClientInstrumentation);
+            Assert.False(captured.EnableSqlClientInstrumentation);
+            Assert.False(captured.EnableAzureSdkInstrumentation);
+            // gen_ai instrumentation still enabled
+            Assert.True(captured.EnableOpenAIInstrumentation);
+            Assert.True(captured.EnableAgentFrameworkInstrumentation);
+        }
+
+        [Fact]
+        public void Agent365Only_UserOverride_Respected()
+        {
+            var services = new ServiceCollection();
+            InstrumentationOptions? captured = null;
+
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365 | ExportTarget.Console;
+                    o.Instrumentation.EnableHttpClientInstrumentation = true;
+                    captured = o.Instrumentation;
+                });
+
+            Assert.NotNull(captured);
+            Assert.False(captured!.EnableAspNetCoreInstrumentation); // suppressed
+            Assert.True(captured.EnableHttpClientInstrumentation);   // user override
+            Assert.False(captured.EnableSqlClientInstrumentation);   // suppressed
+            Assert.False(captured.EnableAzureSdkInstrumentation);    // suppressed
+        }
+
+        [Fact]
+        public void Agent365Only_UserOverrideMultiple_AllRespected()
+        {
+            var services = new ServiceCollection();
+            InstrumentationOptions? captured = null;
+
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365;
+                    o.Instrumentation.EnableAspNetCoreInstrumentation = true;
+                    o.Instrumentation.EnableHttpClientInstrumentation = false;
+                    // SQL and Azure SDK left at default
+                    captured = o.Instrumentation;
+                });
+
+            Assert.NotNull(captured);
+            Assert.True(captured!.EnableAspNetCoreInstrumentation);  // user true
+            Assert.False(captured.EnableHttpClientInstrumentation);   // user false
+            Assert.False(captured.EnableSqlClientInstrumentation);    // suppressed
+            Assert.False(captured.EnableAzureSdkInstrumentation);     // suppressed
+        }
+
+        [Fact]
+        public void Agent365PlusAzureMonitor_InfraEnabled()
+        {
+            var services = new ServiceCollection();
+            InstrumentationOptions? captured = null;
+
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365 | ExportTarget.AzureMonitor;
+                    o.AzureMonitor.ConnectionString = "InstrumentationKey=00000000-0000-0000-0000-000000000000";
+                    captured = o.Instrumentation;
+                });
+
+            Assert.NotNull(captured);
+            Assert.True(captured!.EnableAspNetCoreInstrumentation);
+            Assert.True(captured.EnableHttpClientInstrumentation);
+            Assert.True(captured.EnableSqlClientInstrumentation);
+            Assert.True(captured.EnableAzureSdkInstrumentation);
+        }
+
+        [Fact]
+        public void Agent365PlusOtlp_InfraEnabled()
+        {
+            var services = new ServiceCollection();
+            InstrumentationOptions? captured = null;
+
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365 | ExportTarget.Otlp;
+                    captured = o.Instrumentation;
+                });
+
+            Assert.NotNull(captured);
+            Assert.True(captured!.EnableAspNetCoreInstrumentation);
+            Assert.True(captured.EnableHttpClientInstrumentation);
+            Assert.True(captured.EnableSqlClientInstrumentation);
+            Assert.True(captured.EnableAzureSdkInstrumentation);
+        }
+
+        [Fact]
+        public void Agent365Only_NoConsole_StillSuppresses()
+        {
+            var services = new ServiceCollection();
+            InstrumentationOptions? captured = null;
+
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365; // no Console
+                    captured = o.Instrumentation;
+                });
+
+            Assert.NotNull(captured);
+            Assert.False(captured!.EnableAspNetCoreInstrumentation);
+            Assert.False(captured.EnableHttpClientInstrumentation);
+            Assert.False(captured.EnableSqlClientInstrumentation);
+            Assert.False(captured.EnableAzureSdkInstrumentation);
+        }
+
+        [Fact]
+        public void ConsoleOnly_NoA365_NoSuppression()
+        {
+            var services = new ServiceCollection();
+            InstrumentationOptions? captured = null;
+
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Console;
+                    captured = o.Instrumentation;
+                });
+
+            Assert.NotNull(captured);
+            Assert.True(captured!.EnableAspNetCoreInstrumentation);
+            Assert.True(captured.EnableHttpClientInstrumentation);
+            Assert.True(captured.EnableSqlClientInstrumentation);
+            Assert.True(captured.EnableAzureSdkInstrumentation);
+        }
+
+        [Fact]
+        public void AzureMonitorOnly_NoSuppression()
+        {
+            var services = new ServiceCollection();
+            InstrumentationOptions? captured = null;
+
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.AzureMonitor;
+                    o.AzureMonitor.ConnectionString = "InstrumentationKey=00000000-0000-0000-0000-000000000000";
+                    captured = o.Instrumentation;
+                });
+
+            Assert.NotNull(captured);
+            Assert.True(captured!.EnableAspNetCoreInstrumentation);
+            Assert.True(captured.EnableHttpClientInstrumentation);
+            Assert.True(captured.EnableSqlClientInstrumentation);
+            Assert.True(captured.EnableAzureSdkInstrumentation);
+        }
+
+        [Fact]
+        public void NoExporters_NoSuppression()
+        {
+            const string envVar = "APPLICATIONINSIGHTS_CONNECTION_STRING";
+            var original = Environment.GetEnvironmentVariable(envVar);
+            try
+            {
+                Environment.SetEnvironmentVariable(envVar, null);
+                var services = new ServiceCollection();
+                InstrumentationOptions? captured = null;
+
+                services.AddOpenTelemetry()
+                    .UseMicrosoftOpenTelemetry(o =>
+                    {
+                        captured = o.Instrumentation;
+                    });
+
+                Assert.NotNull(captured);
+                Assert.True(captured!.EnableAspNetCoreInstrumentation);
+                Assert.True(captured.EnableHttpClientInstrumentation);
+                Assert.True(captured.EnableSqlClientInstrumentation);
+                Assert.True(captured.EnableAzureSdkInstrumentation);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(envVar, original);
+            }
+        }
+
+        [Fact]
+        public void DuplicateCallThrows()
+        {
+            var services = new ServiceCollection();
+            var builder = services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Console;
+                });
+
+            Assert.Throws<NotSupportedException>(() =>
+                builder.UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Console;
+                }));
+        }
+
+        [Fact]
+        public void Agent365Only_GenAiFlags_AllEnabled()
+        {
+            var services = new ServiceCollection();
+            InstrumentationOptions? captured = null;
+
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365;
+                    captured = o.Instrumentation;
+                });
+
+            Assert.NotNull(captured);
+            Assert.True(captured!.EnableOpenAIInstrumentation);
+            Assert.True(captured.EnableSemanticKernelInstrumentation);
+            Assert.True(captured.EnableAgentFrameworkInstrumentation);
+            Assert.True(captured.EnableAgent365Instrumentation);
+        }
+
+        [Fact]
+        public void Agent365PlusAllExporters_InfraEnabled()
+        {
+            var services = new ServiceCollection();
+            InstrumentationOptions? captured = null;
+
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365 | ExportTarget.AzureMonitor | ExportTarget.Otlp | ExportTarget.Console;
+                    o.AzureMonitor.ConnectionString = "InstrumentationKey=00000000-0000-0000-0000-000000000000";
+                    captured = o.Instrumentation;
+                });
+
+            Assert.NotNull(captured);
+            Assert.True(captured!.EnableAspNetCoreInstrumentation);
+            Assert.True(captured.EnableHttpClientInstrumentation);
+            Assert.True(captured.EnableSqlClientInstrumentation);
+            Assert.True(captured.EnableAzureSdkInstrumentation);
+        }
+    }
 }
 #endif
