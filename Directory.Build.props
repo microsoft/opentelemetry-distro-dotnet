@@ -16,4 +16,18 @@
     <BaseOutputPath>$(MSBuildThisFileDirectory)target\bin\$(MSBuildProjectName)\</BaseOutputPath>
     <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)target\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
   </PropertyGroup>
+
+  <!-- Strong-name signing -->
+  <PropertyGroup>
+    <KeysRoot>$(MSBuildThisFileDirectory).keys</KeysRoot>
+    <SignAssembly>true</SignAssembly>
+    <PublicSign Condition=" '$(OS)' != 'Windows_NT' ">true</PublicSign>
+    <AssemblyOriginatorKeyFile>$(KeysRoot)\InternalKey.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(PublicRelease)' == 'True'">
+    <SignAssembly>true</SignAssembly>
+    <DelaySign>true</DelaySign>
+    <AssemblyOriginatorKeyFile>$(KeysRoot)\35MSSharedLib1024.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
 </Project>

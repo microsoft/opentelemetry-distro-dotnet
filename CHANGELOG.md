@@ -13,4 +13,6 @@
 - Microsoft Agent Framework: captures `Experimental.Microsoft.Agents.AI` activity sources and metrics
 - Agent365 framework extensions: Semantic Kernel, Agent Framework, Azure OpenAI (opt-in via fluent API)
 - `IHostApplicationBuilder` and `IOpenTelemetryBuilder` entry points
-- Targets `net8.0` and `net10.0`
+- Agent365-only mode: infrastructure instrumentation auto-disabled when A365 is the sole exporter (#29)
+- Strong-name signing with Microsoft shared library key
+- Targets `net8.0` and `netstandard2.0`
