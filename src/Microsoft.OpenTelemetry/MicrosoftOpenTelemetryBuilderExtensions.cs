@@ -108,8 +108,30 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             
         }
 
+        // When A365 is the only real exporter (with or without Console), suppress noisy
+        // infrastructure instrumentation (HTTP, ASP.NET, SQL, Azure SDK) by default.
+        // A365 only exports gen_ai/agent spans, so creating Activities for infrastructure
+        // spans wastes CPU. Console in this mode also only shows traces.
+        // NOTE: This is scoped to built-in exporters selected via ExportTarget. If a caller
+        // chains additional exporters directly on the returned builder, those are not considered.
+        // Users can re-enable individual instrumentations by setting them in the callback:
+        //   o.Instrumentation.EnableHttpClientInstrumentation = true;
+        var a365OnlyMode = exporters.HasFlag(ExportTarget.Agent365)
+                        && !exporters.HasFlag(ExportTarget.AzureMonitor)
+                        && !exporters.HasFlag(ExportTarget.Otlp);
+
+        var consoleTracesOnly = a365OnlyMode && exporters.HasFlag(ExportTarget.Console);
+
+        if (a365OnlyMode)
+        {
+            options.Instrumentation.SuppressDefaultInfraInstrumentation();
+        }
+
         // Determine which signals have at least one exporter destination.
         // Agent365 only exports traces — metrics and logs sent to it would go nowhere.
+        // Note: Console is included here even when consoleTracesOnly is true, because
+        // the global flags affect ALL exporters (including any the caller chains after us).
+        // Console-specific suppression is handled later by skipping AddConsoleExporter() calls.
         var hasTracingExporter = exporters != ExportTarget.None; // all exporters support traces
         var hasMetricsExporter = exporters.HasFlag(ExportTarget.AzureMonitor)
                               || exporters.HasFlag(ExportTarget.Otlp)
@@ -200,20 +222,29 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         // --- Console exporter ---
         if (exporters.HasFlag(ExportTarget.Console))
         {
+            // When consoleTracesOnly is true, noisy instrumentation (HTTP, ASP.NET, SQL,
+            // Azure SDK) has already been disabled above, so only gen_ai/agent Activities
+            // are created. Plain AddConsoleExporter() is sufficient — no filtering needed.
             if (effectiveInstrumentation.EnableTracing)
             {
                 builder.WithTracing(tracing => tracing.AddConsoleExporter());
             }
 
-            if (effectiveInstrumentation.EnableMetrics)
+            if (effectiveInstrumentation.EnableMetrics && !consoleTracesOnly)
             {
                 builder.WithMetrics(metrics => metrics.AddConsoleExporter());
             }
 
-            if (effectiveInstrumentation.EnableLogging)
+            if (effectiveInstrumentation.EnableLogging && !consoleTracesOnly)
             {
                 builder.WithLogging(logging => logging.AddConsoleExporter());
             }
+        }
+
+        // --- A365-only mode startup message ---
+        if (a365OnlyMode)
+        {
+            LogA365OnlyModeMessage(builder.Services);
         }
 
         // --- Logging kill switch ---
@@ -268,5 +299,39 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         // Fallback: check raw environment variable (for non-host DI apps without IConfiguration)
         var envConnStr = Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING");
         return !string.IsNullOrWhiteSpace(envConnStr);
+    }
+
+    /// <summary>
+    /// Registers a one-time startup log message explaining that Agent365-only mode
+    /// has disabled infrastructure instrumentation.
+    /// </summary>
+    private static void LogA365OnlyModeMessage(IServiceCollection services)
+    {
+        services.AddHostedService<A365OnlyModeStartupLogger>();
+    }
+
+    /// <summary>
+    /// Logs a one-time informational message at startup when Agent365-only mode is active.
+    /// </summary>
+    private sealed class A365OnlyModeStartupLogger : Microsoft.Extensions.Hosting.IHostedService
+    {
+        private readonly ILogger<A365OnlyModeStartupLogger> _logger;
+
+        public A365OnlyModeStartupLogger(ILogger<A365OnlyModeStartupLogger> logger)
+        {
+            _logger = logger;
+        }
+
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            _logger.LogInformation(
+                "Microsoft.OpenTelemetry: Agent365-only mode active. Infrastructure instrumentation " +
+                "(HTTP, ASP.NET, SQL, Azure SDK) is disabled — Agent365 exports gen_ai/agent traces only. " +
+                "To re-enable, set EnableHttpClientInstrumentation = true (or similar) in " +
+                "UseMicrosoftOpenTelemetry options, or add ExportTarget.AzureMonitor / ExportTarget.Otlp for full observability.");
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

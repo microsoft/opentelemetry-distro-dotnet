@@ -9,6 +9,12 @@ namespace Microsoft.OpenTelemetry;
 /// </summary>
 public class InstrumentationOptions
 {
+    // Backing fields to track explicit user assignment vs defaults.
+    private bool? _enableAspNetCoreInstrumentation;
+    private bool? _enableHttpClientInstrumentation;
+    private bool? _enableSqlClientInstrumentation;
+    private bool? _enableAzureSdkInstrumentation;
+
     // ── Signal pipelines ──
 
     /// <summary>
@@ -40,25 +46,53 @@ public class InstrumentationOptions
     /// Gets or sets a value indicating whether ASP.NET Core incoming request
     /// instrumentation is enabled. Default: <c>true</c>.
     /// </summary>
-    public bool EnableAspNetCoreInstrumentation { get; set; } = true;
+    public bool EnableAspNetCoreInstrumentation
+    {
+        get => _enableAspNetCoreInstrumentation ?? true;
+        set => _enableAspNetCoreInstrumentation = value;
+    }
 
     /// <summary>
     /// Gets or sets a value indicating whether <see cref="System.Net.Http.HttpClient"/>
     /// outgoing request instrumentation is enabled. Default: <c>true</c>.
     /// </summary>
-    public bool EnableHttpClientInstrumentation { get; set; } = true;
+    public bool EnableHttpClientInstrumentation
+    {
+        get => _enableHttpClientInstrumentation ?? true;
+        set => _enableHttpClientInstrumentation = value;
+    }
 
     /// <summary>
     /// Gets or sets a value indicating whether SQL Client database call
     /// instrumentation is enabled. Default: <c>true</c>.
     /// </summary>
-    public bool EnableSqlClientInstrumentation { get; set; } = true;
+    public bool EnableSqlClientInstrumentation
+    {
+        get => _enableSqlClientInstrumentation ?? true;
+        set => _enableSqlClientInstrumentation = value;
+    }
 
     /// <summary>
     /// Gets or sets a value indicating whether Azure SDK client library
     /// instrumentation is enabled. Default: <c>true</c>.
     /// </summary>
-    public bool EnableAzureSdkInstrumentation { get; set; } = true;
+    public bool EnableAzureSdkInstrumentation
+    {
+        get => _enableAzureSdkInstrumentation ?? true;
+        set => _enableAzureSdkInstrumentation = value;
+    }
+
+    /// <summary>
+    /// Suppresses infrastructure instrumentation options that were not explicitly set by the user.
+    /// Only unset (default) values are overridden to <c>false</c>; explicit user choices are preserved.
+    /// </summary>
+    internal void SuppressDefaultInfraInstrumentation()
+    {
+        _enableAspNetCoreInstrumentation ??= false;
+        _enableHttpClientInstrumentation ??= false;
+        _enableSqlClientInstrumentation ??= false;
+        _enableAzureSdkInstrumentation ??= false;
+    }
 
     // ── GenAI / Agent instrumentation libraries ──
 
