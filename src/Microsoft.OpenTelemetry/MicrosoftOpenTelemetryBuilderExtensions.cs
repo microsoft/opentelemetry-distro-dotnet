@@ -259,6 +259,53 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             });
         }
 
+        // --- Non-hosted scenario support ---
+        // Azure Monitor's trace and log exporters are registered via IHostedService
+        // (ExporterRegistrationHostedService), which only starts in hosted apps.
+        // For non-hosted apps (e.g., OpenTelemetrySdk.Create()), we initialize them
+        // during MeterProvider build — by then TracerProvider and LoggerProvider are
+        // already built and cached as singletons, so resolving them is safe.
+        //
+        // We remove the IHostedService registration to prevent double-initialization
+        // in hosted apps (ExporterRegistrationHostedService.Initialize() is NOT
+        // idempotent — calling it twice adds duplicate exporters).
+        // Same pattern used by ApplicationInsights 3.x SDK (TelemetryConfiguration.StartHostedServices).
+        if (exporters.HasFlag(ExportTarget.AzureMonitor))
+        {
+            // Find and remove only the Azure Monitor ExporterRegistrationHostedService.
+            // Other IHostedService registrations (e.g., A365OnlyModeStartupLogger) must stay.
+            ServiceDescriptor? exporterServiceDescriptor = null;
+            for (int i = builder.Services.Count - 1; i >= 0; i--)
+            {
+                var descriptor = builder.Services[i];
+                if (descriptor.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)
+                    && descriptor.ImplementationFactory != null)
+                {
+                    // Verify this is the Azure Monitor exporter registration, not an unrelated hosted service.
+                    var declaringType = descriptor.ImplementationFactory.Method.DeclaringType?.FullName ?? string.Empty;
+                    if (declaringType.Contains("Azure.Monitor") || declaringType.Contains("AzureMonitor"))
+                    {
+                        exporterServiceDescriptor = descriptor;
+                        builder.Services.RemoveAt(i);
+                        break;
+                    }
+                }
+            }
+
+            if (exporterServiceDescriptor != null)
+            {
+                var savedFactory = exporterServiceDescriptor.ImplementationFactory!;
+
+                // MeterProvider builds last (after Tracer and Logger), so both providers
+                // are available for the exporter to attach to.
+                builder.Services.ConfigureOpenTelemetryMeterProvider((sp, _) =>
+                {
+                    var service = (Microsoft.Extensions.Hosting.IHostedService)savedFactory(sp);
+                    service.StartAsync(CancellationToken.None).GetAwaiter().GetResult();
+                });
+            }
+        }
+
         return builder;
     }
 
