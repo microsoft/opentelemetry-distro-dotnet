@@ -51,6 +51,34 @@ Install the Microsoft OpenTelemetry Distro package. This single package replaces
 <!-- ... all other non-observability packages stay as-is -->
 ```
 
+### API differences from A365 SDK
+
+The distro bundles the same observability functionality as the A365 SDK packages, with a few intentional differences:
+
+| A365 SDK | Distro | Notes |
+|----------|--------|-------|
+| `ChatToolCallExtensions.Trace()` | Not included | The distro does not depend on the `OpenAI` NuGet package. Use `ExecuteToolScope.Start()` directly instead (see [workaround](#chattoolcallextensions-workaround)). |
+| `Builder` (fluent API) | `UseMicrosoftOpenTelemetry()` | The distro replaces the A365 `Builder` class with a single entry point. See [Configuration](#configuration-net). |
+
+#### `ChatToolCallExtensions` workaround
+
+If you previously used `chatToolCall.Trace(agentId, tenantId)` from `Microsoft.Agents.A365.Observability.Extensions.OpenAI`, replace it with direct scope creation — all required types are public in the distro:
+
+```csharp
+using var scope = ExecuteToolScope.Start(
+    new Request(),
+    new ToolCallDetails(
+        chatToolCall.FunctionName,
+        chatToolCall.FunctionArguments?.ToString(),
+        chatToolCall.Id,
+        null,
+        chatToolCall.Kind.ToString()),
+    new AgentDetails(agentId: agentId, tenantId: tenantId));
+
+// execute tool...
+scope.RecordResponse(result);
+```
+
 ## Configuration (.NET)
 
 ### Before (Agent365 SDK — deprecated)
