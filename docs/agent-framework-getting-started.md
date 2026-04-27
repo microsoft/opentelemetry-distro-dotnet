@@ -33,13 +33,15 @@ Once observability is enabled, the distro automatically captures:
 
 ### Activity sources
 
-The distro listens to these MAF activity sources:
+The distro listens to these MAF activity sources by default:
 
 | ActivitySource | Description |
 |---|---|
 | `Experimental.Microsoft.Agents.AI` | Default source — used when no custom `sourceName` is specified in `.UseOpenTelemetry()`. |
 | `Experimental.Microsoft.Agents.AI.Agent` | Agent-level operations. |
 | `Experimental.Microsoft.Agents.AI.ChatClient` | Chat client operations. |
+
+> **Important:** If you specify a custom `sourceName` in `.UseOpenTelemetry()` or `.WithOpenTelemetry()` (e.g., `sourceName: "MyAgentApp"`), you **must** also register that source with the distro using `.WithTracing()` and `.WithMetrics()`. See [Using a custom ActivitySource name](#using-a-custom-activitysource-name) for details.
 
 ## Prerequisites
 
@@ -210,7 +212,85 @@ var agent = new ChatClientAgent(
 
 > ⚠️ **Warning:** Only enable `EnableSensitiveData` in development or testing environments. Sensitive data includes prompts, responses, function call arguments, and results.
 
-> **Tip:** If you don't specify a `sourceName`, the default `Experimental.Microsoft.Agents.AI` is used. Make sure the source name matches what your tracer provider listens to.
+> **Tip:** If you don't specify a `sourceName`, the default `Experimental.Microsoft.Agents.AI` is used, and the distro captures these spans automatically. If you use a custom `sourceName`, you must register it with the distro — see [Using a custom ActivitySource name](#using-a-custom-activitysource-name) below.
+
+## Using a custom ActivitySource name
+
+When you specify a custom `sourceName` in `.UseOpenTelemetry()` or `.WithOpenTelemetry()`, the Agent Framework emits spans under that custom source instead of the default `Experimental.Microsoft.Agents.AI*` sources. The distro only subscribes to the default sources automatically, so you **must** register your custom source name with the distro to collect those spans.
+
+This follows the standard OpenTelemetry pattern — the source name used for emission must match the source name registered for collection. See the [Agent Framework observability docs](https://learn.microsoft.com/en-us/agent-framework/agents/observability?pivots=programming-language-csharp) for details.
+
+### Hosted apps
+
+```csharp
+using Microsoft.OpenTelemetry;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+
+const string SourceName = "MyAgentApp";
+
+var builder = WebApplication.CreateBuilder(args);
+
+// 1. Configure the distro
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.AzureMonitor;
+});
+
+// 2. Register the custom source name for collection
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing => tracing.AddSource(SourceName))
+    .WithMetrics(metrics => metrics.AddMeter(SourceName));
+
+var app = builder.Build();
+
+// 3. Instrument the agent with the same custom source name
+var instrumentedChatClient = new AzureOpenAIClient(new Uri(endpoint), new ApiKeyCredential(apiKey))
+    .GetChatClient(deploymentName)
+    .AsIChatClient()
+    .AsBuilder()
+    .UseOpenTelemetry(sourceName: SourceName, configure: cfg => cfg.EnableSensitiveData = true)
+    .Build();
+
+var agent = new ChatClientAgent(instrumentedChatClient, name: "MyAgent", instructions: "...")
+    .WithOpenTelemetry(sourceName: SourceName, configure: cfg => cfg.EnableSensitiveData = true);
+```
+
+### Non-hosted apps
+
+```csharp
+using Microsoft.OpenTelemetry;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+using OpenTelemetry;
+
+const string SourceName = "MyAgentApp";
+
+// 1. Configure the distro and register the custom source name
+var sdk = OpenTelemetrySdk.Create(otel =>
+{
+    otel.UseMicrosoftOpenTelemetry(o =>
+    {
+        o.Exporters = ExportTarget.AzureMonitor;
+    });
+
+    otel.WithTracing(tracing => tracing.AddSource(SourceName));
+    otel.WithMetrics(metrics => metrics.AddMeter(SourceName));
+});
+
+// 2. Instrument the agent with the same custom source name
+var instrumentedChatClient = new AzureOpenAIClient(new Uri(endpoint), new ApiKeyCredential(apiKey))
+    .GetChatClient(deploymentName)
+    .AsIChatClient()
+    .AsBuilder()
+    .UseOpenTelemetry(sourceName: SourceName, configure: cfg => cfg.EnableSensitiveData = true)
+    .Build();
+
+var agent = new ChatClientAgent(instrumentedChatClient, name: "MyAgent", instructions: "...")
+    .WithOpenTelemetry(sourceName: SourceName, configure: cfg => cfg.EnableSensitiveData = true);
+```
+
+> **Key point:** The `sourceName` passed to `.UseOpenTelemetry()` / `.WithOpenTelemetry()` must exactly match the source name passed to `.AddSource()` and `.AddMeter()`. If they don't match, spans will be silently dropped.
 
 ## Aspire Dashboard (local development)
 
@@ -346,9 +426,9 @@ Other related instrumentation options:
 **Solutions:**
 
 - Verify that `.UseOpenTelemetry()` is called on the chat client builder and/or `.WithOpenTelemetry()` is called on the agent.
-- If using the distro (`UseMicrosoftOpenTelemetry()`), MAF sources are registered automatically — no manual `AddSource()` needed. Check that `EnableAgentFrameworkInstrumentation` is not set to `false`.
-- If using `OpenTelemetrySdk.Create()` **without** the distro, ensure you call `.AddSource("Experimental.Microsoft.Agents.AI")` in the tracer provider configuration.
-- If using a custom `sourceName`, ensure the same name is used in both the agent instrumentation and the `AddSource()` call.
+- If using the distro (`UseMicrosoftOpenTelemetry()`), the default MAF sources (`Experimental.Microsoft.Agents.AI*`) are registered automatically. Check that `EnableAgentFrameworkInstrumentation` is not set to `false`.
+- **If using a custom `sourceName`** (e.g., `UseOpenTelemetry(sourceName: "MyAgentApp")`), you must also register that source with the distro via `.WithTracing(t => t.AddSource("MyAgentApp"))` and `.WithMetrics(m => m.AddMeter("MyAgentApp"))`. The distro does not automatically detect custom source names. See [Using a custom ActivitySource name](#using-a-custom-activitysource-name).
+- If using `OpenTelemetrySdk.Create()` **without** the distro, ensure you call `.AddSource("Experimental.Microsoft.Agents.AI")` (or your custom source name) in the tracer provider configuration.
 
 ### Duplicate spans for prompts and responses
 
