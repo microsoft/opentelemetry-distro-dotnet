@@ -112,7 +112,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
         private const string TestConnectionString = "InstrumentationKey=00000000-0000-0000-0000-000000000000";
 
         [Fact]
-        public void AzureMonitor_TracesCaptured_WithoutHostedService()
+        public void NonHosted_TracesCaptured_WithAzureMonitorConfigured()
         {
             // Mirrors NonHostedExporterTests.AzureMonitor_ExporterHostedService_RemovedFromDI
             // Instead of checking DI internals, verify traces actually flow
@@ -142,7 +142,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
         }
 
         [Fact]
-        public void AzureMonitor_MetricsCaptured_WithoutHostedService()
+        public void NonHosted_MetricsCaptured_WithAzureMonitorConfigured()
         {
             // Mirrors NonHostedExporterTests.AzureMonitor_MeterProviderCallback_Registered
             // Instead of checking the callback is registered, verify metrics flow.
@@ -175,9 +175,9 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
         }
 
         [Fact]
-        public void AzureMonitor_LogsCaptured_WithoutHostedService()
+        public void NonHosted_LogsCaptured_WithAzureMonitorConfigured()
         {
-            // Verifies logs flow through the non-hosted Azure Monitor pipeline.
+            // Verifies logs flow through the non-hosted pipeline with Azure Monitor configured.
             var exportedLogs = new List<LogRecord>();
 
             using var sdk = OpenTelemetrySdk.Create(otel =>
@@ -317,6 +317,10 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
                     o.Instrumentation.EnableMetrics = enableMetrics;
                     o.Instrumentation.EnableLogging = enableLogging;
                 })
+                // In-memory exporters are added unconditionally so we can verify
+                // that disabled signals produce NO telemetry (not just that providers
+                // are absent). This matches the DI-based SignalCombinationMatrix pattern
+                // in InstrumentationOptionsTests.cs.
                 .WithTracing(t => t.AddInMemoryExporter(exportedActivities))
                 .WithMetrics(m => m.AddInMemoryExporter(exportedMetrics))
                 .WithLogging(logging => logging.AddInMemoryExporter(exportedLogs));
@@ -401,49 +405,56 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
             listener.Prefixes.Add($"http://localhost:{port}/");
             listener.Start();
 
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    var ctx = await listener.GetContextAsync();
-                    ctx.Response.StatusCode = expectedStatusCode;
-                    ctx.Response.Close();
-                }
-                catch { }
-            });
-
-            var exportedActivities = new List<Activity>();
-
-            using var sdk = OpenTelemetrySdk.Create(otel =>
-            {
-                otel.UseMicrosoftOpenTelemetry(o =>
-                {
-                    o.Exporters = ExportTarget.Console;
-                })
-                .WithTracing(t => t.AddInMemoryExporter(exportedActivities));
-            });
-
-            using var client = new HttpClient();
             try
             {
-                await client.GetAsync($"http://localhost:{port}/test");
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var ctx = await listener.GetContextAsync();
+                        ctx.Response.StatusCode = expectedStatusCode;
+                        ctx.Response.Close();
+                    }
+                    catch { }
+                });
+
+                var exportedActivities = new List<Activity>();
+
+                using var sdk = OpenTelemetrySdk.Create(otel =>
+                {
+                    otel.UseMicrosoftOpenTelemetry(o =>
+                    {
+                        o.Exporters = ExportTarget.Console;
+                    })
+                    .WithTracing(t => t.AddInMemoryExporter(exportedActivities));
+                });
+
+                using var client = new HttpClient();
+                try
+                {
+                    await client.GetAsync($"http://localhost:{port}/test");
+                }
+                catch { }
+
+                sdk.TracerProvider?.ForceFlush();
+
+                var clientActivities = exportedActivities.Where(a => a.Kind == ActivityKind.Client).ToList();
+
+                _output.WriteLine($"Exported {exportedActivities.Count} activities, {clientActivities.Count} client");
+                foreach (var a in exportedActivities)
+                {
+                    _output.WriteLine($"  {a.Source.Name} {a.Kind} {a.DisplayName} {a.Status}");
+                }
+
+                Assert.NotEmpty(clientActivities);
+                var activity = clientActivities.First();
+                Assert.NotEqual(default, activity.TraceId);
             }
-            catch { }
-
-            sdk.TracerProvider?.ForceFlush();
-            listener.Stop();
-
-            var clientActivities = exportedActivities.Where(a => a.Kind == ActivityKind.Client).ToList();
-
-            _output.WriteLine($"Exported {exportedActivities.Count} activities, {clientActivities.Count} client");
-            foreach (var a in exportedActivities)
+            finally
             {
-                _output.WriteLine($"  {a.Source.Name} {a.Kind} {a.DisplayName} {a.Status}");
+                listener.Stop();
+                listener.Close();
             }
-
-            Assert.NotEmpty(clientActivities);
-            var activity = clientActivities.First();
-            Assert.NotEqual(default, activity.TraceId);
         }
 
         [Fact]
@@ -590,7 +601,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
         public async Task SqlClient_SpansCaptured()
         {
             var exportedActivities = new List<Activity>();
-            var fakeSqlDiagnosticSource = new DiagnosticListener("SqlClientDiagnosticListener");
+            using var fakeSqlDiagnosticSource = new DiagnosticListener("SqlClientDiagnosticListener");
 
             using var sdk = OpenTelemetrySdk.Create(otel =>
             {
@@ -631,8 +642,6 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
             Assert.NotEmpty(sqlActivities);
             var activity = sqlActivities.First();
             Assert.Contains(activity.Tags, t => t.Key == "db.system.name" || t.Key == "db.system");
-
-            fakeSqlDiagnosticSource.Dispose();
         }
     }
 }
