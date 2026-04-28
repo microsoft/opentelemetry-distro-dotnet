@@ -59,6 +59,8 @@ The distro bundles the same observability functionality as the A365 SDK packages
 |----------|--------|-------|
 | `ChatToolCallExtensions.Trace()` | Not included | The distro does not depend on the `OpenAI` NuGet package. Use `ExecuteToolScope.Start()` directly instead (see [workaround](#chattoolcallextensions-workaround)). |
 | `Builder` (fluent API) | `UseMicrosoftOpenTelemetry()` | The distro replaces the A365 `Builder` class with a single entry point. See [Configuration](#configuration-net). |
+| `WithAgentFramework(additionalSources)` | `.WithTracing(t => t.AddSource("..."))` | Agent Framework–specific. The distro subscribes to the default `Experimental.Microsoft.Agents.AI*` sources only. Register custom source names via standard OpenTelemetry `.AddSource()`. See [Agent Framework getting-started: custom ActivitySource name](agent-framework-getting-started.md#using-a-custom-activitysource-name). |
+| `.ConfigureResource()` (service identity) | `.ConfigureResource()` (unchanged) | Works the same way. Chain it before `UseMicrosoftOpenTelemetry()`. The distro merges user-configured attributes with auto-detected ones (Azure VM, etc.). See [Customization: Configuring the Resource](customization.md#configuring-the-resource). |
 
 #### `ChatToolCallExtensions` workaround
 
@@ -140,7 +142,7 @@ builder.Services.AddOpenTelemetry()
         .AddSource("MyCompany.MyAgent.CustomSource"));
 ```
 
-> Activity sources for Agent Framework, Semantic Kernel, and OpenAI are auto-registered by the distro — you only need `.AddSource()` for your own custom sources.
+> Activity sources for Agent Framework, Semantic Kernel, and OpenAI are auto-registered by the distro — you only need `.AddSource()` for your own custom sources. **Note:** If you used a custom `sourceName` in Agent Framework's `.UseOpenTelemetry(sourceName: "...")`, you must register it here — the distro does not auto-detect custom names. See [Agent Framework: custom ActivitySource name](agent-framework-getting-started.md#using-a-custom-activitysource-name).
 
 > ⚠️ **Production warning:** `ExportTarget.Console` is intended for local development only. Do not include it in production deployments — it adds overhead and may log sensitive telemetry to stdout. Use `ExportTarget.Agent365` and/or `ExportTarget.AzureMonitor` in production.
 
