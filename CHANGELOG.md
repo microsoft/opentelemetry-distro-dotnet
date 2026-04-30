@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0 - 2026-05-01
+
+First stable release of the Microsoft OpenTelemetry distro for .NET.
+
+- Updated `Azure.Monitor.OpenTelemetry.Exporter` to 1.8.0 (#72)
+- Removed URL query redaction override — OTel defaults now flow through (#71)
+- Agent365 exporter: payload chunking and improved export reliability (#63)
+- Distro SDK version reporting (#62)
+- Source Link, deterministic builds, and `.snupkg` symbol packages (#55)
+- Exclude example and test projects from NuGet packaging (#49)
+- Resource attribute tests for `ConfigureResource` + `UseMicrosoftOpenTelemetry` (#51)
+- Public API surface locked in `PublicAPI.Shipped.txt`
+
 ## 1.0.0-beta.2
 
 ### Bug Fixes
