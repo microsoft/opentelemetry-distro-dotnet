@@ -136,25 +136,6 @@ builder.Services.AddOpenTelemetry()
 - `TokenStore` class file — delete it if present. Use `o.Agent365.Exporter.TokenResolver` directly, or let the distro auto-manage tokens via `IExporterTokenCache<AgenticTokenStruct>` (injected via DI)
 - `ConfigureOpenTelemetry()` extension method file (if you have one) — delete it, the distro handles all OTel setup
 
-## Observability scope change
-
-> ⚠️ **Breaking change:** The observability authentication scope has changed. If you hardcoded the old scope in your token acquisition code, you will get auth failures after migration.
-
-| | Scope |
-|---|---|
-| **Old (A365 SDK)** | `https://api.powerplatform.com/.default` |
-| **New (Distro)** | `api://9b975845-388f-4429-889e-eab1ef63949c/Agent365.Observability.OtelWrite` |
-
-**Action required:** Stop hardcoding scopes. Use `EnvironmentUtils.GetObservabilityAuthenticationScope()`, which returns the correct scope automatically:
-
-```csharp
-using Microsoft.Agents.A365.Observability.Runtime.Common;
-
-var scopes = EnvironmentUtils.GetObservabilityAuthenticationScope();
-```
-
-You must also grant the new `Agent365.Observability.OtelWrite` permission to your identity (Managed Identity or app registration). Without it, telemetry export fails with HTTP 403. See [HTTP 403 Forbidden](#http-403-forbidden) for steps on granting the permission.
-
 ## ConfigureResource for service identity
 
 If your old SDK project used a custom `AgentOTELExtensions.cs` with `.AddService()` to set `service.name`, `service.namespace`, `service.version`, and `deployment.environment`, migrate to the standard `.ConfigureResource()` API. Without this, spans show `unknown_service:...` as the service name.
@@ -473,18 +454,21 @@ builder.Services.AddOpenTelemetry()
 
 ### Auth scopes
 
-There is no `AuthScopes` property on `Agent365ExporterOptions`. Auth scopes are controlled two ways:
+> ⚠️ **Breaking change:** The observability authentication scope changed from `https://api.powerplatform.com/.default` (old A365 SDK) to a new value. If you hardcoded the old scope, you will get auth failures after migration. You must also grant the `Agent365.Observability.OtelWrite` permission — see [HTTP 403 Forbidden](#http-403-forbidden).
 
-1. **Via `RegisterObservability()`** — the `observabilityScopes` parameter on the token cache:
+There is no `AuthScopes` property on `Agent365ExporterOptions`. Do not hardcode scope strings. Auth scopes are controlled two ways:
+
+1. **Via `RegisterObservability()`** — the `observabilityScopes` parameter on the token cache. Use the helper to get the correct scope automatically:
    ```csharp
+   using Microsoft.Agents.A365.Observability.Runtime.Common;
+
    _agentTokenCache.RegisterObservability(agentId, tenantId, tokenGenerator,
        EnvironmentUtils.GetObservabilityAuthenticationScope());
    ```
-   The default production scope is `api://9b975845-388f-4429-889e-eab1ef63949c/Agent365.Observability.OtelWrite`.
 
 2. **Via environment variable** — `A365_OBSERVABILITY_SCOPE_OVERRIDE` overrides the default scope for testing:
    ```powershell
-   $env:A365_OBSERVABILITY_SCOPE_OVERRIDE = "https://api.powerplatform.com/.default"
+   $env:A365_OBSERVABILITY_SCOPE_OVERRIDE = "api://test/.default"
    ```
 
 ## Validate locally
