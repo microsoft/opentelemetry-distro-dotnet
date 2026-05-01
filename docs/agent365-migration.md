@@ -171,7 +171,7 @@ builder.Services.AddOpenTelemetry()
 
 ## Token resolver
 
-When using the Agent 365 exporter, you must provide a token resolver function that returns an authentication token. The distro supports two approaches.
+When using the Agent 365 exporter, a token resolver is required. The distro can either auto-provide one via DI or you can set one explicitly via `o.Agent365.Exporter.TokenResolver`.
 
 ### Auto (DI) — recommended for Agent Framework apps
 
@@ -261,7 +261,6 @@ builder.Services.AddOpenTelemetry()
 | **Auto (DI)** — default | Agent Framework apps with `UserAuthorization` | Distro internally calls `AddAgenticTracingExporter()`, registering `IExporterTokenCache<AgenticTokenStruct>`. Your agent calls `RegisterObservability()`. Token exchange happens via `ExchangeTurnTokenAsync`. |
 | **Custom resolver** | Non-agent apps, service-to-service, or custom auth | Set `o.Agent365.Exporter.TokenResolver` directly. You own token acquisition. |
 
-> **Note:** In earlier builds, setting a custom `TokenResolver` prevented `IExporterTokenCache<AgenticTokenStruct>` from being registered via DI ([Issue #42](https://github.com/microsoft/opentelemetry-distro-dotnet/issues/42)). This is fixed in the current distro — `IExporterTokenCache<AgenticTokenStruct>` is always registered, even when a custom `TokenResolver` is set.
 
 ## Baggage middleware
 
@@ -306,9 +305,7 @@ Auto-instrumentation automatically listens to agentic frameworks' existing telem
 
 > **How it works:** All A365 auto-instrumentations are **span processors that enrich existing spans** — they do not create new spans. Semantic Kernel and Agent Framework have dedicated span processors that extract and transform span attributes (e.g., input/output messages). OpenAI has source subscriptions only. The distro registers these processors automatically when `UseMicrosoftOpenTelemetry()` is called.
 
-All auto-instrumentation is conditional on `o.Instrumentation.Enable*` flags (all default to `true`).
-
-The distro automatically subscribes to these `ActivitySource` names:
+The distro automatically subscribes to these `ActivitySource` names when the relevant instrumentation is enabled:
 
 | ActivitySource | Origin |
 |---|---|
@@ -382,7 +379,11 @@ public async Task<string> ProcessUserRequest(string userInput)
 }
 ```
 
-The distro automatically calls `AppContext.SetSwitch("OpenAI.Experimental.EnableOpenTelemetry", true)` — you do not need to enable this manually.
+The distro subscribes to `OpenAI.*` and `Azure.AI.OpenAI*` sources automatically. However, to enable the OpenAI SDK to emit telemetry, you must set the `AppContext` switch in your application:
+
+```csharp
+AppContext.SetSwitch("OpenAI.Experimental.EnableOpenTelemetry", true);
+```
 
 ### Agent Framework
 
