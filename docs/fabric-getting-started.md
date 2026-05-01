@@ -90,13 +90,16 @@ app.MapGet("/", () => "Hello from distro → Fabric!");
 app.Run();
 ```
 
-That's it for the app. `UseMicrosoftOpenTelemetry` automatically instruments HTTP requests, captures logs, and collects metrics. Setting `ExportTarget.Otlp` sends everything to the collector via the OTLP protocol.
+That's it for the app. `UseMicrosoftOpenTelemetry` automatically instruments HTTP requests, captures logs, and collects metrics. Setting `ExportTarget.Otlp` sends everything to the collector via the OTLP/gRPC protocol.
 
-By default, the OTLP exporter connects to `http://localhost:4317`. To change the endpoint (e.g., a remote collector or one using TLS):
+By default, the OTLP exporter sends to `http://localhost:4317` (gRPC). To override the endpoint, set the `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable:
 
 ```bash
+# Remote collector or TLS
 OTEL_EXPORTER_OTLP_ENDPOINT=https://<collector-host>:4317
 ```
+
+> **gRPC vs HTTP:** The distro uses OTLP/gRPC (port 4317) by default. To use OTLP/HTTP (port 4318) instead, also set `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`.
 
 ## Step 4: Download the OpenTelemetry Collector
 
@@ -109,7 +112,7 @@ The collector is a standalone process that receives OTLP data from your app and 
 
 ### Option A: Binary (recommended for getting started)
 
-Download the latest **otelcol-contrib** binary for your OS from [OTel Collector Contrib releases](https://github.com/open-telemetry/opentelemetry-collector-releases/releases) (look for `otelcol-contrib_*` assets).
+Download **otelcol-contrib** version **0.121.0** (or later) for your OS from [OTel Collector Contrib releases](https://github.com/open-telemetry/opentelemetry-collector-releases/releases) (look for `otelcol-contrib_*` assets).
 
 ### Option B: Docker
 
@@ -186,7 +189,7 @@ service:
 | **DefaultAzureCredential** | `use_azure_auth: true` | Local dev (`az login`), Managed Identity, Workload Identity (AKS) |
 | **Service principal** | `application_id` + `application_key` + `tenant_id` | CI/CD, headless environments |
 
-> **Note:** When using `use_azure_auth: true`, the collector authenticates via the [DefaultAzureCredential](https://learn.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication) chain. For local development, `az login` is the simplest option. In production (AKS), use [Workload Identity federation](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview) with a federated credential on your Entra app registration — no client secrets needed.
+> **Note:** When using `use_azure_auth: true`, the collector authenticates via the [DefaultAzureCredential](https://learn.microsoft.com/en-us/dotnet/api/azure.identity.defaultazurecredential) chain. For local development, `az login` is the simplest option. In production (AKS), use [Workload Identity federation](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview) with a federated credential on your Entra app registration — no client secrets needed.
 
 ## Step 6: Start the collector
 
