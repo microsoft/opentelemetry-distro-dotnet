@@ -1,10 +1,6 @@
-# Agent 365 Observability (.NET)
+# Microsoft OpenTelemetry Distro
 
-> **Standalone guide** — covers everything you need to add Agent365 observability using the `Microsoft.OpenTelemetry` distro. For migrating from the standalone Agent365 SDK, see [Migrating from Agent365 SDK](agent365-migration.md).
-
-> **Important:** You need to be part of the [Frontier preview program](https://adoption.microsoft.com/copilot/frontier-program/) to get **early access** to Microsoft Agent 365. Frontier connects you directly with Microsoft's latest AI innovations.
-
-To participate in the Agent 365 ecosystem, add Agent 365 Observability capabilities to your agent. Agent 365 Observability builds on [OpenTelemetry (OTel)](https://opentelemetry.io/docs/specs/otel/protocol/) and provides a unified framework for capturing telemetry consistently and securely across all agent platforms. By implementing this required component, you enable IT admins to monitor your agent's activity in Microsoft admin center and allow security teams to use Defender and Purview for compliance and threat detection.
+Microsoft OpenTelemetry Distro is a unified observability distribution that provides a single onboarding experience for collecting traces, metrics, and logs from agentic and nonagentic applications. It supports observability for Microsoft Agent 365, Microsoft Foundry, Azure Monitor, and any OpenTelemetry Protocol (OTLP)-compatible backend. The distro supports .NET, Node.js, and Python, and replaces fragmented setup across multiple observability stacks with one import and one configuration call.
 
 ## Key benefits
 
