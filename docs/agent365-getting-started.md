@@ -925,18 +925,42 @@ After implementing observability, verify telemetry capture:
 
 ### HTTP 401 Unauthorized
 
+**Symptoms:** Export fails with HTTP 401. The exporter doesn't retry this error.
+
 **Resolution:**
 
-- Verify the token audience matches the observability endpoint scope (default: `api://9b975845-388f-4429-889e-eab1ef63949c/Agent365.Observability.OtelWrite`).
-- Ensure the identity has Agent 365 observability permissions.
-- The `Agent365.Observability.OtelWrite` permission is required for `.NET 0.3-beta` and newer.
+- Verify the token audience matches the observability endpoint scope.
+- Check that the token resolver isn't returning a delegated user token, a token for an incorrect audience, or an expired token.
 
 ### HTTP 403 Forbidden
 
+**Symptoms:** Export fails with HTTP 403. The exporter doesn't retry this error. An HTTP 403 error can have different causes. Check the following resolutions in order.
+
 **Resolution:**
 
-- Verify the tenant ID is in the Agent 365 allowed tenant list for trace ingestion.
-- Confirm the agent identity has the required role or permission for the target tenant.
+- **Missing license** — Verify that your tenant has one of the following licenses assigned in [Microsoft 365 admin center](https://admin.cloud.microsoft/?source=applauncher#/homepage):
+  - **Test - Microsoft 365 E7**
+  - **Microsoft 365 E7**
+  - **Microsoft Agent 365 Frontier**
+- **Missing `Agent365.Observability.OtelWrite` permission** — If you recently upgraded your observability packages, you need to grant this permission. Grant it using one of the following options:
+
+  **Option A — Agent 365 CLI** (requires `a365.config.json` and `a365.generated.config.json` in your config directory, a Global Administrator account, and [Agent 365 CLI v1.1.139-preview](https://www.nuget.org/packages/Microsoft.Agents.A365.DevTools.Cli/1.1.139-preview) or later)
+
+  ```
+  a365 setup admin --config-dir "<path-to-config-dir>"
+  ```
+
+  This command grants all missing permissions, including the new Observability scopes.
+
+  **Option B — Entra Portal** (no config files required; requires Global Administrator access to the blueprint app registration)
+
+  1. Go to **Entra portal** > **App registrations** > select your Blueprint app.
+  2. Go to **API permissions** > **Add a permission** > **APIs my organization uses** > search for `9b975845-388f-4429-889e-eab1ef63949c`.
+  3. Select **Delegated permissions** > check `Agent365.Observability.OtelWrite` > **Add permissions**.
+  4. Repeat step 2–3, this time select **Application permissions** > check `Agent365.Observability.OtelWrite` > **Add permissions**.
+  5. Click **Grant admin consent** and confirm.
+
+  Both `Agent365.Observability.OtelWrite` (Delegated) and `Agent365.Observability.OtelWrite` (Application) should show `Granted` status.
 
 ### HTTP 429 / 5xx — Transient errors
 
