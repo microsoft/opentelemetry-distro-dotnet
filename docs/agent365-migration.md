@@ -306,14 +306,6 @@ Auto-instrumentation automatically listens to agentic frameworks' existing telem
 
 > **How it works:** All A365 auto-instrumentations are **span processors that enrich existing spans** — they do not create new spans. Semantic Kernel and Agent Framework have dedicated span processors that extract and transform span attributes (e.g., input/output messages). OpenAI has source subscriptions only. The distro registers these processors automatically when `UseMicrosoftOpenTelemetry()` is called.
 
-### Supported frameworks (.NET)
-
-| SDK / Framework | Support | Span Processor | Notes |
-|---|---|---|---|
-| Semantic Kernel | ✅ | `SemanticKernelSpanProcessor` (internal) | Enriches SK spans: converts `chat.completions` → `chat`, extracts input/output messages. |
-| OpenAI / Azure OpenAI | ✅ | None (source subscriptions only) | The distro automatically enables `AppContext.SetSwitch("OpenAI.Experimental.EnableOpenTelemetry", true)` — no developer action needed. |
-| Agent Framework | ✅ | `AgentFrameworkSpanProcessor` (internal) | Enriches AF spans: maps input/output messages for `invoke_agent`, `chat`, `execute_tool` operations. |
-
 All auto-instrumentation is conditional on `o.Instrumentation.Enable*` flags (all default to `true`).
 
 The distro automatically subscribes to these `ActivitySource` names:
