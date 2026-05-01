@@ -33,26 +33,24 @@ Set `ExportTarget.Otlp` so the distro sends telemetry to `localhost:4317` (the d
 
 ```csharp
 using Microsoft.OpenTelemetry;
-using OpenTelemetry;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenTelemetry()
-    .UseMicrosoftOpenTelemetry(o =>
-    {
-        o.Exporters = ExportTarget.Otlp;
-    });
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.Otlp;
+});
 
 var app = builder.Build();
 app.MapGet("/", () => "Hello!");
 app.Run();
 ```
 
-Run the app and send a few requests:
+Run the app and send a few requests (use the URL printed by `dotnet run`):
 
 ```bash
 dotnet run
-curl http://localhost:5000/
+curl http://localhost:<port>/
 ```
 
 Switch to the dashboard at `http://localhost:18888` — you should see traces, structured logs, and metrics appearing in real time.
@@ -72,12 +70,11 @@ Then start the collector. If you forget, you'll see a `port is already allocated
 You can send to the dashboard **and** Azure Monitor at the same time:
 
 ```csharp
-builder.Services.AddOpenTelemetry()
-    .UseMicrosoftOpenTelemetry(o =>
-    {
-        o.Exporters = ExportTarget.Otlp | ExportTarget.AzureMonitor;
-        o.AzureMonitor.ConnectionString = "InstrumentationKey=...";
-    });
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.Otlp | ExportTarget.AzureMonitor;
+    o.AzureMonitor.ConnectionString = "InstrumentationKey=...";
+});
 ```
 
 ## References

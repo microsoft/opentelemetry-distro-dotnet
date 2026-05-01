@@ -77,22 +77,20 @@ Replace `Program.cs` with:
 
 ```csharp
 using Microsoft.OpenTelemetry;
-using OpenTelemetry;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenTelemetry()
-    .UseMicrosoftOpenTelemetry(o =>
-    {
-        o.Exporters = ExportTarget.Otlp;
-    });
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.Otlp;
+});
 
 var app = builder.Build();
 app.MapGet("/", () => "Hello from distro → Fabric!");
 app.Run();
 ```
 
-That's it for the app. The distro automatically instruments HTTP requests, captures logs, and collects metrics. Setting `ExportTarget.Otlp` sends everything to `http://localhost:4317` (the collector) via the OTLP protocol.
+That's it for the app. `UseMicrosoftOpenTelemetry` automatically instruments HTTP requests, captures logs, and collects metrics. Setting `ExportTarget.Otlp` sends everything to `http://localhost:4317` (the collector) via the OTLP protocol.
 
 > **Remote collector?** Set the environment variable `OTEL_EXPORTER_OTLP_ENDPOINT=http://<collector-host>:4317` before running the app.
 
@@ -151,7 +149,7 @@ service:
 
 | Placeholder | Replace with | Example |
 |---|---|---|
-| `<your-cluster>` | Your ADX cluster or Fabric KQL database URI | `mycluster.westus2.kusto.windows.net` |
+| `<your-cluster>` | Your cluster hostname (without `https://`) | `mycluster.westus2.kusto.windows.net` |
 | `<your-database>` | The database name where you created the tables | `MyDatabase` |
 
 ### Authentication options
@@ -214,11 +212,11 @@ With the collector running in one terminal, open a second terminal and start the
 dotnet run
 ```
 
-Send a few requests to generate telemetry:
+Send a few requests to generate telemetry (use the URL printed by `dotnet run`):
 
 ```bash
-curl http://localhost:5000/
-curl http://localhost:5000/weather
+curl http://localhost:<port>/
+curl http://localhost:<port>/weather
 ```
 
 After the collector batch interval (5s default), query your tables in the ADX web UI:
@@ -241,12 +239,11 @@ OTELMetrics | take 10
 You can send to both Azure Monitor **and** Fabric simultaneously. The app exports via OTLP (collector → Fabric) and directly to Azure Monitor — no extra collector needed for Azure Monitor:
 
 ```csharp
-builder.Services.AddOpenTelemetry()
-    .UseMicrosoftOpenTelemetry(o =>
-    {
-        o.Exporters = ExportTarget.AzureMonitor | ExportTarget.Otlp;
-        o.AzureMonitor.ConnectionString = "InstrumentationKey=...";
-    });
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.AzureMonitor | ExportTarget.Otlp;
+    o.AzureMonitor.ConnectionString = "InstrumentationKey=...";
+});
 ```
 
 ## References

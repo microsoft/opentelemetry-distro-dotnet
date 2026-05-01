@@ -15,17 +15,15 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 using Microsoft.OpenTelemetry;
-using OpenTelemetry;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenTelemetry()
-    .UseMicrosoftOpenTelemetry(o =>
-    {
-        // Export via OTLP to the OTel Collector.
-        // The collector forwards to Azure Data Explorer / Fabric.
-        o.Exporters = ExportTarget.Otlp;
-    });
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    // Export via OTLP to the OTel Collector.
+    // The collector forwards to Azure Data Explorer / Fabric.
+    o.Exporters = ExportTarget.Otlp;
+});
 
 var app = builder.Build();
 
