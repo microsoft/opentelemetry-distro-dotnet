@@ -141,6 +141,23 @@ builder.UseMicrosoftOpenTelemetry(o =>
 
 ---
 
+### 4. Microsoft Fabric / Azure Data Explorer
+
+Send traces, metrics, and logs to [Microsoft Fabric Real-Time Intelligence](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/overview) or Azure Data Explorer via an OpenTelemetry Collector with the Azure Data Explorer exporter.
+
+```csharp
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.Otlp;
+});
+```
+
+The app sends OTLP to a collector, which forwards to Fabric/ADX. No code changes needed — just configure the collector.
+
+📖 **Full guide:** [Fabric Getting Started](docs/fabric-getting-started.md)
+
+---
+
 ### Combining destinations
 
 ```csharp
@@ -268,12 +285,15 @@ builder.Services.AddLogging(logging => logging.AddConsole());
 - [Agent 365 Getting Started](docs/agent365-getting-started.md) — Add Agent365 observability using the distro
 - [Agent 365 Migration Guide](docs/agent365-migration.md) — Migrate from the standalone Agent365 SDK to the distro
 - [Agent 365 Migration Testing](docs/testing-agent365.md) — Detailed migration checklist with auto-instrumentation, env vars, and span comparison
+- [Fabric Getting Started](docs/fabric-getting-started.md) — Send telemetry to Microsoft Fabric / Azure Data Explorer via OTLP + OTel Collector
+- [Aspire Dashboard](docs/aspire-dashboard.md) — Validate telemetry locally with the .NET Aspire Dashboard
 
 ## Examples
 
 - [Azure.Monitor.OpenTelemetry.AspNetCore.Demo](examples/Azure.Monitor.OpenTelemetry.AspNetCore.Demo) — ASP.NET Core → Azure Monitor
 - [Microsoft.OpenTelemetry.Agent365.Demo](examples/Microsoft.OpenTelemetry.Agent365.Demo) — Agent Framework app → Agent365
 - [Microsoft.OpenTelemetry.AgentFramework.Demo](examples/Microsoft.OpenTelemetry.AgentFramework.Demo) — Agent Framework → OTLP / Azure Monitor
+- [Microsoft.OpenTelemetry.Fabric.Demo](examples/Microsoft.OpenTelemetry.Fabric.Demo) — ASP.NET Core → OTLP → OTel Collector → Microsoft Fabric / Azure Data Explorer
 
 ## AI-Assisted Setup & Migration Skills
 
