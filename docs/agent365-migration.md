@@ -136,6 +136,25 @@ builder.Services.AddOpenTelemetry()
 - `TokenStore` class file — delete it if present. Use `o.Agent365.Exporter.TokenResolver` directly, or let the distro auto-manage tokens via `IExporterTokenCache<AgenticTokenStruct>` (injected via DI)
 - `ConfigureOpenTelemetry()` extension method file (if you have one) — delete it, the distro handles all OTel setup
 
+## Observability scope change
+
+> ⚠️ **Breaking change:** The observability authentication scope has changed. If you hardcoded the old scope in your token acquisition code, you will get auth failures after migration.
+
+| | Scope |
+|---|---|
+| **Old (A365 SDK)** | `https://api.powerplatform.com/.default` |
+| **New (Distro)** | `api://9b975845-388f-4429-889e-eab1ef63949c/Agent365.Observability.OtelWrite` |
+
+**Action required:** Stop hardcoding scopes. Use `EnvironmentUtils.GetObservabilityAuthenticationScope()`, which returns the correct scope automatically:
+
+```csharp
+using Microsoft.Agents.A365.Observability.Runtime.Common;
+
+var scopes = EnvironmentUtils.GetObservabilityAuthenticationScope();
+```
+
+You must also grant the new `Agent365.Observability.OtelWrite` permission to your identity (Managed Identity or app registration). Without it, telemetry export fails with HTTP 403. See [HTTP 403 Forbidden](#http-403-forbidden) for steps on granting the permission.
+
 ## ConfigureResource for service identity
 
 If your old SDK project used a custom `AgentOTELExtensions.cs` with `.AddService()` to set `service.name`, `service.namespace`, `service.version`, and `deployment.environment`, migrate to the standard `.ConfigureResource()` API. Without this, spans show `unknown_service:...` as the service name.
