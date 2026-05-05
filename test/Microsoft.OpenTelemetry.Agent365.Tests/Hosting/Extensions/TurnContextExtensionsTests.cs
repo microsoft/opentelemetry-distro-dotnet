@@ -74,7 +74,7 @@ public class TurnContextExtensionsTests
             AadObjectId = aadObjectId,
         };
 
-        // Set AgenticUserId via reflection or property if available
+        // Set AgenticUserId
         if (agenticUserId != null)
         {
             from.AgenticUserId = agenticUserId;
