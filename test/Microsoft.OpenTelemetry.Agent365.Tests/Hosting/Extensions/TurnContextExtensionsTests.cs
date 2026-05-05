@@ -46,6 +46,22 @@ public class TurnContextExtensionsTests
     }
 
     [TestMethod]
+    public void GetCallerBaggagePairs_NoAadObjectId_FallsBackToGuidAgenticUserId()
+    {
+        // Arrange – A2A scenario where AgenticUserId is a GUID
+        var turnContext = CreateTurnContext(
+            fromId: "29:1sH5NArUwkWAX",
+            aadObjectId: null,
+            agenticUserId: "bef730f4-d6f5-4ffb-b759-26ffa449ed7e");
+
+        // Act
+        var pairs = turnContext.GetCallerBaggagePairs().ToDictionary(p => p.Key, p => p.Value);
+
+        // Assert – falls back to AgenticUserId (GUID format)
+        pairs[OpenTelemetryConstants.UserIdKey].Should().Be("bef730f4-d6f5-4ffb-b759-26ffa449ed7e");
+    }
+
+    [TestMethod]
     public void GetCallerBaggagePairs_NoAadObjectIdNoAgenticUserId_FallsBackToFromId()
     {
         // Arrange – non-Teams channel where only From.Id is available
