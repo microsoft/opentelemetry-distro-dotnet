@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 - 2026-05-06
+
+- Update to hosting telemetry extraction logic so that user.id baggage is resolved across more channel types ([#86](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/86))
+
 ## 1.0.1 - 2026-05-01
 
 - Add explicit `Microsoft.Extensions.Logging` and `Microsoft.Extensions.Configuration.Binder` dependencies for net8.0 runtime compatibility
