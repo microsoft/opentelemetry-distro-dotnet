@@ -94,7 +94,7 @@ public sealed class PayloadChunkingTests
         {
             ["gen_ai.system"] = "openai",
             ["gen_ai.tool.call.arguments"] = new string('x', 1000),
-            ["gen_ai.tool.call_result"] = new string('y', 1000),
+            ["gen_ai.tool.call.result"] = new string('y', 1000),
         };
         var activity = CreateActivity("test", attrs);
 
