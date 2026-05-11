@@ -85,14 +85,37 @@ namespace Microsoft.Agents.A365.Observability.Hosting.Extensions
             {
                 try
                 {
-                    var channelDataJson = turnContext.Activity.ChannelData.ToString();
-                    if (!string.IsNullOrWhiteSpace(channelDataJson))
+                    var channelData = turnContext.Activity.ChannelData;
+
+                    // Handle JsonElement directly (avoids ToString + reparse)
+                    if (channelData is System.Text.Json.JsonElement jsonElement)
                     {
-                        using var doc = System.Text.Json.JsonDocument.Parse(channelDataJson);
-                        if (doc.RootElement.TryGetProperty("productContext", out var productContextElem) &&
+                        if (jsonElement.TryGetProperty("productContext", out var productContextElem) &&
                             productContextElem.ValueKind == System.Text.Json.JsonValueKind.String)
                         {
                             subChannel = productContextElem.GetString();
+                        }
+                    }
+                    else if (channelData is System.Text.Json.Nodes.JsonObject jsonObject)
+                    {
+                        if (jsonObject.TryGetPropertyValue("productContext", out var node) &&
+                            node is System.Text.Json.Nodes.JsonValue val)
+                        {
+                            subChannel = val.ToString();
+                        }
+                    }
+                    else
+                    {
+                        // Fallback: serialize to string and parse
+                        var channelDataJson = channelData.ToString();
+                        if (!string.IsNullOrWhiteSpace(channelDataJson))
+                        {
+                            using var doc = System.Text.Json.JsonDocument.Parse(channelDataJson);
+                            if (doc.RootElement.TryGetProperty("productContext", out var elem) &&
+                                elem.ValueKind == System.Text.Json.JsonValueKind.String)
+                            {
+                                subChannel = elem.GetString();
+                            }
                         }
                     }
                 }
@@ -102,7 +125,7 @@ namespace Microsoft.Agents.A365.Observability.Hosting.Extensions
                 }
             }
 
-            return subChannel;
+            return string.IsNullOrWhiteSpace(subChannel) ? null : subChannel;
         }
 
         /// <summary>
