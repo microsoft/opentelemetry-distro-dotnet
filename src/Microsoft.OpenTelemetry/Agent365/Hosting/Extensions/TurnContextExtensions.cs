@@ -71,7 +71,15 @@ namespace Microsoft.Agents.A365.Observability.Hosting.Extensions
         public static IEnumerable<KeyValuePair<string, object?>> GetChannelBaggagePairs(this ITurnContext turnContext)
         {
             yield return new KeyValuePair<string, object?>(OpenTelemetryConstants.ChannelNameKey, turnContext.Activity?.ChannelId?.Channel);
+            yield return new KeyValuePair<string, object?>(OpenTelemetryConstants.ChannelLinkKey, ResolveSubChannel(turnContext));
+        }
 
+        /// <summary>
+        /// Resolves the sub-channel value from the turn context, falling back to
+        /// the <c>productContext</c> property in ChannelData when SubChannel is not set.
+        /// </summary>
+        internal static string? ResolveSubChannel(ITurnContext turnContext)
+        {
             var subChannel = turnContext.Activity?.ChannelId?.SubChannel;
             if (string.IsNullOrWhiteSpace(subChannel) && turnContext.Activity?.ChannelData != null)
             {
@@ -94,7 +102,7 @@ namespace Microsoft.Agents.A365.Observability.Hosting.Extensions
                 }
             }
 
-            yield return new KeyValuePair<string, object?>(OpenTelemetryConstants.ChannelLinkKey, subChannel);
+            return subChannel;
         }
 
         /// <summary>

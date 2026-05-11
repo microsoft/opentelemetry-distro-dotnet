@@ -112,7 +112,10 @@ public class BaggageTurnMiddlewareTests
     {
         // Arrange
         var middleware = new BaggageTurnMiddleware();
-        var channelData = new { productContext = "copilot-m365" };
+        var channelData = new System.Text.Json.Nodes.JsonObject
+        {
+            ["productContext"] = "copilot-m365",
+        };
         var turnContext = CreateTurnContext(channelData: channelData);
 
         string? capturedChannelLink = null;
@@ -135,7 +138,10 @@ public class BaggageTurnMiddlewareTests
     {
         // Arrange
         var middleware = new BaggageTurnMiddleware();
-        var channelData = new { productContext = "copilot-m365" };
+        var channelData = new System.Text.Json.Nodes.JsonObject
+        {
+            ["productContext"] = "copilot-m365",
+        };
         var turnContext = CreateTurnContext(subChannel: "explicit-subchannel", channelData: channelData);
 
         string? capturedChannelLink = null;
