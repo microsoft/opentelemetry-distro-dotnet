@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Read(//c/distro//**)",
-      "Read(//c/repos//**)",
-      "Read(//c/repos1//**)"
-    ]
-  }
-}
