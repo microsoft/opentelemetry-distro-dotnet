@@ -86,14 +86,14 @@ namespace Microsoft.Agents.A365.Observability.Hosting.Extensions
                 try
                 {
                     var channelData = turnContext.Activity.ChannelData;
+                    string? productContext = null;
 
-                    // Handle JsonElement directly (avoids ToString + reparse)
                     if (channelData is System.Text.Json.JsonElement jsonElement)
                     {
-                        if (jsonElement.TryGetProperty("productContext", out var productContextElem) &&
-                            productContextElem.ValueKind == System.Text.Json.JsonValueKind.String)
+                        if (jsonElement.TryGetProperty("productContext", out var pc) &&
+                            pc.ValueKind == System.Text.Json.JsonValueKind.String)
                         {
-                            subChannel = productContextElem.GetString();
+                            productContext = pc.GetString();
                         }
                     }
                     else if (channelData is System.Text.Json.Nodes.JsonObject jsonObject)
@@ -101,22 +101,26 @@ namespace Microsoft.Agents.A365.Observability.Hosting.Extensions
                         if (jsonObject.TryGetPropertyValue("productContext", out var node) &&
                             node is System.Text.Json.Nodes.JsonValue val)
                         {
-                            subChannel = val.ToString();
+                            productContext = val.ToString();
                         }
                     }
                     else
                     {
-                        // Fallback: serialize to string and parse
-                        var channelDataJson = channelData.ToString();
-                        if (!string.IsNullOrWhiteSpace(channelDataJson))
+                        var json = channelData.ToString();
+                        if (!string.IsNullOrWhiteSpace(json))
                         {
-                            using var doc = System.Text.Json.JsonDocument.Parse(channelDataJson);
-                            if (doc.RootElement.TryGetProperty("productContext", out var elem) &&
-                                elem.ValueKind == System.Text.Json.JsonValueKind.String)
+                            using var doc = System.Text.Json.JsonDocument.Parse(json);
+                            if (doc.RootElement.TryGetProperty("productContext", out var pc) &&
+                                pc.ValueKind == System.Text.Json.JsonValueKind.String)
                             {
-                                subChannel = elem.GetString();
+                                productContext = pc.GetString();
                             }
                         }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(productContext))
+                    {
+                        subChannel = productContext;
                     }
                 }
                 catch
