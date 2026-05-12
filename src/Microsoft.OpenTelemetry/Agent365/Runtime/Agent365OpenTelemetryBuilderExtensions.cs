@@ -51,7 +51,7 @@ internal static class Agent365OpenTelemetryBuilderExtensions
     /// builder.Services.AddOpenTelemetry()
     ///     .UseAgent365(o =>
     ///     {
-    ///         o.Exporter.TokenResolver = (agentId, tenantId) => GetTokenAsync(agentId, tenantId);
+    ///         o.TokenResolver = (agentId, tenantId) => GetTokenAsync(agentId, tenantId);
     ///     });
     /// </code>
     /// </remarks>

@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-using System;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
 
 namespace Microsoft.OpenTelemetry;
@@ -14,24 +13,10 @@ namespace Microsoft.OpenTelemetry;
 public class Agent365Options
 {
     /// <summary>
-    /// Gets the underlying Agent365 exporter options.
-    /// Prefer setting properties directly on <see cref="Agent365Options"/> instead.
+    /// Gets the underlying Agent365 exporter options instance. Internal storage for the
+    /// flat properties exposed on this class; also used to register the singleton with DI.
     /// </summary>
-    [Obsolete("Set properties directly on Agent365Options (e.g. options.Agent365.TokenResolver) instead of options.Agent365.Exporter.TokenResolver.")]
-    public Agent365ExporterOptions Exporter { get; } = new();
-
-    /// <summary>
-    /// Gets the internal exporter options instance (not obsolete for internal use).
-    /// </summary>
-    internal Agent365ExporterOptions ExporterOptions
-    {
-        get
-        {
-#pragma warning disable CS0618 // Obsolete
-            return Exporter;
-#pragma warning restore CS0618
-        }
-    }
+    internal Agent365ExporterOptions ExporterOptions { get; } = new();
 
     /// <summary>
     /// Cluster region argument. Defaults to "production".

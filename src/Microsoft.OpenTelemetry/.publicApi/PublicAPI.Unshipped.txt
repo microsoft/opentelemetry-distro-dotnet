@@ -16,4 +16,3 @@ Microsoft.OpenTelemetry.Agent365Options.TokenResolver.get -> Microsoft.Agents.A3
 Microsoft.OpenTelemetry.Agent365Options.TokenResolver.set -> void
 Microsoft.OpenTelemetry.Agent365Options.UseS2SEndpoint.get -> bool
 Microsoft.OpenTelemetry.Agent365Options.UseS2SEndpoint.set -> void
-Microsoft.OpenTelemetry.Agent365Options.Exporter.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions!
