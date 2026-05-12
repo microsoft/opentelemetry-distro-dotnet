@@ -181,11 +181,13 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             o.SkipExporter = !exporters.HasFlag(ExportTarget.Agent365);
             o.TokenResolver = options.Agent365.TokenResolver;
             o.DomainResolver = options.Agent365.DomainResolver;
+            o.ClusterCategory = options.Agent365.ClusterCategory;
             o.UseS2SEndpoint = options.Agent365.UseS2SEndpoint;
             o.MaxQueueSize = options.Agent365.MaxQueueSize;
             o.ScheduledDelayMilliseconds = options.Agent365.ScheduledDelayMilliseconds;
             o.ExporterTimeoutMilliseconds = options.Agent365.ExporterTimeoutMilliseconds;
             o.MaxExportBatchSize = options.Agent365.MaxExportBatchSize;
+            o.MaxPayloadBytes = options.Agent365.MaxPayloadBytes;
         }, effectiveInstrumentation);
 
         // --- Microsoft Agent Framework (always: captures MAF spans + processor) ---
