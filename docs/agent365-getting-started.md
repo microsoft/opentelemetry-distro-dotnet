@@ -41,7 +41,7 @@ builder.UseMicrosoftOpenTelemetry(o =>
 {
     o.Exporters = ExportTarget.Console | ExportTarget.Agent365;
 
-    o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
+    o.Agent365.TokenResolver = async (agentId, tenantId) =>
     {
         return await MyTokenService.GetTokenAsync(agentId, tenantId);
     };
@@ -94,7 +94,7 @@ Combine targets with `|`: `ExportTarget.Console | ExportTarget.Agent365 | Export
 
 ### Agent365 exporter options
 
-Customize the Agent365 exporter behavior via `o.Agent365.Exporter`:
+Customize the Agent365 exporter behavior via `o.Agent365`:
 
 | Property | Description | Default |
 |---|---|---|
@@ -264,7 +264,7 @@ For non-agent apps, service-to-service, or custom auth scenarios, set the token 
 builder.UseMicrosoftOpenTelemetry(o =>
 {
     o.Exporters = ExportTarget.Agent365;
-    o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
+    o.Agent365.TokenResolver = async (agentId, tenantId) =>
     {
         return await MyTokenService.GetTokenAsync(agentId, tenantId);
     };

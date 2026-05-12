@@ -451,7 +451,6 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OutputScope.RecordOut
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.TraceContextHelper
 Microsoft.OpenTelemetry.Agent365Options
 Microsoft.OpenTelemetry.Agent365Options.Agent365Options() -> void
-Microsoft.OpenTelemetry.Agent365Options.Exporter.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions!
 Microsoft.OpenTelemetry.AzureMonitorOptions
 Microsoft.OpenTelemetry.AzureMonitorOptions.AzureMonitorOptions() -> void
 Microsoft.OpenTelemetry.AzureMonitorOptions.DisableOfflineStorage.get -> bool

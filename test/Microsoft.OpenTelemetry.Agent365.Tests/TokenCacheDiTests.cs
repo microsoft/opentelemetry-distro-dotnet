@@ -24,7 +24,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Tests
                 .UseMicrosoftOpenTelemetry(o =>
                 {
                     o.Exporters = ExportTarget.Agent365;
-                    o.Agent365.Exporter.TokenResolver = (agentId, tenantId) =>
+                    o.Agent365.TokenResolver = (agentId, tenantId) =>
                         Task.FromResult<string?>("custom-token");
                 });
 
@@ -43,7 +43,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Tests
                 .UseMicrosoftOpenTelemetry(o =>
                 {
                     o.Exporters = ExportTarget.Agent365;
-                    o.Agent365.Exporter.TokenResolver = (agentId, tenantId) =>
+                    o.Agent365.TokenResolver = (agentId, tenantId) =>
                         Task.FromResult<string?>("custom-token");
                 });
 

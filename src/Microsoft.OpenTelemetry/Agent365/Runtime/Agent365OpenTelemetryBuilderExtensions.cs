@@ -126,11 +126,11 @@ internal static class Agent365OpenTelemetryBuilderExtensions
                 // and setting TokenResolver are independent operations.
                 builder.Services.AddAgenticTracingExporter();
 
-                if (options.Exporter.TokenResolver != null)
+                if (options.TokenResolver != null)
                 {
                     // Inline TokenResolver provided — override the cache-based options.
                     // This singleton takes precedence over the one from AddAgenticTracingExporter().
-                    builder.Services.AddSingleton(options.Exporter);
+                    builder.Services.AddSingleton(options.ExporterOptions);
                 }
 
                 tracing.AddAgent365Exporter();
