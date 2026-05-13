@@ -1,0 +1,34 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "files": ["src/Microsoft.OpenTelemetry/Microsoft.OpenTelemetry.csproj"],
+          "src": "."
+        }
+      ],
+      "dest": "api",
+      "properties": {
+        "TargetFramework": "net8.0"
+      }
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        "files": ["api/**.yml", "api/index.md"]
+      },
+      {
+        "files": ["index.md"]
+      }
+    ],
+    "output": "_site",
+    "template": ["default", "modern"],
+    "globalMetadata": {
+      "_appTitle": "Microsoft OpenTelemetry Distro for .NET",
+      "_appFooter": "Microsoft OpenTelemetry Distro for .NET — API Documentation",
+      "_enableSearch": true
+    },
+    "postProcessors": ["ExtractSearchIndex"]
+  }
+}
