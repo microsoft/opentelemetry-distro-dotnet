@@ -29,40 +29,54 @@ Install the Microsoft OpenTelemetry Distro NuGet package. This single package in
 
 ## Configuration
 
-In `Program.cs`, call `UseMicrosoftOpenTelemetry()` to enable observability:
+The Agent 365 exporter doesn't use a connection string. It discovers its endpoint automatically based on tenant. To enable export to Agent 365, set the exporter target and provide a token resolver that returns an access token for a given agent ID and tenant ID.
+
+In `Program.cs`, call `UseMicrosoftOpenTelemetry()` to enable observability. The `ExportTarget` flags enum controls where telemetry is sent — combine targets with `|` (for example, `ExportTarget.Console | ExportTarget.Agent365`).
+
+**Auto (DI) token cache (recommended for Agent Framework apps):**
+
+When you don't set `TokenResolver`, the distro automatically registers `IExporterTokenCache<AgenticTokenStruct>` via DI. Your agent calls `RegisterObservability()` at runtime to supply credentials, and the cache handles token acquisition and refresh.
 
 ```csharp
-using Microsoft.OpenTelemetry;
-using Microsoft.Agents.A365.Observability.Hosting.Middleware;
-
-var builder = WebApplication.CreateBuilder(args);
-
+// Program.cs — no TokenResolver needed
 builder.UseMicrosoftOpenTelemetry(o =>
 {
     o.Exporters = ExportTarget.Agent365;
-
-    // Enable console exporter for local development only
-    if (builder.Environment.IsDevelopment())
-        o.Exporters |= ExportTarget.Console;
-
-    o.Agent365.TokenResolver = async (agentId, tenantId) =>
-    {
-        return await MyTokenService.GetTokenAsync(agentId, tenantId);
-    };
+    // TokenResolver is auto-registered via the agentic token cache in DI, with required imports in the next code snippet.
 });
-
-var app = builder.Build();
-
-// Register HTTP-level baggage middleware (optional — see Baggage section)
-app.UseObservabilityRequestContext((httpContext) =>
-{
-    var tenantId = GetTenantIdFromContext(httpContext);
-    var agentId = GetAgentIdFromContext(httpContext);
-    return (tenantId, agentId);
-});
-
-app.Run();
 ```
+
+```csharp
+using Microsoft.Agents.A365.Observability.Hosting.Caching;
+using Microsoft.Agents.A365.Observability.Runtime.Common;
+
+// In your agent class
+public class MyAgent : AgentApplication
+{
+    private readonly IExporterTokenCache<AgenticTokenStruct> _agentTokenCache;
+
+    public MyAgent(AgentApplicationOptions options,
+        IExporterTokenCache<AgenticTokenStruct> agentTokenCache) : base(options)
+    {
+        _agentTokenCache = agentTokenCache;
+    }
+
+    protected async Task MessageActivityAsync(
+        ITurnContext turnContext, ITurnState turnState, CancellationToken cancellationToken)
+    {
+        _agentTokenCache.RegisterObservability(
+            turnContext.Activity.Recipient.AgenticAppId,
+            turnContext.Activity.Recipient.TenantId,
+            new AgenticTokenStruct(
+                userAuthorization: UserAuthorization,
+                turnContext: turnContext,
+                authHandlerName: "AGENTIC"),
+            EnvironmentUtils.GetObservabilityAuthenticationScope());
+    }
+}
+```
+
+For custom token resolution (instead of the default token resolver), see [Manual token resolver](#manual-token-resolver).
 
 If you need to add your own application-specific activity sources, use the longer form:
 
@@ -118,7 +132,7 @@ Combine targets with `|`: `ExportTarget.Console | ExportTarget.Agent365 | Export
 
 ### Agent365 exporter options
 
-Customize the Agent365 exporter behavior via `o.Agent365`:
+Customize the Agent365 exporter behavior via `o.Agent365.Exporter`:
 
 | Property | Description | Default |
 |---|---|---|
@@ -217,39 +231,24 @@ When using the Agent 365 exporter, you must provide a mechanism to supply an aut
 
 ### Manual token resolver
 
-Use a manual resolver when you acquire tokens outside the Agent Framework pipeline, when you're building non-Agent Framework apps, or when you use service-to-service (S2S) authentication (client credentials flow). Agents can generate a token themselves (for example, using MSAL), but they need to ensure the token has the correct observability scope (`api://9b975845-388f-4429-889e-eab1ef63949c/Agent365.Observability.OtelWrite`).
+Use a manual resolver when you acquire tokens outside the Agent Framework pipeline, when you're building non-Agent Framework apps, or when you use service-to-service (S2S) authentication (client credentials flow). Agents can generate a token themselves, for example by using Microsoft Authentication Library (MSAL) or any other token acquisition method, but they need to ensure the token has the correct observability scope (`api://9b975845-388f-4429-889e-eab1ef63949c/Agent365.Observability.OtelWrite`).
 
 > **Note:** For service-to-service (S2S) authentication, you must use this manual token resolver approach. The [agentic token cache](#agentic-token-cache-with-agent-framework-apps) only supports on-behalf-of (OBO) auth flows.
 
 ```csharp
+using Microsoft.OpenTelemetry;
+
 builder.UseMicrosoftOpenTelemetry(o =>
 {
     o.Exporters = ExportTarget.Agent365;
-    o.Agent365.TokenResolver = async (agentId, tenantId) =>
+    o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
     {
         return await MyTokenService.GetTokenAsync(agentId, tenantId);
     };
 });
 ```
 
-If you set `TokenResolver` explicitly, the auto DI token cache is **not** registered — your resolver is used instead.
-
-For agents that acquire tokens outside the Agent Framework hosting pipeline (e.g., via MSAL directly), you can use `ServiceTokenCache` for simple caching:
-
-```csharp
-using Microsoft.Agents.A365.Observability.Hosting.Caching;
-using Microsoft.Agents.A365.Observability.Runtime.Common;
-
-var cache = new ServiceTokenCache(
-    defaultExpiration: TimeSpan.FromMinutes(30),
-    cleanupInterval: TimeSpan.FromMinutes(5));
-
-cache.RegisterObservability(agentId, tenantId, bearerToken,
-    EnvironmentUtils.GetObservabilityAuthenticationScope());
-
-// Later:
-var token = await cache.GetObservabilityToken(agentId, tenantId);
-```
+When you set `TokenResolver` explicitly, the auto DI token cache isn't registered — your resolver is used instead.
 
 ### Agentic token cache with Agent Framework apps
 
