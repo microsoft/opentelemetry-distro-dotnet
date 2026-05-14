@@ -6,26 +6,26 @@ namespace Microsoft.Agents.A365.Observability.Tests.Tracing;
 using System.Diagnostics;
 using FluentAssertions;
 using Microsoft.Agents.A365.Observability.Runtime.Common;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using global::OpenTelemetry;
 using global::OpenTelemetry.Trace;
 using static Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants;
 
 [TestClass]
-public sealed class ActivityProcessorTests
+public sealed class ActivityProcessorTests : ActivityTest
 {
     private const string ExternalSourceName = "System.Net.Http";
 
-    [TestInitialize]
-    public void EnableTelemetry()
-    {
-        AppContext.SetSwitch(EnableOpenTelemetrySwitch, true);
-    }
-
+    /// <summary>
+    /// Activities from a non-Agent365Sdk source must pass through untouched even when
+    /// Agent365 baggage is set in the ambient context.
+    /// </summary>
     [TestMethod]
     public void OnStart_DoesNotMutate_NonAgent365Activities()
     {
-        // Arrange - build a provider that listens to an external source but uses the Agent365 processor
+        // Arrange - register the processor for an external source
         using var tracerProvider = Sdk.CreateTracerProviderBuilder()
             .AddSource(ExternalSourceName)
             .AddProcessor(new ActivityProcessor())
@@ -51,7 +51,7 @@ public sealed class ActivityProcessorTests
             var externalSource = new ActivitySource(ExternalSourceName);
             using var activity = externalSource.StartActivity("HTTP GET /api/data");
 
-            // Assert - the processor must NOT have applied any Agent365 / GenAI tags
+            // Assert - no Agent365 / GenAI tags must be applied
             capturedActivity.Should().NotBeNull();
             capturedActivity!.GetTagItem(TenantIdKey).Should().BeNull(
                 because: "non-Agent365 spans must not receive microsoft.tenant.id");
@@ -66,10 +66,15 @@ public sealed class ActivityProcessorTests
         }
     }
 
+    /// <summary>
+    /// An activity that originates from the Agent365Sdk source but carries no
+    /// <c>gen_ai.operation.name</c> tag (i.e. not one of the four GenAI scopes)
+    /// must also pass through untouched.
+    /// </summary>
     [TestMethod]
-    public void OnStart_Mutates_Agent365Activities()
+    public void OnStart_DoesNotMutate_Agent365ActivitiesWithoutGenAiOperationName()
     {
-        // Arrange
+        // Arrange - register the processor for the Agent365 source
         using var tracerProvider = Sdk.CreateTracerProviderBuilder()
             .AddSource(SourceName)
             .AddProcessor(new ActivityProcessor())
@@ -85,23 +90,57 @@ public sealed class ActivityProcessorTests
         };
         ActivitySource.AddActivityListener(listener);
 
-        // Act - set baggage then start a span from the Agent365 source
+        // Act - set baggage and start a raw Agent365Sdk span (no gen_ai.operation.name tag)
         using (new BaggageBuilder()
             .TenantId("tenant-123")
             .AgentId("agent-abc")
             .Build())
         {
             var agent365Source = new ActivitySource(SourceName);
-            using var activity = agent365Source.StartActivity("invoke_agent");
+            using var activity = agent365Source.StartActivity("custom-non-genai-span");
 
-            // Assert - the processor SHOULD have applied the Agent365 tags
+            // Assert - no GenAI tags must be applied to a non-GenAI Agent365Sdk span
             capturedActivity.Should().NotBeNull();
-            capturedActivity!.GetTagItem(TenantIdKey).Should().Be("tenant-123",
-                because: "Agent365 spans must receive microsoft.tenant.id from baggage");
-            capturedActivity.GetTagItem(GenAiAgentIdKey).Should().Be("agent-abc",
-                because: "Agent365 spans must receive gen_ai.agent.id from baggage");
-            capturedActivity.GetTagItem(TelemetrySdkNameKey).Should().Be(TelemetrySdkNameValue,
-                because: "Agent365 spans must receive the telemetry.sdk.name tag");
+            capturedActivity!.GetTagItem(TenantIdKey).Should().BeNull(
+                because: "Agent365Sdk spans without gen_ai.operation.name must not receive microsoft.tenant.id");
+            capturedActivity.GetTagItem(GenAiAgentIdKey).Should().BeNull(
+                because: "Agent365Sdk spans without gen_ai.operation.name must not receive gen_ai.agent.id");
+            capturedActivity.GetTagItem(TelemetrySdkNameKey).Should().BeNull(
+                because: "Agent365Sdk spans without gen_ai.operation.name must not receive telemetry.sdk.name");
+        }
+    }
+
+    /// <summary>
+    /// The four GenAI scope types (invoke_agent, execute_tool, inference, output_messages)
+    /// must have baggage-backed tags coalesced onto them by the processor.
+    /// </summary>
+    [TestMethod]
+    public void OnStart_Mutates_GenAiScopeActivities()
+    {
+        // Arrange
+        using var tracerProvider = ConstructTracerProvider();
+
+        // Act - set baggage then start a real GenAI scope (InvokeAgentScope)
+        using (new BaggageBuilder()
+            .TenantId("tenant-123")
+            .AgentId("agent-abc")
+            .Build())
+        {
+            var activity = ListenForActivity(() =>
+            {
+                using var scope = InvokeAgentScope.Start(
+                    new Request(),
+                    new InvokeAgentScopeDetails(endpoint: null),
+                    new AgentDetails("agent-1"));
+            });
+
+            // Assert - baggage-backed tags must be coalesced onto GenAI spans
+            activity.GetTagItem(TenantIdKey).Should().Be("tenant-123",
+                because: "GenAI spans must receive microsoft.tenant.id from baggage");
+            activity.GetTagItem(GenAiAgentIdKey).Should().NotBeNull(
+                because: "GenAI spans must receive gen_ai.agent.id");
+            activity.GetTagItem(TelemetrySdkNameKey).Should().Be(TelemetrySdkNameValue,
+                because: "GenAI spans must receive the telemetry.sdk.name tag");
         }
     }
 }
