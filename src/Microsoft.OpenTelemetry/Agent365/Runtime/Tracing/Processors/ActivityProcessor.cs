@@ -52,10 +52,18 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
 
         /// <summary>
         /// Called when an activity starts, adds tags for attributes listed in AttributeKeys.
+        /// Only activities originating from the Agent365 SDK source are processed; all other
+        /// activities pass through unmodified to avoid polluting unrelated spans.
         /// </summary>
         /// <param name="activity">The activity that is starting.</param>
         public override void OnStart(Activity activity)
         {
+            if (activity.Source.Name != OpenTelemetryConstants.SourceName)
+            {
+                base.OnStart(activity);
+                return;
+            }
+
             // Set telemetry SDK attributes
             activity.CoalesceTag(OpenTelemetryConstants.TelemetrySdkNameKey, OpenTelemetryConstants.TelemetrySdkNameValue);
             activity.CoalesceTag(OpenTelemetryConstants.TelemetrySdkLanguageKey, OpenTelemetryConstants.TelemetrySdkLanguageValue);
