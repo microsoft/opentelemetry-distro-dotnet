@@ -1,0 +1,8 @@
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.AsyncContextualTokenResolver
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.TokenResolverContext
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.TokenResolverContext.TokenResolverContext(string! agentId, string! tenantId, string? agenticUserId) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.TokenResolverContext.AgentId.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.TokenResolverContext.TenantId.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.TokenResolverContext.AgenticUserId.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.ContextualTokenResolver.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.AsyncContextualTokenResolver?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.ContextualTokenResolver.set -> void
