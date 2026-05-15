@@ -197,10 +197,19 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                     // first activity in the group (1:1 relationship between agent and agentic user).
                     if (options.ContextualTokenResolver != null)
                     {
+                        Dictionary<string, string>? metadata = null;
                         var agenticUserId = activities.Count > 0
                             ? activities[0].GetAttributeOrBaggage(OpenTelemetryConstants.AgentAUIDKey)
                             : null;
-                        var context = new TokenResolverContext(agentId, tenantId, agenticUserId);
+                        if (agenticUserId != null)
+                        {
+                            metadata = new Dictionary<string, string>
+                            {
+                                [TokenResolverContext.AgenticUserIdKey] = agenticUserId,
+                            };
+                        }
+
+                        var context = new TokenResolverContext(agentId, tenantId, metadata);
                         token = await options.ContextualTokenResolver(context).ConfigureAwait(false);
                     }
                     else
