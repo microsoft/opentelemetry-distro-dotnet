@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Flatten Agent365 exporter configuration to remove one layer of nesting (remove `.Exporter`) ([#94](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/94))
+
 ## 1.0.2 - 2026-05-06
 
 - Update to hosting telemetry extraction logic so that user.id baggage is resolved across more channel types ([#86](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/86))
