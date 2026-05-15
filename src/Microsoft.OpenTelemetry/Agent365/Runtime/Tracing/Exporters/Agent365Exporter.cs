@@ -31,7 +31,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         /// <param name="options">The exporter configuration options.</param>
         /// <param name="resource">Optional OpenTelemetry resource information.</param>
         /// <param name="httpClient">Optional HttpClient instance.</param>
-        internal Agent365Exporter(
+        public Agent365Exporter(
             Agent365ExporterCore core,
             ILogger<Agent365Exporter> logger,
             Agent365ExporterOptions options,

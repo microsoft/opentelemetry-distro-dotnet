@@ -23,7 +23,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
     /// Configuration for Agent365Exporter.
     /// Only TokenResolver is required for core operation.
     /// </summary>
-    internal sealed class Agent365ExporterOptions
+    public sealed class Agent365ExporterOptions
     {
         /// <summary>
         /// The default endpoint host for Agent365 observability.

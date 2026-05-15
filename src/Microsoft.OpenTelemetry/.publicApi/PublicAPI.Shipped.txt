@@ -361,13 +361,41 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.UserDetails.UserEm
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.UserDetails.UserId.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.UserDetails.UserName.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365Exporter
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365Exporter.Agent365Exporter(Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore! core, Microsoft.Extensions.Logging.ILogger<Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365Exporter!>! logger, Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions! options, OpenTelemetry.Resources.Resource? resource = null, System.Net.Http.HttpClient? httpClient = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterAsync
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterAsync.Agent365ExporterAsync(Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore! core, Microsoft.Extensions.Logging.ILogger<Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365Exporter!>! logger, Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions! options, OpenTelemetry.Resources.Resource? resource = null, System.Net.Http.HttpClient? httpClient = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore.Agent365ExporterCore(Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter! formatter, Microsoft.Extensions.Logging.ILogger<Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore!>! logger) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore.BuildEndpointPath(string! tenantId, string! agentId, bool useS2SEndpoint) -> string!
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore.BuildRequestUri(string! endpoint, string! endpointPath) -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore.ExportBatchCoreAsync(System.Collections.Generic.IEnumerable<(string! TenantId, string! AgentId, System.Collections.Generic.List<System.Diagnostics.Activity!>! Activities)>! groups, OpenTelemetry.Resources.Resource! resource, Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions! options, System.Func<string!, string!, System.Threading.Tasks.Task<string?>!>! tokenResolver, System.Func<System.Net.Http.HttpRequestMessage!, System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage!>!>! sendAsync) -> System.Threading.Tasks.Task<OpenTelemetry.ExportResult>!
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore.PartitionByIdentity(in OpenTelemetry.Batch<System.Diagnostics.Activity!> batch) -> System.Collections.Generic.List<(string! TenantId, string! AgentId, System.Collections.Generic.List<System.Diagnostics.Activity!>! Activities)>!
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterCore.PartitionByIdentity(System.Collections.Generic.IEnumerable<System.Diagnostics.Activity!>! batch) -> System.Collections.Generic.List<(string! TenantId, string! AgentId, System.Collections.Generic.List<System.Diagnostics.Activity!>! Activities)>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.Agent365ExporterOptions() -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.ClusterCategory.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.ClusterCategory.set -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.DomainResolver.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.TenantDomainResolver!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.DomainResolver.set -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.ExporterTimeoutMilliseconds.get -> int
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.ExporterTimeoutMilliseconds.set -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.MaxExportBatchSize.get -> int
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.MaxExportBatchSize.set -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.MaxPayloadBytes.get -> long
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.MaxPayloadBytes.set -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.MaxQueueSize.get -> int
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.MaxQueueSize.set -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.ScheduledDelayMilliseconds.get -> int
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.ScheduledDelayMilliseconds.set -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.TokenResolver.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.AsyncAuthTokenResolver?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.TokenResolver.set -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.UseS2SEndpoint.get -> bool
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.UseS2SEndpoint.set -> void
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.DefaultEndpointHost = "agent365.svc.cloud.microsoft" -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.PayloadChunking
+static Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.PayloadChunking.EstimateValueBytes(object? value) -> long
+static Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.PayloadChunking.EstimateActivityBytes(System.Diagnostics.Activity! activity) -> long
+static Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.PayloadChunking.ChunkBySize<T>(System.Collections.Generic.IEnumerable<T>! items, System.Func<T, long>! getSize, long maxChunkBytes) -> System.Collections.Generic.List<System.Collections.Generic.List<T>!>!
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType.Agent365Exporter = 0 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType.Agent365ExporterAsync = 1 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterType

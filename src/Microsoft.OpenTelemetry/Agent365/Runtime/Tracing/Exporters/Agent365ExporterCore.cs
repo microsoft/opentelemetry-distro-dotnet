@@ -156,7 +156,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         /// <param name="tokenResolver"></param>
         /// <param name="sendAsync"></param>
         /// <returns></returns>
-        internal async Task<ExportResult> ExportBatchCoreAsync(
+        public async Task<ExportResult> ExportBatchCoreAsync(
             IEnumerable<(string TenantId, string AgentId, List<Activity> Activities)> groups,
             Resource resource,
             Agent365ExporterOptions options,

@@ -18,7 +18,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
     /// at the batch level by splitting batches into sub-batches whose cumulative estimated
     /// size stays under <see cref="Agent365ExporterOptions.MaxPayloadBytes"/>.
     /// </summary>
-    internal static class PayloadChunking
+    public static class PayloadChunking
     {
         /// <summary>
         /// Overhead constant for OTLP JSON span fixed fields
