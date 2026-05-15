@@ -120,27 +120,54 @@ public sealed class ActivityProcessorTests : ActivityTest
         // Arrange
         using var tracerProvider = ConstructTracerProvider();
 
-        // Act - set baggage then start a real GenAI scope (InvokeAgentScope)
+        // Act - set baggage then start each GenAI scope
         using (new BaggageBuilder()
             .TenantId("tenant-123")
             .AgentId("agent-abc")
             .Build())
         {
-            var activity = ListenForActivity(() =>
+            var activities = new[]
             {
-                using var scope = InvokeAgentScope.Start(
-                    new Request(),
-                    new InvokeAgentScopeDetails(endpoint: null),
-                    new AgentDetails("agent-1"));
-            });
+                ListenForActivity(() =>
+                {
+                    using var scope = InvokeAgentScope.Start(
+                        new Request(),
+                        new InvokeAgentScopeDetails(endpoint: null),
+                        new AgentDetails("agent-1"));
+                }),
+                ListenForActivity(() =>
+                {
+                    using var scope = ExecuteToolScope.Start(
+                        new Request(),
+                        new ToolCallDetails("tool-name", "{}"),
+                        new AgentDetails("agent-1"));
+                }),
+                ListenForActivity(() =>
+                {
+                    using var scope = InferenceScope.Start(
+                        new Request(),
+                        new InferenceCallDetails(InferenceOperationType.Chat, "model-name", "provider-name"),
+                        new AgentDetails("agent-1"));
+                }),
+                ListenForActivity(() =>
+                {
+                    using var scope = OutputScope.Start(
+                        new Request(),
+                        new Response(new[] { "output-message" }),
+                        new AgentDetails("agent-1"));
+                }),
+            };
 
             // Assert - baggage-backed tags must be coalesced onto GenAI spans
-            activity.GetTagItem(TenantIdKey).Should().Be("tenant-123",
-                because: "GenAI spans must receive microsoft.tenant.id from baggage");
-            activity.GetTagItem(GenAiAgentIdKey).Should().NotBeNull(
-                because: "GenAI spans must receive gen_ai.agent.id");
-            activity.GetTagItem(TelemetrySdkNameKey).Should().Be(TelemetrySdkNameValue,
-                because: "GenAI spans must receive the telemetry.sdk.name tag");
+            foreach (var activity in activities)
+            {
+                activity.GetTagItem(TenantIdKey).Should().Be("tenant-123",
+                    because: "GenAI spans must receive microsoft.tenant.id from baggage");
+                activity.GetTagItem(GenAiAgentIdKey).Should().NotBeNull(
+                    because: "GenAI spans must receive gen_ai.agent.id");
+                activity.GetTagItem(TelemetrySdkNameKey).Should().Be(TelemetrySdkNameValue,
+                    because: "GenAI spans must receive the telemetry.sdk.name tag");
+            }
         }
     }
 }
