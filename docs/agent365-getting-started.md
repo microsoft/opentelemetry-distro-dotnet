@@ -29,7 +29,7 @@ Install the Microsoft OpenTelemetry Distro NuGet package. This single package in
 
 ## Configuration
 
-The Agent 365 exporter doesn't use a connection string. It discovers its endpoint automatically based on tenant. To enable export to Agent 365, set the exporter target and provide a token resolver that returns an access token for a given agent ID and tenant ID.
+The Agent 365 exporter doesn't use a connection string. It discovers its endpoint automatically based on tenant. To enable export to Agent 365, set the exporter target and supply a token — either via the built-in agentic token cache (recommended for Agent Framework apps) or by providing an explicit token resolver.
 
 In `Program.cs`, call `UseMicrosoftOpenTelemetry()` to enable observability. The `ExportTarget` flags enum controls where telemetry is sent — combine targets with `|` (for example, `ExportTarget.Console | ExportTarget.Agent365`).
 
@@ -248,7 +248,9 @@ builder.UseMicrosoftOpenTelemetry(o =>
 });
 ```
 
-When you set `TokenResolver` explicitly, the auto DI token cache isn't registered — your resolver is used instead.
+When you set `TokenResolver` explicitly, your resolver is used instead of the cache-based one.
+
+> **Note:** For S2S authentication, also set `o.Agent365.UseS2SEndpoint = true` so the exporter sends to the service-to-service endpoint path.
 
 ### Agentic token cache with Agent Framework apps
 
