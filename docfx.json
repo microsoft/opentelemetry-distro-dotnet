@@ -23,11 +23,12 @@
       }
     ],
     "output": "_site",
-    "template": ["default", "modern"],
+    "template": ["default", "modern", "template"],
     "globalMetadata": {
       "_appTitle": "Microsoft OpenTelemetry Distro for .NET",
       "_appFooter": "Microsoft OpenTelemetry Distro for .NET — API Documentation",
-      "_enableSearch": true
+      "_enableSearch": true,
+      "_disableSideFilter": false
     },
     "postProcessors": ["ExtractSearchIndex"]
   }

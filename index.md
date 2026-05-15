@@ -1,3 +1,4 @@
-# Microsoft OpenTelemetry Distro for .NET — API Reference
-
-Browse the auto-generated API reference from the navigation on the left.
+---
+uid: index
+---
+<script>window.location.href = 'api/index.html';</script>
