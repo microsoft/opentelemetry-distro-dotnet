@@ -130,7 +130,7 @@ Send agent telemetry (invoke agent, inference, tool execution, output) to the [A
 builder.UseMicrosoftOpenTelemetry(o =>
 {
     o.Exporters = ExportTarget.Agent365;
-    o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
+    o.Agent365.TokenResolver = async (agentId, tenantId) =>
     {
         return await MyTokenService.GetTokenAsync(agentId, tenantId);
     };
@@ -166,7 +166,7 @@ builder.UseMicrosoftOpenTelemetry(o =>
     o.Exporters = ExportTarget.AzureMonitor | ExportTarget.Agent365 | ExportTarget.Otlp;
 
     o.AzureMonitor.ConnectionString = "InstrumentationKey=...";
-    o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
+    o.Agent365.TokenResolver = async (agentId, tenantId) =>
     {
         return await MyTokenService.GetTokenAsync(agentId, tenantId);
     };
@@ -205,22 +205,22 @@ builder.UseMicrosoftOpenTelemetry(o =>
     // IExporterTokenCache<AgenticTokenStruct>. No TokenResolver needed.
 
     // Option B: Custom token resolver (non-agent apps, S2S, custom auth)
-    o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
+    o.Agent365.TokenResolver = async (agentId, tenantId) =>
     {
         return await MyTokenService.GetTokenAsync(agentId, tenantId);
     };
 
     // Optional: custom domain resolver (default: agent365.svc.cloud.microsoft)
-    o.Agent365.Exporter.DomainResolver = tenantId => "agent365.svc.cloud.microsoft";
+    o.Agent365.DomainResolver = tenantId => "agent365.svc.cloud.microsoft";
 
     // Optional: use S2S endpoint path
-    o.Agent365.Exporter.UseS2SEndpoint = false;
+    o.Agent365.UseS2SEndpoint = false;
 
     // Optional: batch export tuning
-    o.Agent365.Exporter.MaxQueueSize = 2048;
-    o.Agent365.Exporter.MaxExportBatchSize = 512;
-    o.Agent365.Exporter.ScheduledDelayMilliseconds = 5000;
-    o.Agent365.Exporter.ExporterTimeoutMilliseconds = 30000;
+    o.Agent365.MaxQueueSize = 2048;
+    o.Agent365.MaxExportBatchSize = 512;
+    o.Agent365.ScheduledDelayMilliseconds = 5000;
+    o.Agent365.ExporterTimeoutMilliseconds = 30000;
 
     // --- Instrumentation options (all default to true) ---
     o.Instrumentation.EnableTracing = true;
@@ -242,7 +242,7 @@ builder.UseMicrosoftOpenTelemetry(o =>
 | Approach | When to use | How it works |
 |---|---|---|
 | **Auto (DI) — default** | Agent Framework apps that reference `Microsoft.Agents.A365.Observability.Hosting` | `IExporterTokenCache<AgenticTokenStruct>` is registered automatically. Per-request token exchange happens via `ExchangeTurnTokenAsync`. |
-| **Custom resolver** | Non-agent apps, service-to-service, or custom auth | Set `o.Agent365.Exporter.TokenResolver` directly. You own token acquisition. |
+| **Custom resolver** | Non-agent apps, service-to-service, or custom auth | Set `o.Agent365.TokenResolver` directly. You own token acquisition. |
 
 > If `TokenResolver` is set explicitly, the auto DI token cache is **not** registered — your resolver wins.
 

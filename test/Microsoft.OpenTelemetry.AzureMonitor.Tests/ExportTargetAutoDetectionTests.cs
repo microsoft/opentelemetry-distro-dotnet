@@ -153,7 +153,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
             services.AddOpenTelemetry()
                 .UseMicrosoftOpenTelemetry(o =>
                 {
-                    o.Agent365.Exporter.TokenResolver = (agentId, tenantId) =>
+                    o.Agent365.TokenResolver = (agentId, tenantId) =>
                         System.Threading.Tasks.Task.FromResult<string?>("test-token");
                 });
 

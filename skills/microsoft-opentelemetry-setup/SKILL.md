@@ -57,7 +57,7 @@ builder.UseMicrosoftOpenTelemetry(o =>
 See [token resolver patterns](./references/token-resolver-patterns.md).
 
 - **Agent Framework apps**: No code needed — DI token cache auto-registers
-- **Custom apps**: Set `o.Agent365.Exporter.TokenResolver`
+- **Custom apps**: Set `o.Agent365.TokenResolver`
 
 ### 5. Add Baggage Context
 

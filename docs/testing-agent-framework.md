@@ -112,7 +112,7 @@ builder.UseMicrosoftOpenTelemetry(o =>
 
     // Agent365 exporter (for A365 platform — requires token resolver)
     // o.Exporters |= ExportTarget.Agent365;
-    // o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
+    // o.Agent365.TokenResolver = async (agentId, tenantId) =>
     //     await MyTokenService.GetTokenAsync(agentId, tenantId);
 });
 ```

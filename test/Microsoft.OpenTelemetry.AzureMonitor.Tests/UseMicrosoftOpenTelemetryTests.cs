@@ -86,7 +86,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
                     o.AzureMonitor.ConnectionString = TestConnectionString;
                     o.AzureMonitor.DisableOfflineStorage = true;
                     o.AzureMonitor.EnableLiveMetrics = false;
-                    o.Agent365.Exporter.TokenResolver = (a, t) =>
+                    o.Agent365.TokenResolver = (a, t) =>
                         System.Threading.Tasks.Task.FromResult<string?>("token");
                 });
 
@@ -109,7 +109,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
                     o.AzureMonitor.ConnectionString = TestConnectionString;
                     o.AzureMonitor.DisableOfflineStorage = true;
                     o.AzureMonitor.EnableLiveMetrics = false;
-                    o.Agent365.Exporter.TokenResolver = (a, t) =>
+                    o.Agent365.TokenResolver = (a, t) =>
                         System.Threading.Tasks.Task.FromResult<string?>("token");
                 });
 

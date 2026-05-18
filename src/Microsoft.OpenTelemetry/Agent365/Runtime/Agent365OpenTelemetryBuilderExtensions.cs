@@ -51,7 +51,7 @@ internal static class Agent365OpenTelemetryBuilderExtensions
     /// builder.Services.AddOpenTelemetry()
     ///     .UseAgent365(o =>
     ///     {
-    ///         o.Exporter.TokenResolver = (agentId, tenantId) => GetTokenAsync(agentId, tenantId);
+    ///         o.TokenResolver = (agentId, tenantId) => GetTokenAsync(agentId, tenantId);
     ///     });
     /// </code>
     /// </remarks>
@@ -130,7 +130,7 @@ internal static class Agent365OpenTelemetryBuilderExtensions
                 {
                     // Inline TokenResolver or ContextualTokenResolver provided — override the cache-based options.
                     // This singleton takes precedence over the one from AddAgenticTracingExporter().
-                    builder.Services.AddSingleton(options.Exporter);
+                    builder.Services.AddSingleton(options.ExporterOptions);
                 }
 
                 tracing.AddAgent365Exporter();

@@ -8,7 +8,7 @@
 | `.ConfigureResource()` | `.ConfigureResource()` (unchanged) | Chain before `UseMicrosoftOpenTelemetry()` |
 | `ConfigureOpenTelemetry()` | Removed | Replaced by `UseMicrosoftOpenTelemetry()` |
 | `AddA365Tracing()` | Removed | Replaced by `UseMicrosoftOpenTelemetry()` |
-| `Agent365ExporterOptions` (manual) | `o.Agent365.Exporter.*` | Configured inside callback |
+| `Agent365ExporterOptions` (manual) | `o.Agent365.*` | Configured inside callback |
 | `TokenStore` | `IExporterTokenCache<AgenticTokenStruct>` | Auto-registered via DI |
 
 ## ChatToolCallExtensions workaround

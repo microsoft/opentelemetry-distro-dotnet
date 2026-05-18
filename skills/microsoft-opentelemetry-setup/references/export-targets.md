@@ -50,11 +50,11 @@ o.AzureMonitor.EnableLiveMetrics = true;
 ## Agent365 exporter options
 
 ```csharp
-o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) => { ... };
-o.Agent365.Exporter.DomainResolver = tenantId => "agent365.svc.cloud.microsoft";
-o.Agent365.Exporter.UseS2SEndpoint = false;
-o.Agent365.Exporter.MaxQueueSize = 2048;
-o.Agent365.Exporter.MaxExportBatchSize = 512;
-o.Agent365.Exporter.ScheduledDelayMilliseconds = 5000;
-o.Agent365.Exporter.ExporterTimeoutMilliseconds = 30000;
+o.Agent365.TokenResolver = async (agentId, tenantId) => { ... };
+o.Agent365.DomainResolver = tenantId => "agent365.svc.cloud.microsoft";
+o.Agent365.UseS2SEndpoint = false;
+o.Agent365.MaxQueueSize = 2048;
+o.Agent365.MaxExportBatchSize = 512;
+o.Agent365.ScheduledDelayMilliseconds = 5000;
+o.Agent365.ExporterTimeoutMilliseconds = 30000;
 ```
