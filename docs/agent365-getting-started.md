@@ -29,36 +29,54 @@ Install the Microsoft OpenTelemetry Distro NuGet package. This single package in
 
 ## Configuration
 
-In `Program.cs`, call `UseMicrosoftOpenTelemetry()` to enable observability:
+The Agent 365 exporter doesn't use a connection string. It discovers its endpoint automatically based on tenant. To enable export to Agent 365, set the exporter target and supply a token — either via the built-in agentic token cache (recommended for Agent Framework apps) or by providing an explicit token resolver.
+
+In `Program.cs`, call `UseMicrosoftOpenTelemetry()` to enable observability. The `ExportTarget` flags enum controls where telemetry is sent — combine targets with `|` (for example, `ExportTarget.Console | ExportTarget.Agent365`).
+
+**Auto (DI) token cache (recommended for Agent Framework apps):**
+
+When you don't set `TokenResolver`, the distro automatically registers `IExporterTokenCache<AgenticTokenStruct>` via DI. Your agent calls `RegisterObservability()` at runtime to supply credentials, and the cache handles token acquisition and refresh.
 
 ```csharp
-using Microsoft.OpenTelemetry;
-using Microsoft.Agents.A365.Observability.Hosting.Middleware;
-
-var builder = WebApplication.CreateBuilder(args);
-
+// Program.cs — no TokenResolver needed
 builder.UseMicrosoftOpenTelemetry(o =>
 {
-    o.Exporters = ExportTarget.Console | ExportTarget.Agent365;
-
-    o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
-    {
-        return await MyTokenService.GetTokenAsync(agentId, tenantId);
-    };
+    o.Exporters = ExportTarget.Agent365;
+    // TokenResolver is auto-registered via the agentic token cache in DI, with required imports in the next code snippet.
 });
-
-var app = builder.Build();
-
-// Register HTTP-level baggage middleware (optional — see Baggage section)
-app.UseObservabilityRequestContext((httpContext) =>
-{
-    var tenantId = GetTenantIdFromContext(httpContext);
-    var agentId = GetAgentIdFromContext(httpContext);
-    return (tenantId, agentId);
-});
-
-app.Run();
 ```
+
+```csharp
+using Microsoft.Agents.A365.Observability.Hosting.Caching;
+using Microsoft.Agents.A365.Observability.Runtime.Common;
+
+// In your agent class
+public class MyAgent : AgentApplication
+{
+    private readonly IExporterTokenCache<AgenticTokenStruct> _agentTokenCache;
+
+    public MyAgent(AgentApplicationOptions options,
+        IExporterTokenCache<AgenticTokenStruct> agentTokenCache) : base(options)
+    {
+        _agentTokenCache = agentTokenCache;
+    }
+
+    protected async Task MessageActivityAsync(
+        ITurnContext turnContext, ITurnState turnState, CancellationToken cancellationToken)
+    {
+        _agentTokenCache.RegisterObservability(
+            turnContext.Activity.Recipient.AgenticAppId,
+            turnContext.Activity.Recipient.TenantId,
+            new AgenticTokenStruct(
+                userAuthorization: UserAuthorization,
+                turnContext: turnContext,
+                authHandlerName: "AGENTIC"),
+            EnvironmentUtils.GetObservabilityAuthenticationScope());
+    }
+}
+```
+
+For custom token resolution (instead of the default token resolver), see [Manual token resolver](#manual-token-resolver).
 
 If you need to add your own application-specific activity sources, use the longer form:
 
@@ -68,7 +86,7 @@ using Microsoft.OpenTelemetry;
 builder.Services.AddOpenTelemetry()
     .UseMicrosoftOpenTelemetry(o =>
     {
-        o.Exporters = ExportTarget.Console | ExportTarget.Agent365;
+        o.Exporters = ExportTarget.Agent365;
     })
     .WithTracing(tracing => tracing
         .AddSource("MyCompany.MyAgent.CustomSource"));
@@ -77,6 +95,26 @@ builder.Services.AddOpenTelemetry()
 > Activity sources for Agent Framework, Semantic Kernel, OpenAI, and Azure SDK are auto-registered by the distro — you only need `.AddSource()` for your own custom sources.
 
 > ⚠️ **Production warning:** `ExportTarget.Console` is intended for local development only. Do not include it in production deployments — it adds overhead and may log sensitive telemetry to stdout. Use `ExportTarget.Agent365` and/or `ExportTarget.AzureMonitor` in production.
+
+### Configure service identity
+
+Set `service.name` and `service.version` so your spans are identifiable. Without this, spans show `unknown_service:...` as the service name.
+
+```csharp
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r
+        .AddService(serviceName: "MyAgent", serviceVersion: "1.0.0")
+        .AddAttributes(new Dictionary<string, object>
+        {
+            ["deployment.environment"] = builder.Environment.EnvironmentName,
+        }))
+    .UseMicrosoftOpenTelemetry(o =>
+    {
+        o.Exporters = ExportTarget.Agent365;
+    });
+```
+
+> `ConfigureResource()` is additive — your attributes are merged with the distro's auto-detected resource attributes (Azure VM, App Service, etc.). See [Customization: Configuring the Resource](customization.md#configuring-the-resource) for the full guide.
 
 ### Export targets
 
@@ -189,11 +227,36 @@ builder.UseMicrosoftOpenTelemetry(o =>
 
 ## Token resolver
 
-When using the Agent 365 exporter, you must provide a token resolver function that returns an authentication token. The distro supports two approaches.
+When using the Agent 365 exporter, you must provide a mechanism to supply an authentication token. The token resolver works per export batch using the agent ID and tenant ID from the active baggage context. The distro supports two approaches.
 
-### Auto (DI) — recommended for Agent Framework apps
+### Manual token resolver
 
-When no custom `TokenResolver` is set, the distro automatically calls `AddAgenticTracingExporter()` internally, registering `IExporterTokenCache<AgenticTokenStruct>` and `Agent365ExporterOptions` via DI. Your agent calls `RegisterObservability()` at runtime to supply credentials, and the cache handles token acquisition and refresh.
+Use a manual resolver when you acquire tokens outside the Agent Framework pipeline, when you're building non-Agent Framework apps, or when you use service-to-service (S2S) authentication (client credentials flow). Agents can generate a token themselves, for example by using Microsoft Authentication Library (MSAL) or any other token acquisition method, but they need to ensure the token has the correct observability scope (`api://9b975845-388f-4429-889e-eab1ef63949c/Agent365.Observability.OtelWrite`).
+
+> **Note:** For service-to-service (S2S) authentication, you must use this manual token resolver approach. The [agentic token cache](#agentic-token-cache-with-agent-framework-apps) only supports on-behalf-of (OBO) auth flows.
+
+```csharp
+using Microsoft.OpenTelemetry;
+
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.Agent365;
+    o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
+    {
+        return await MyTokenService.GetTokenAsync(agentId, tenantId);
+    };
+});
+```
+
+When you set `TokenResolver` explicitly, your resolver is used instead of the cache-based one.
+
+> **Note:** For S2S authentication, also set `o.Agent365.UseS2SEndpoint = true` so the exporter sends to the service-to-service endpoint path.
+
+### Agentic token cache with Agent Framework apps
+
+For Agent Framework apps that use on-behalf-of (OBO) authentication, the distro automatically registers `IExporterTokenCache<AgenticTokenStruct>` via DI when you don't set a custom `TokenResolver`. Your agent calls `RegisterObservability()` at runtime to supply credentials, and the cache handles token acquisition and refresh.
+
+> **Note:** This approach only supports on-behalf-of (OBO) auth flows. For service-to-service (S2S) authentication, use the [manual token resolver](#manual-token-resolver) instead.
 
 **Setup in `Program.cs`:**
 
@@ -254,42 +317,6 @@ public class MyAgent : AgentApplication
         // ... your agent logic
     }
 }
-```
-
-### Custom resolver — advanced
-
-For non-agent apps, service-to-service, or custom auth scenarios, set the token resolver directly:
-
-```csharp
-builder.UseMicrosoftOpenTelemetry(o =>
-{
-    o.Exporters = ExportTarget.Agent365;
-    o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
-    {
-        return await MyTokenService.GetTokenAsync(agentId, tenantId);
-    };
-});
-```
-
-If you set `TokenResolver` explicitly, the auto DI token cache is **not** registered — your resolver is used instead.
-
-### ServiceTokenCache — simple token caching
-
-For agents that acquire tokens outside the Agent Framework hosting pipeline (e.g., via MSAL directly), use `ServiceTokenCache`:
-
-```csharp
-using Microsoft.Agents.A365.Observability.Hosting.Caching;
-using Microsoft.Agents.A365.Observability.Runtime.Common;
-
-var cache = new ServiceTokenCache(
-    defaultExpiration: TimeSpan.FromMinutes(30),
-    cleanupInterval: TimeSpan.FromMinutes(5));
-
-cache.RegisterObservability(agentId, tenantId, bearerToken,
-    EnvironmentUtils.GetObservabilityAuthenticationScope());
-
-// Later:
-var token = await cache.GetObservabilityToken(agentId, tenantId);
 ```
 
 ## Baggage attributes
@@ -357,9 +384,13 @@ Register baggage middleware to automatically populate baggage for every incoming
 using Microsoft.Agents.A365.Observability.Hosting.Middleware;
 
 adapter.Use(new BaggageTurnMiddleware());
+adapter.Use(new OutputLoggingMiddleware());
 ```
 
-The middleware skips baggage setup for async replies (`ContinueConversation` events) to avoid overwriting baggage that the originating request already set.
+- `BaggageTurnMiddleware` automatically populates baggage (tenant ID, agent ID, conversation ID, etc.) from the `TurnContext` for every incoming request.
+- `OutputLoggingMiddleware` automatically captures outgoing messages as span attributes, replacing the need for manual `OutputScope.Start()` calls.
+
+The baggage middleware skips setup for async replies (`ContinueConversation` events) to avoid overwriting baggage that the originating request already set.
 
 **HTTP-level middleware** — for setting tenant and agent IDs before the Bot Framework pipeline runs:
 
@@ -408,6 +439,8 @@ builder.UseMicrosoftOpenTelemetry(o =>
     o.Instrumentation.EnableSemanticKernelInstrumentation = false;
 });
 ```
+
+> ⚠️ **Custom ActivitySource names:** If you use a custom `sourceName` in Agent Framework's `.UseOpenTelemetry(sourceName: "MyApp")`, the distro does **not** auto-detect it. You must register it explicitly via `.WithTracing(t => t.AddSource("MyApp"))` or spans will be silently dropped. See [Agent Framework: custom ActivitySource name](agent-framework-getting-started.md#using-a-custom-activitysource-name) for details.
 
 ### Semantic Kernel
 
