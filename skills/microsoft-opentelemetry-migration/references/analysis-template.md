@@ -21,7 +21,7 @@ Search `.csproj` files for:
 Search `.cs` files for:
 - `ConfigureOpenTelemetry()` → replace with `UseMicrosoftOpenTelemetry()`
 - `AddA365Tracing` → replace with `UseMicrosoftOpenTelemetry()`
-- `new Agent365ExporterOptions` → use `o.Agent365.Exporter.*` or DI cache
+- `new Agent365ExporterOptions` → use `o.Agent365.*` or DI cache
 - `TokenStore` → delete class, use DI token cache
 - `new Builder(` → replace with `UseMicrosoftOpenTelemetry()`
 - `.WithSemanticKernel()` → auto-registered by distro

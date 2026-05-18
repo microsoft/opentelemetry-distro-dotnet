@@ -104,7 +104,7 @@ builder.UseMicrosoftOpenTelemetry(o =>
     // Your agent calls RegisterObservability() at runtime.
 
     // Option B: Provide your own token resolver (matches old Agent365ExporterOptions pattern)
-    o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
+    o.Agent365.TokenResolver = async (agentId, tenantId) =>
     {
         return await MyTokenService.GetTokenAsync(agentId, tenantId);
     };
@@ -133,7 +133,7 @@ builder.Services.AddOpenTelemetry()
 - `builder.Services.AddSingleton(new Agent365ExporterOptions { ... });` — token cache is auto-registered via DI
 - `builder.AddA365Tracing(config => { ... });` — replaced by `UseMicrosoftOpenTelemetry()`
 - `using` statements for `Microsoft.Agents.A365.Observability.*` in Program.cs — replace with `using Microsoft.OpenTelemetry;` and `using OpenTelemetry;`
-- `TokenStore` class file — delete it if present. Use `o.Agent365.Exporter.TokenResolver` directly, or let the distro auto-manage tokens via `IExporterTokenCache<AgenticTokenStruct>` (injected via DI)
+- `TokenStore` class file — delete it if present. Use `o.Agent365.TokenResolver` directly, or let the distro auto-manage tokens via `IExporterTokenCache<AgenticTokenStruct>` (injected via DI)
 - `ConfigureOpenTelemetry()` extension method file (if you have one) — delete it, the distro handles all OTel setup
 
 ## ConfigureResource for service identity
@@ -171,7 +171,7 @@ builder.Services.AddOpenTelemetry()
 
 ## Token resolver
 
-When using the Agent 365 exporter, a token resolver is required. The distro can either auto-provide one via DI or you can set one explicitly via `o.Agent365.Exporter.TokenResolver`.
+When using the Agent 365 exporter, a token resolver is required. The distro can either auto-provide one via DI or you can set one explicitly via `o.Agent365.TokenResolver`.
 
 ### Auto (DI) — recommended for Agent Framework apps
 
@@ -247,7 +247,7 @@ builder.Services.AddOpenTelemetry()
     .UseMicrosoftOpenTelemetry(o =>
     {
         o.Exporters = ExportTarget.Agent365;
-        o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
+        o.Agent365.TokenResolver = async (agentId, tenantId) =>
         {
             return await MyTokenService.GetTokenAsync(agentId, tenantId);
         };
@@ -259,7 +259,7 @@ builder.Services.AddOpenTelemetry()
 | Approach | When to use | How it works |
 |---|---|---|
 | **Auto (DI)** — default | Agent Framework apps with `UserAuthorization` | Distro internally calls `AddAgenticTracingExporter()`, registering `IExporterTokenCache<AgenticTokenStruct>`. Your agent calls `RegisterObservability()`. Token exchange happens via `ExchangeTurnTokenAsync`. |
-| **Custom resolver** | Non-agent apps, service-to-service, or custom auth | Set `o.Agent365.Exporter.TokenResolver` directly. You own token acquisition. |
+| **Custom resolver** | Non-agent apps, service-to-service, or custom auth | Set `o.Agent365.TokenResolver` directly. You own token acquisition. |
 
 
 ## Baggage middleware
@@ -428,22 +428,22 @@ builder.Services.AddOpenTelemetry()
         // No TokenResolver needed here — it's wired internally.
 
         // Option B: Provide your own token resolver (advanced/custom)
-        o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
+        o.Agent365.TokenResolver = async (agentId, tenantId) =>
         {
             return await MyTokenService.GetTokenAsync(agentId, tenantId);
         };
 
         // Optional: custom domain resolver
-        o.Agent365.Exporter.DomainResolver = tenantId => "agent365.svc.cloud.microsoft";
+        o.Agent365.DomainResolver = tenantId => "agent365.svc.cloud.microsoft";
 
         // Optional: use S2S endpoint path
-        o.Agent365.Exporter.UseS2SEndpoint = false;
+        o.Agent365.UseS2SEndpoint = false;
 
         // Optional: batch export tuning
-        o.Agent365.Exporter.MaxQueueSize = 2048;
-        o.Agent365.Exporter.MaxExportBatchSize = 512;
-        o.Agent365.Exporter.ScheduledDelayMilliseconds = 5000;
-        o.Agent365.Exporter.ExporterTimeoutMilliseconds = 30000;
+        o.Agent365.MaxQueueSize = 2048;
+        o.Agent365.MaxExportBatchSize = 512;
+        o.Agent365.ScheduledDelayMilliseconds = 5000;
+        o.Agent365.ExporterTimeoutMilliseconds = 30000;
 
         // --- Azure Monitor settings ---
         // o.AzureMonitor.ConnectionString = "InstrumentationKey=...";

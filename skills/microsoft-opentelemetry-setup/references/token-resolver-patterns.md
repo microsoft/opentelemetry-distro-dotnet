@@ -48,7 +48,7 @@ public class MyAgent : AgentApplication
 builder.UseMicrosoftOpenTelemetry(o =>
 {
     o.Exporters = ExportTarget.Agent365;
-    o.Agent365.Exporter.TokenResolver = async (agentId, tenantId) =>
+    o.Agent365.TokenResolver = async (agentId, tenantId) =>
     {
         return await MyTokenService.GetTokenAsync(agentId, tenantId);
     };

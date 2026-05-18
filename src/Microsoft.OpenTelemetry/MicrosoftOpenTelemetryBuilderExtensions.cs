@@ -30,7 +30,7 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
     /// builder.UseMicrosoftOpenTelemetry(o =>
     /// {
     ///     o.AzureMonitor.ConnectionString = "InstrumentationKey=...";
-    ///     o.Agent365.Exporter.TokenResolver = (agentId, tenantId) => GetTokenAsync(agentId, tenantId);
+    ///     o.Agent365.TokenResolver = (agentId, tenantId) => GetTokenAsync(agentId, tenantId);
     ///     o.OtlpEndpoint = new Uri("http://localhost:4317");
     /// });
     /// </code>
@@ -73,7 +73,7 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
     ///         o.AzureMonitor.ConnectionString = "InstrumentationKey=...";
     ///
     ///         // Agent365
-    ///         o.Agent365.Exporter.TokenResolver = (agentId, tenantId) => GetTokenAsync(agentId, tenantId);
+    ///         o.Agent365.TokenResolver = (agentId, tenantId) => GetTokenAsync(agentId, tenantId);
     ///     });
     /// </code>
     /// </remarks>
@@ -103,7 +103,7 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             if (!string.IsNullOrWhiteSpace(options.AzureMonitor.ConnectionString)
                 || HasAzureMonitorConnectionString(builder.Services))
                 exporters |= ExportTarget.AzureMonitor;
-            if (options.Agent365.Exporter.TokenResolver != null)
+            if (options.Agent365.TokenResolver != null)
                 exporters |= ExportTarget.Agent365;
             
         }
@@ -179,13 +179,15 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         builder.UseAgent365(o =>
         {
             o.SkipExporter = !exporters.HasFlag(ExportTarget.Agent365);
-            o.Exporter.TokenResolver = options.Agent365.Exporter.TokenResolver;
-            o.Exporter.DomainResolver = options.Agent365.Exporter.DomainResolver;
-            o.Exporter.UseS2SEndpoint = options.Agent365.Exporter.UseS2SEndpoint;
-            o.Exporter.MaxQueueSize = options.Agent365.Exporter.MaxQueueSize;
-            o.Exporter.ScheduledDelayMilliseconds = options.Agent365.Exporter.ScheduledDelayMilliseconds;
-            o.Exporter.ExporterTimeoutMilliseconds = options.Agent365.Exporter.ExporterTimeoutMilliseconds;
-            o.Exporter.MaxExportBatchSize = options.Agent365.Exporter.MaxExportBatchSize;
+            o.TokenResolver = options.Agent365.TokenResolver;
+            o.DomainResolver = options.Agent365.DomainResolver;
+            o.ClusterCategory = options.Agent365.ClusterCategory;
+            o.UseS2SEndpoint = options.Agent365.UseS2SEndpoint;
+            o.MaxQueueSize = options.Agent365.MaxQueueSize;
+            o.ScheduledDelayMilliseconds = options.Agent365.ScheduledDelayMilliseconds;
+            o.ExporterTimeoutMilliseconds = options.Agent365.ExporterTimeoutMilliseconds;
+            o.MaxExportBatchSize = options.Agent365.MaxExportBatchSize;
+            o.MaxPayloadBytes = options.Agent365.MaxPayloadBytes;
         }, effectiveInstrumentation);
 
         // --- Microsoft Agent Framework (always: captures MAF spans + processor) ---

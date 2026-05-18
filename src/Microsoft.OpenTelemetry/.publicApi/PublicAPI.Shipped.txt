@@ -381,6 +381,8 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOp
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.ExporterTimeoutMilliseconds.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.MaxExportBatchSize.get -> int
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.MaxExportBatchSize.set -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.MaxPayloadBytes.get -> long
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.MaxPayloadBytes.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.MaxQueueSize.get -> int
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.MaxQueueSize.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.ScheduledDelayMilliseconds.get -> int
@@ -390,8 +392,6 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOp
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.UseS2SEndpoint.get -> bool
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.UseS2SEndpoint.set -> void
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.DefaultEndpointHost = "agent365.svc.cloud.microsoft" -> string!
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.MaxPayloadBytes.get -> long
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.MaxPayloadBytes.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.PayloadChunking
 static Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.PayloadChunking.EstimateValueBytes(object? value) -> long
 static Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.PayloadChunking.EstimateActivityBytes(System.Diagnostics.Activity! activity) -> long
@@ -451,7 +451,6 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OutputScope.RecordOut
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.TraceContextHelper
 Microsoft.OpenTelemetry.Agent365Options
 Microsoft.OpenTelemetry.Agent365Options.Agent365Options() -> void
-Microsoft.OpenTelemetry.Agent365Options.Exporter.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions!
 Microsoft.OpenTelemetry.AzureMonitorOptions
 Microsoft.OpenTelemetry.AzureMonitorOptions.AzureMonitorOptions() -> void
 Microsoft.OpenTelemetry.AzureMonitorOptions.DisableOfflineStorage.get -> bool
