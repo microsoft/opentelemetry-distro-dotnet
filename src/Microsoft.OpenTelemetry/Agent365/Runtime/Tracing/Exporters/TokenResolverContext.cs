@@ -9,14 +9,14 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
     /// Provides contextual information to the token resolver delegate.
     /// <para>
     /// <see cref="AgentId"/> and <see cref="TenantId"/> identify the cache key.
-    /// Additional contextual data (e.g. agentic user ID) is available via the
+    /// Additional contextual data (e.g. agentic user ID, which is the AAD Object ID) is available via the
     /// <see cref="Metadata"/> dictionary and corresponding convenience accessors.
     /// </para>
     /// </summary>
     public class TokenResolverContext
     {
         /// <summary>
-        /// Well-known metadata key for the agentic user identifier.
+        /// Well-known metadata key for the agentic user identifier (AAD Object ID).
         /// </summary>
         public const string AgenticUserIdKey = "AgenticUserId";
 
@@ -50,7 +50,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         public IReadOnlyDictionary<string, string> Metadata { get; }
 
         /// <summary>
-        /// Gets the agentic user identifier from metadata, or <c>null</c> if not present.
+        /// Gets the agentic user identifier (AAD Object ID) from metadata, or <c>null</c> if not present.
         /// Convenience accessor for <c>Metadata[<see cref="AgenticUserIdKey"/>]</c>.
         /// </summary>
         public string? AgenticUserId =>
