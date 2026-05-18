@@ -17,6 +17,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
     {
         /// <summary>
         /// Well-known metadata key for the agentic user identifier (AAD Object ID).
+        /// In the AI teammate scenario, the agentic user ID is 1:1 with the agent ID.
+        /// This value will be null in the S2S scenario.
         /// </summary>
         public const string AgenticUserIdKey = "AgenticUserId";
 
@@ -51,6 +53,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
         /// <summary>
         /// Gets the agentic user identifier (AAD Object ID) from metadata, or <c>null</c> if not present.
+        /// In the AI teammate scenario, this value is 1:1 with <see cref="AgentId"/>.
         /// Convenience accessor for <c>Metadata[<see cref="AgenticUserIdKey"/>]</c>.
         /// </summary>
         public string? AgenticUserId =>
