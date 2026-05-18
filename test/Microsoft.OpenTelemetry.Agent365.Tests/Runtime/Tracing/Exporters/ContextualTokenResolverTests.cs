@@ -92,53 +92,50 @@ public sealed class ContextualTokenResolverTests
     [TestMethod]
     public void TokenResolverContext_Constructor_SetsKeyFields()
     {
-        var ctx = new TokenResolverContext("agent-1", "tenant-1");
+        var identity = new AgentIdentity("agent-1");
+        var ctx = new TokenResolverContext(identity, "tenant-1");
 
-        ctx.AgentId.Should().Be("agent-1");
+        ctx.Identity.AgentId.Should().Be("agent-1");
         ctx.TenantId.Should().Be("tenant-1");
-        ctx.Metadata.Should().BeEmpty();
-        ctx.AgenticUserId.Should().BeNull();
+        ctx.Identity.Should().BeSameAs(identity);
+        ctx.Identity.AgenticUserId.Should().BeNull();
     }
 
     [TestMethod]
-    public void TokenResolverContext_WithMetadata_ExposesAgenticUserId()
+    public void TokenResolverContext_WithIdentity_ExposesAgenticUserId()
     {
-        var metadata = new Dictionary<string, string>
-        {
-            [TokenResolverContext.AgenticUserIdKey] = "user-42"
-        };
-        var ctx = new TokenResolverContext("agent-1", "tenant-1", metadata);
+        var identity = new AgentIdentity("agent-1", "user-42");
+        var ctx = new TokenResolverContext(identity, "tenant-1");
 
-        ctx.AgenticUserId.Should().Be("user-42");
-        ctx.Metadata.Should().ContainKey(TokenResolverContext.AgenticUserIdKey);
+        ctx.Identity.AgenticUserId.Should().Be("user-42");
+        ctx.Identity.AgentId.Should().Be("agent-1");
     }
 
     [TestMethod]
     public void TokenResolverContext_WithoutAgenticUserId_ReturnsNull()
     {
-        var metadata = new Dictionary<string, string>
-        {
-            ["SomeOtherKey"] = "value"
-        };
-        var ctx = new TokenResolverContext("agent-1", "tenant-1", metadata);
+        var identity = new AgentIdentity("agent-1");
+        var ctx = new TokenResolverContext(identity, "tenant-1");
 
-        ctx.AgenticUserId.Should().BeNull();
-        ctx.Metadata.Should().HaveCount(1);
+        ctx.Identity.AgenticUserId.Should().BeNull();
     }
 
     [TestMethod]
-    public void TokenResolverContext_NullMetadata_DefaultsToEmptyDictionary()
+    public void AgentIdentity_Constructor_SetsProperties()
     {
-        var ctx = new TokenResolverContext("agent-1", "tenant-1", metadata: null);
+        var id = new AgentIdentity("agent-1", "user-1");
 
-        ctx.Metadata.Should().NotBeNull();
-        ctx.Metadata.Should().BeEmpty();
+        id.AgentId.Should().Be("agent-1");
+        id.AgenticUserId.Should().Be("user-1");
     }
 
     [TestMethod]
-    public void TokenResolverContext_AgenticUserIdKey_HasExpectedValue()
+    public void AgentIdentity_NullAgenticUserId_IsAllowed()
     {
-        TokenResolverContext.AgenticUserIdKey.Should().Be("AgenticUserId");
+        var id = new AgentIdentity("agent-1");
+
+        id.AgentId.Should().Be("agent-1");
+        id.AgenticUserId.Should().BeNull();
     }
 
     // ──────────── Constructor validation: either resolver accepted ────────────
@@ -219,9 +216,9 @@ public sealed class ContextualTokenResolverTests
         exporter.Export(in batch);
 
         captured.Should().NotBeNull();
-        captured!.AgentId.Should().Be("agent-1");
+        captured!.Identity.AgentId.Should().Be("agent-1");
         captured.TenantId.Should().Be("tenant-1");
-        captured.AgenticUserId.Should().Be("user-99");
+        captured.Identity.AgenticUserId.Should().Be("user-99");
     }
 
     [TestMethod]
@@ -243,8 +240,7 @@ public sealed class ContextualTokenResolverTests
         exporter.Export(in batch);
 
         captured.Should().NotBeNull();
-        captured!.AgenticUserId.Should().BeNull();
-        captured.Metadata.Should().BeEmpty();
+        captured!.Identity.AgenticUserId.Should().BeNull();
     }
 
     [TestMethod]
@@ -274,7 +270,7 @@ public sealed class ContextualTokenResolverTests
 
         vanillaCalled.Should().BeFalse("ContextualTokenResolver should take precedence");
         captured.Should().NotBeNull();
-        captured!.AgentId.Should().Be("agent-1");
+        captured!.Identity.AgentId.Should().Be("agent-1");
     }
 
     [TestMethod]

@@ -42,7 +42,7 @@ builder.Services.AddOpenTelemetry()
             o.Agent365.Exporter.ContextualTokenResolver = async (context) =>
             {
                 return await tokenService.GetTokenAsync(
-                    context.AgentId, context.TenantId, context.AgenticUserId);
+                    context.Identity.AgentId, context.TenantId, context.Identity.AgenticUserId);
             };
         }
         // Otherwise: vanilla TokenResolver is auto-registered via AddAgenticTracingExporter (DI cache).

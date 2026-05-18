@@ -14,7 +14,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
     /// <summary>
     /// Async delegate used by the exporter to obtain an auth token using rich context.
-    /// Provides additional fields (e.g. <see cref="TokenResolverContext.AgenticUserId"/>)
+    /// Provides additional fields (e.g. <see cref="TokenResolverContext.Identity"/>)
     /// beyond what <see cref="AsyncAuthTokenResolver"/> offers.
     /// Must be fast and non-blocking (use internal caching elsewhere).
     /// Return null/empty to omit the Authorization header.
