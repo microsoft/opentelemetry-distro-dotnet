@@ -12,6 +12,8 @@ Microsoft.OpenTelemetry.Agent365Options.MaxQueueSize.get -> int
 Microsoft.OpenTelemetry.Agent365Options.MaxQueueSize.set -> void
 Microsoft.OpenTelemetry.Agent365Options.ScheduledDelayMilliseconds.get -> int
 Microsoft.OpenTelemetry.Agent365Options.ScheduledDelayMilliseconds.set -> void
+Microsoft.OpenTelemetry.Agent365Options.ContextualTokenResolver.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.AsyncContextualTokenResolver?
+Microsoft.OpenTelemetry.Agent365Options.ContextualTokenResolver.set -> void
 Microsoft.OpenTelemetry.Agent365Options.TokenResolver.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.AsyncAuthTokenResolver?
 Microsoft.OpenTelemetry.Agent365Options.TokenResolver.set -> void
 Microsoft.OpenTelemetry.Agent365Options.UseS2SEndpoint.get -> bool

@@ -39,7 +39,7 @@ builder.Services.AddOpenTelemetry()
         if (useContextualResolver)
         {
             // ContextualTokenResolver: receives agentId, tenantId, and agenticUserId via context.
-            o.Agent365.Exporter.ContextualTokenResolver = async (context) =>
+            o.Agent365.ContextualTokenResolver = async (context) =>
             {
                 return await tokenService.GetTokenAsync(
                     context.Identity.AgentId, context.TenantId, context.Identity.AgenticUserId);
