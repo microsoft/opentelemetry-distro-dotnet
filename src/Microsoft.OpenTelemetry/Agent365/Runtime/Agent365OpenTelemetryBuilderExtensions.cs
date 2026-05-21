@@ -4,7 +4,6 @@
 using Microsoft.Agents.A365.Observability.Runtime;
 using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.A365.Observability.Extensions.SemanticKernel;
-using Microsoft.Agents.A365.Observability.Hosting;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
@@ -120,19 +119,7 @@ internal static class Agent365OpenTelemetryBuilderExtensions
             // Agent365 Exporter (enabled when not skipped)
             if (!options.SkipExporter)
             {
-                // Always register the token cache so DI consumers (e.g., agents
-                // injecting IExporterTokenCache<AgenticTokenStruct>) can resolve it.
-                // This matches the base A365 SDK behavior where AddAgenticTracingExporter()
-                // and setting TokenResolver are independent operations.
-                builder.Services.AddAgenticTracingExporter();
-
-                if (options.ExporterOptions.TokenResolver != null || options.ExporterOptions.ContextualTokenResolver != null)
-                {
-                    // Inline TokenResolver or ContextualTokenResolver provided — override the cache-based options.
-                    // This singleton takes precedence over the one from AddAgenticTracingExporter().
-                    builder.Services.AddSingleton(options.ExporterOptions);
-                }
-
+                builder.Services.AddSingleton(options.ExporterOptions);
                 tracing.AddAgent365Exporter();
             }
             });

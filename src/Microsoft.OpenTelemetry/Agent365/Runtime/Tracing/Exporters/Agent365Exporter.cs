@@ -43,7 +43,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             _options = options ?? throw new ArgumentNullException(nameof(options));
 
             if (_options.TokenResolver == null && _options.ContextualTokenResolver == null)
-                throw new ArgumentNullException(nameof(options.TokenResolver), "Agent365ExporterOptions.TokenResolver or Agent365ExporterOptions.ContextualTokenResolver must be provided.");
+                throw new ArgumentNullException(nameof(options.TokenResolver),
+                    "Agent365 exporter requires a TokenResolver or ContextualTokenResolver. " +
+                    "Configure one via UseMicrosoftOpenTelemetry(o => o.Agent365.TokenResolver = ...) or " +
+                    "UseMicrosoftOpenTelemetry(o => o.Agent365.ContextualTokenResolver = ...).");
 
             _httpClient = httpClient ?? HttpClientFactory.CreateWithTimeout(options.ExporterTimeoutMilliseconds);
             _resource = resource ?? ResourceBuilder.CreateEmpty().Build();
