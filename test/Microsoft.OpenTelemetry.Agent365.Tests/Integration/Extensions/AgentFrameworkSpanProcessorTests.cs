@@ -68,7 +68,7 @@ public class AgentFrameworkSpanProcessorTests
     }
 
     [TestMethod]
-    public async Task SimpleChat_ProcessorMapsToVersionedFormat()
+    public async Task SimpleChat_ProcessorMapsToArrayFormat()
     {
         SkipIfNoCredentials();
 
