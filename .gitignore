@@ -420,6 +420,7 @@ FodyWeavers.xsd
 # DocFX output
 _site/
 api/
+!docs/api/
 
 # Language server cache
 *.lscache
