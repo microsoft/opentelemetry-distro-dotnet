@@ -16,7 +16,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Tests.Integration.Extensions;
 
 /// <summary>
 /// Pipeline integration tests for <see cref="AgentFrameworkSpanProcessor"/> handling invoke_agent spans.
-/// Verifies the full UseAgentFramework → Processor → Exporter chain produces A365 versioned messages.
+/// Verifies the full UseAgentFramework → Processor → Exporter chain produces structured JSON-array messages.
 /// Does NOT require Azure OpenAI credentials.
 /// </summary>
 [TestClass]
@@ -95,18 +95,18 @@ public class AgentFrameworkInvokeAgentPipelineTests
         span.Should().NotBeNull("invoke_agent span should be captured by pipeline");
         var tags = GetTags(span!);
 
-        // Input: versioned, all roles preserved, TextPart format
+        // Input: JSON array, all roles preserved, TextPart format
         var input = tags[OpenTelemetryConstants.GenAiInputMessagesKey] as string;
-        input.Should().Contain("\"version\":\"0.1.0\"", "should use A365 versioned wrapper");
+        input.Should().StartWith("[");
         input.Should().Contain("\"role\":\"system\"", "system messages should be preserved");
         input.Should().Contain("\"role\":\"user\"", "user messages should be mapped");
         input.Should().Contain("\"type\":\"text\"", "should use TextPart format");
         input.Should().Contain("You are a helpful agent.");
         input.Should().Contain("What can you do?");
 
-        // Output: versioned, assistant role, finish reason, TextPart format
+        // Output: JSON array, assistant role, finish reason, TextPart format
         var output = tags[OpenTelemetryConstants.GenAiOutputMessagesKey] as string;
-        output.Should().Contain("\"version\":\"0.1.0\"");
+        output.Should().StartWith("[");
         output.Should().Contain("\"role\":\"assistant\"");
         output.Should().Contain("\"type\":\"text\"");
         output.Should().Contain("I can help with many tasks!");
@@ -155,7 +155,7 @@ public class AgentFrameworkInvokeAgentPipelineTests
         var tags = GetTags(span!);
         var input = tags[OpenTelemetryConstants.GenAiInputMessagesKey] as string;
 
-        input.Should().Contain("\"version\":\"0.1.0\"");
+        input.Should().StartWith("[");
         input.Should().Contain("\"type\":\"tool_call\"", "tool call request should be mapped");
         input.Should().Contain("GetWeather", "function name should be preserved");
         input.Should().Contain("\"type\":\"tool_call_response\"", "tool response should be mapped");

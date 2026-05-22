@@ -19,7 +19,6 @@ public sealed class MessageUtilsTest
         result.Messages[0].Role.Should().Be(MessageRole.User);
         result.Messages[0].Parts.Should().HaveCount(1);
         result.Messages[0].Parts[0].Should().BeOfType<TextPart>().Which.Content.Should().Be("Hello");
-        result.Version.Should().Be(MessageConstants.SchemaVersion);
     }
 
     [TestMethod]
@@ -40,12 +39,11 @@ public sealed class MessageUtilsTest
         });
         var json = MessageUtils.Serialize(wrapper);
         var doc = JsonDocument.Parse(json);
-        doc.RootElement.GetProperty("version").GetString().Should().Be("0.1.0");
-        var messages = doc.RootElement.GetProperty("messages");
-        messages.GetArrayLength().Should().Be(1);
-        messages[0].GetProperty("role").GetString().Should().Be("user");
-        messages[0].GetProperty("parts")[0].GetProperty("type").GetString().Should().Be("text");
-        messages[0].GetProperty("parts")[0].GetProperty("content").GetString().Should().Be("Hello");
+        doc.RootElement.ValueKind.Should().Be(JsonValueKind.Array);
+        doc.RootElement.GetArrayLength().Should().Be(1);
+        doc.RootElement[0].GetProperty("role").GetString().Should().Be("user");
+        doc.RootElement[0].GetProperty("parts")[0].GetProperty("type").GetString().Should().Be("text");
+        doc.RootElement[0].GetProperty("parts")[0].GetProperty("content").GetString().Should().Be("Hello");
     }
 
     [TestMethod]
@@ -57,7 +55,7 @@ public sealed class MessageUtilsTest
         });
         var json = MessageUtils.Serialize(wrapper);
         var doc = JsonDocument.Parse(json);
-        doc.RootElement.GetProperty("messages")[0].GetProperty("finish_reason").GetString().Should().Be("stop");
+        doc.RootElement[0].GetProperty("finish_reason").GetString().Should().Be("stop");
     }
 
     [TestMethod]
@@ -92,7 +90,7 @@ public sealed class MessageUtilsTest
         });
         var json = MessageUtils.Serialize(wrapper);
         var doc = JsonDocument.Parse(json);
-        doc.RootElement.GetProperty("messages")[0].GetProperty("parts")[0]
+        doc.RootElement[0].GetProperty("parts")[0]
             .GetProperty("content").GetString().Should().Be(content);
     }
 
@@ -102,8 +100,8 @@ public sealed class MessageUtilsTest
         var wrapper = new InputMessages(Array.Empty<ChatMessage>());
         var json = MessageUtils.Serialize(wrapper);
         var doc = JsonDocument.Parse(json);
-        doc.RootElement.GetProperty("version").GetString().Should().Be("0.1.0");
-        doc.RootElement.GetProperty("messages").GetArrayLength().Should().Be(0);
+        doc.RootElement.ValueKind.Should().Be(JsonValueKind.Array);
+        doc.RootElement.GetArrayLength().Should().Be(0);
     }
 
     [TestMethod]
@@ -116,8 +114,8 @@ public sealed class MessageUtilsTest
         });
         var json = MessageUtils.Serialize(wrapper);
         var doc = JsonDocument.Parse(json);
-        doc.RootElement.GetProperty("messages").GetArrayLength().Should().Be(2);
-        doc.RootElement.GetProperty("messages")[0].GetProperty("role").GetString().Should().Be("system");
-        doc.RootElement.GetProperty("messages")[1].GetProperty("role").GetString().Should().Be("user");
+        doc.RootElement.GetArrayLength().Should().Be(2);
+        doc.RootElement[0].GetProperty("role").GetString().Should().Be("system");
+        doc.RootElement[1].GetProperty("role").GetString().Should().Be("user");
     }
 }

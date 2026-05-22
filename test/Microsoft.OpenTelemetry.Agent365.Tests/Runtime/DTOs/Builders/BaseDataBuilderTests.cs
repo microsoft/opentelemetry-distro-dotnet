@@ -114,7 +114,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
         {
             var dict = TestBuilder.BuildAll(input: new[] { "one", "two" });
             dict.Should().ContainKey(OpenTelemetryConstants.GenAiInputMessagesKey);
-            dict[OpenTelemetryConstants.GenAiInputMessagesKey]!.ToString()!.Should().Contain("one").And.Contain("two").And.Contain("\"version\":\"0.1.0\"");
+            var inputMessages = dict[OpenTelemetryConstants.GenAiInputMessagesKey]!.ToString()!;
+            inputMessages.Should().StartWith("[");
+            inputMessages.Should().Contain("one").And.Contain("two");
         }
 
         [TestMethod]
@@ -122,7 +124,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
         {
             var dict = TestBuilder.BuildAll(output: new[] { "out1", "out2" });
             dict.Should().ContainKey(OpenTelemetryConstants.GenAiOutputMessagesKey);
-            dict[OpenTelemetryConstants.GenAiOutputMessagesKey]!.ToString()!.Should().Contain("out1").And.Contain("out2").And.Contain("\"version\":\"0.1.0\"");
+            var outputMessages = dict[OpenTelemetryConstants.GenAiOutputMessagesKey]!.ToString()!;
+            outputMessages.Should().StartWith("[");
+            outputMessages.Should().Contain("out1").And.Contain("out2");
         }
 
         [TestMethod]

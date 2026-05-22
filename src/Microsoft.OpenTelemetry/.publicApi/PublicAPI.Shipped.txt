@@ -249,7 +249,6 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.IMessageP
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.InputMessages
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.InputMessages.InputMessages(System.Collections.Generic.IReadOnlyList<Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ChatMessage!>! messages) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.InputMessages.Messages.get -> System.Collections.Generic.IReadOnlyList<Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ChatMessage!>!
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.InputMessages.Version.get -> string!
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole.Assistant = 2 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole.System = 0 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole
@@ -260,12 +259,11 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.Modality.
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.Modality.Image = 0 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.Modality
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.Modality.Video = 1 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.Modality
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessage
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessage.FinishReason.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessage.FinishReason.get -> string!
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessage.OutputMessage(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.MessageRole role, System.Collections.Generic.IReadOnlyList<Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.IMessagePart!>! parts, string? name = null, string? finishReason = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessages
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessages.Messages.get -> System.Collections.Generic.IReadOnlyList<Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessage!>!
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessages.OutputMessages(System.Collections.Generic.IReadOnlyList<Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessage!>! messages) -> void
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessages.Version.get -> string!
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ReasoningPart
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ReasoningPart.Content.get -> string!
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.ReasoningPart.ReasoningPart(string! content) -> void
