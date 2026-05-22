@@ -9,6 +9,11 @@ namespace Microsoft.Agents.A365.Observability.Hosting
     /// <summary>
     /// Provides extension methods for configuring Microsoft Agent 365 SDK with OpenTelemetry tracing.
     /// </summary>
+    /// <remarks>
+    /// These methods register infrastructure that depends on Microsoft.Agents.Builder at runtime.
+    /// They are opt-in for Agent Framework apps and should NOT be called unless the consumer
+    /// has Microsoft.Agents.Builder available in their dependency graph.
+    /// </remarks>
     internal static class ObservabilityServiceCollectionExtensions
     {
         /// <summary>

@@ -15,10 +15,10 @@ namespace Microsoft.OpenTelemetry.Agent365.Tests
     public class TokenCacheDiTests
     {
         [Fact]
-        public void CustomTokenResolver_IExporterTokenCache_StillRegistered()
+        public void CustomTokenResolver_ExporterOptions_RegisteredDirectly()
         {
-            // Issue #42: Setting custom TokenResolver should NOT prevent
-            // IExporterTokenCache<AgenticTokenStruct> from being registered.
+            // When a custom TokenResolver is provided, Agent365ExporterOptions should be
+            // registered as a singleton instance (no AgenticTokenCache dependency).
             var services = new ServiceCollection();
             services.AddOpenTelemetry()
                 .UseMicrosoftOpenTelemetry(o =>
@@ -28,55 +28,39 @@ namespace Microsoft.OpenTelemetry.Agent365.Tests
                         Task.FromResult<string?>("custom-token");
                 });
 
-            // IExporterTokenCache<AgenticTokenStruct> must be resolvable
-            Assert.Contains(services, s =>
-                s.ServiceType == typeof(IExporterTokenCache<AgenticTokenStruct>));
-        }
-
-        [Fact]
-        public void CustomTokenResolver_ExporterOptions_Overridden()
-        {
-            // When a custom TokenResolver is provided, the Agent365ExporterOptions
-            // singleton should use the inline resolver, not the cache-based one.
-            var services = new ServiceCollection();
-            services.AddOpenTelemetry()
-                .UseMicrosoftOpenTelemetry(o =>
-                {
-                    o.Exporters = ExportTarget.Agent365;
-                    o.Agent365.TokenResolver = (agentId, tenantId) =>
-                        Task.FromResult<string?>("custom-token");
-                });
-
-            // Agent365ExporterOptions should be registered (both cache-based and inline)
+            // Agent365ExporterOptions should be registered directly (instance, not factory)
             var exporterOptionsDescriptors = services
                 .Where(s => s.ServiceType == typeof(Agent365ExporterOptions))
                 .ToList();
 
-            // Should have at least 2: one from AddAgenticTracingExporter (factory) + one inline (instance)
-            Assert.True(exporterOptionsDescriptors.Count >= 2,
-                $"Expected at least 2 Agent365ExporterOptions registrations, got {exporterOptionsDescriptors.Count}");
+            Assert.Single(exporterOptionsDescriptors);
+            Assert.NotNull(exporterOptionsDescriptors[0].ImplementationInstance);
         }
 
         [Fact]
-        public void NoTokenResolver_IExporterTokenCache_Registered()
+        public void CustomTokenResolver_AgenticTokenCache_NotRegistered()
         {
-            // Without custom TokenResolver, IExporterTokenCache should still be registered.
+            // Fix for issue #103: With a custom TokenResolver, AgenticTokenCache
+            // should NOT be auto-registered (it depends on Microsoft.Agents.Builder).
             var services = new ServiceCollection();
             services.AddOpenTelemetry()
                 .UseMicrosoftOpenTelemetry(o =>
                 {
                     o.Exporters = ExportTarget.Agent365;
+                    o.Agent365.TokenResolver = (agentId, tenantId) =>
+                        Task.FromResult<string?>("custom-token");
                 });
 
-            Assert.Contains(services, s =>
+            Assert.DoesNotContain(services, s =>
                 s.ServiceType == typeof(IExporterTokenCache<AgenticTokenStruct>));
         }
 
         [Fact]
-        public void NoTokenResolver_ExporterOptions_SingleRegistration()
+        public void NoTokenResolver_DoesNotThrow_AgenticTokenCacheNotRegistered()
         {
-            // Without custom TokenResolver, only the cache-based Agent365ExporterOptions
-            // should be registered (no inline override).
+            // Without a TokenResolver, the SDK must not crash the host app.
+            // Agent365ExporterOptions is registered (exporter logs error and becomes no-op),
+            // but AgenticTokenCache is NOT auto-registered (no Microsoft.Agents.Builder dependency).
             var services = new ServiceCollection();
             services.AddOpenTelemetry()
                 .UseMicrosoftOpenTelemetry(o =>
@@ -84,12 +68,14 @@ namespace Microsoft.OpenTelemetry.Agent365.Tests
                     o.Exporters = ExportTarget.Agent365;
                 });
 
-            var inlineDescriptors = services
-                .Where(s => s.ServiceType == typeof(Agent365ExporterOptions)
-                         && s.ImplementationInstance != null)
-                .ToList();
+            // Agent365ExporterOptions is registered (exporter handles missing resolver gracefully)
+            Assert.Contains(services, s =>
+                s.ServiceType == typeof(Agent365ExporterOptions));
 
-            Assert.Empty(inlineDescriptors);
+            // No AgenticTokenCache registered
+            Assert.DoesNotContain(services, s =>
+                s.ServiceType == typeof(IExporterTokenCache<AgenticTokenStruct>));
         }
+
     }
 }
