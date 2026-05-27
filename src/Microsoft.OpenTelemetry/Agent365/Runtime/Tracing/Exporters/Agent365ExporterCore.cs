@@ -37,6 +37,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             InvokeAgentScope.OperationName,
             ExecuteToolScope.OperationName,
             OutputScope.OperationName,
+            OpenTelemetryConstants.ApplyGuardrailOperationName,
             "chat",
             nameof(InferenceOperationType.Chat),
         };

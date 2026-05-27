@@ -217,6 +217,23 @@ public sealed class Agent365ExporterTests
     }
 
     [TestMethod]
+    public void PartitionByIdentity_IncludesApplyGuardrailSpans()
+    {
+        // Arrange
+        using var guardrailSpan = CreateActivity("tenant-1", "agent-1", operationName: "apply_guardrail");
+        using var httpSpan = CreateActivity("tenant-1", "agent-1", operationName: "http_request");
+
+        var batch = CreateBatch(guardrailSpan, httpSpan);
+
+        // Act
+        var groups = Agent365ExporterTests._agent365ExporterCore.PartitionByIdentity(in batch);
+
+        // Assert
+        groups.Should().HaveCount(1);
+        groups.Should().Contain(g => g.TenantId == "tenant-1" && g.AgentId == "agent-1" && g.Activities.Count == 1);
+    }
+
+    [TestMethod]
     public void Agent365ExporterOptions_DefaultBatchingParameters_AreSet()
     {
         // Arrange & Act
