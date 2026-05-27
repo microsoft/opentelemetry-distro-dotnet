@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added Feature SDKStats reporting for distro-enabled features. Publishes a `Feature` gauge on the `MicrosoftOpenTelemetryFeatureSdkStatsMeter` meter; the Azure Monitor exporter's Statsbeat MeterProvider subscribes to it and ships the metric on the existing 24-hour cadence. Reported regardless of which exporter the customer selected (Azure Monitor, OTLP, Console, or Agent365) — when Azure Monitor isn't selected, an inert `AzureMonitorMetricExporter` is held to trigger the Statsbeat pipeline and `cikey` is reported as the literal `"N/A"`. Honors `APPLICATIONINSIGHTS_STATSBEAT_DISABLED=true`.
+
 ## 1.0.3 - 2026-05-22
 
 - Fix `gen_ai.tool.arguments` attribute name to `gen_ai.tool.call.arguments` ([#88](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/88))
