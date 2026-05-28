@@ -551,5 +551,140 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
             Assert.True(captured.EnableAzureSdkInstrumentation);
         }
     }
+
+    [Collection("EnvironmentVariableTests")]
+    public class UseCustomExporterTests
+    {
+        [Fact]
+        public void CustomExporterMarker_SkipsBuiltInExporter_RegistersOptionsInDI()
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton(Microsoft.OpenTelemetry.CustomAgent365ExporterMarker.Instance);
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365;
+                    o.Agent365.ContextualTokenResolver = _ =>
+                        System.Threading.Tasks.Task.FromResult<string?>("token");
+                });
+
+            // Agent365ExporterOptions IS registered in DI (shim can resolve it)
+            Assert.Contains(services, s => s.ServiceType.Name == "Agent365ExporterOptions");
+
+            // Tracing configuration is still registered (instrumentation active)
+            Assert.Contains(services, s =>
+                s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder") ||
+                s.ServiceType.Name.Contains("TracerProviderBuilder"));
+        }
+
+        [Fact]
+        public void CustomExporterMarker_ExporterOptionsResolvable_WithTokenResolver()
+        {
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddSingleton(Microsoft.OpenTelemetry.CustomAgent365ExporterMarker.Instance);
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365;
+                    o.Agent365.TokenResolver = (agentId, tenantId) =>
+                        System.Threading.Tasks.Task.FromResult<string?>("resolved-token");
+                });
+
+            var sp = services.BuildServiceProvider();
+            var options = sp.GetService<Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions>();
+
+            Assert.NotNull(options);
+            Assert.NotNull(options!.TokenResolver);
+        }
+
+        [Fact]
+        public void CustomExporterMarker_ExporterOptionsResolvable_WithContextualTokenResolver()
+        {
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddSingleton(Microsoft.OpenTelemetry.CustomAgent365ExporterMarker.Instance);
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365;
+                    o.Agent365.ContextualTokenResolver = ctx =>
+                        System.Threading.Tasks.Task.FromResult<string?>("contextual-token");
+                });
+
+            var sp = services.BuildServiceProvider();
+            var options = sp.GetService<Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions>();
+
+            Assert.NotNull(options);
+            Assert.NotNull(options!.ContextualTokenResolver);
+        }
+
+        [Fact]
+        public void NoMarker_RegistersBuiltInExporter()
+        {
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365;
+                    o.Agent365.TokenResolver = (a, t) =>
+                        System.Threading.Tasks.Task.FromResult<string?>("token");
+                });
+
+            // Built-in exporter is registered (no marker present)
+            Assert.Contains(services, s => s.ServiceType.Name == "Agent365ExporterOptions");
+        }
+
+        [Fact]
+        public void CustomExporterMarker_WithSkipExporter_NoOptionsInDI()
+        {
+            const string envVar = "APPLICATIONINSIGHTS_CONNECTION_STRING";
+            var original = Environment.GetEnvironmentVariable(envVar);
+            try
+            {
+                Environment.SetEnvironmentVariable(envVar, null);
+
+                var services = new ServiceCollection();
+                services.AddSingleton(Microsoft.OpenTelemetry.CustomAgent365ExporterMarker.Instance);
+                services.AddOpenTelemetry()
+                    .UseMicrosoftOpenTelemetry(o =>
+                    {
+                        o.Exporters = ExportTarget.Console; // Agent365 NOT in target
+                        o.Agent365.TokenResolver = (a, t) =>
+                            System.Threading.Tasks.Task.FromResult<string?>("token");
+                    });
+
+                // Agent365ExporterOptions NOT registered (SkipExporter takes precedence)
+                Assert.DoesNotContain(services, s => s.ServiceType.Name == "Agent365ExporterOptions");
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(envVar, original);
+            }
+        }
+
+        [Fact]
+        public void CustomExporterMarker_A365OnlyMode_InfraStillSuppressed()
+        {
+            var services = new ServiceCollection();
+            InstrumentationOptions? captured = null;
+
+            services.AddSingleton(Microsoft.OpenTelemetry.CustomAgent365ExporterMarker.Instance);
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365;
+                    o.Agent365.ContextualTokenResolver = _ =>
+                        System.Threading.Tasks.Task.FromResult<string?>("token");
+                    captured = o.Instrumentation;
+                });
+
+            Assert.NotNull(captured);
+            Assert.False(captured!.EnableAspNetCoreInstrumentation);
+            Assert.False(captured.EnableHttpClientInstrumentation);
+            Assert.False(captured.EnableSqlClientInstrumentation);
+            Assert.False(captured.EnableAzureSdkInstrumentation);
+        }
+    }
 }
 #endif

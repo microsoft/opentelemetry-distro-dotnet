@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System.Linq;
 using Microsoft.Agents.A365.Observability.Runtime;
 using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.A365.Observability.Extensions.SemanticKernel;
@@ -116,11 +117,19 @@ internal static class Agent365OpenTelemetryBuilderExtensions
                     .AddSource("Experimental.Microsoft.Extensions.AI");
             }
 
-            // Agent365 Exporter (enabled when not skipped)
+            // Agent365 Exporter options (available via DI for built-in or custom shim exporter)
             if (!options.SkipExporter)
             {
                 builder.Services.AddSingleton(options.ExporterOptions);
-                tracing.AddAgent365Exporter();
+
+                // Skip built-in exporter if a custom shim exporter has been registered
+                var shimRegistered = builder.Services.Any(
+                    s => s.ImplementationInstance is CustomAgent365ExporterMarker);
+
+                if (!shimRegistered)
+                {
+                    tracing.AddAgent365Exporter();
+                }
             }
             });
         }
