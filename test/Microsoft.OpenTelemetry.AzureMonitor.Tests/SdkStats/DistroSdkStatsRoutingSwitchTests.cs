@@ -9,12 +9,12 @@ using Xunit;
 namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 {
     [Collection(nameof(DistroFeatureSdkStatsCollection))]
-    public class DistroStatsbeatRoutingSwitchTests
+    public class DistroSdkStatsRoutingSwitchTests
     {
-        private const string SwitchName = "Azure.Monitor.OpenTelemetry.Exporter.RouteStatsbeatToDistroEndpoint";
+        private const string SwitchName = "Azure.Monitor.OpenTelemetry.Exporter.RouteSdkStatsToDistroEndpoint";
 
         [Fact]
-        public void UseMicrosoftOpenTelemetry_SetsRouteStatsbeatToDistroEndpointAppContextSwitch()
+        public void UseMicrosoftOpenTelemetry_SetsRouteSdkStatsToDistroEndpointAppContextSwitch()
         {
             // Ensure a clean starting state. The switch may be left "on" by a previous test
             // in the same process; reset to false to verify UseMicrosoftOpenTelemetry sets it.
@@ -25,7 +25,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             Assert.True(
                 AppContext.TryGetSwitch(SwitchName, out var enabled) && enabled,
-                "UseMicrosoftOpenTelemetry should set the distro Statsbeat routing AppContext switch.");
+                "UseMicrosoftOpenTelemetry should set the distro SDK statistics routing AppContext switch.");
         }
     }
 }
