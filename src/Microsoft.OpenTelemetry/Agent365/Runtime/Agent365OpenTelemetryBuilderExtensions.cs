@@ -123,8 +123,10 @@ internal static class Agent365OpenTelemetryBuilderExtensions
                 builder.Services.AddSingleton(options.ExporterOptions);
 
                 // Skip built-in exporter if a custom shim exporter has been registered
-                var shimRegistered = builder.Services.Any(
-                    s => s.ImplementationInstance is CustomAgent365ExporterMarker);
+                var shimRegistered = builder.Services.Any(s =>
+                    s.ImplementationInstance is CustomAgent365ExporterMarker ||
+                    s.ServiceType == typeof(CustomAgent365ExporterMarker) ||
+                    s.ImplementationType == typeof(CustomAgent365ExporterMarker));
 
                 if (!shimRegistered)
                 {
