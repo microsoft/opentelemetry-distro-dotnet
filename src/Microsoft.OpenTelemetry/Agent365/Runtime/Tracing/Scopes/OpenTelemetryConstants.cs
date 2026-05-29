@@ -39,19 +39,19 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         [DataContract]
         public enum OperationNames
         {
-            [EnumMember(Value = InvokeAgentOperationName)]
+            [EnumMember(Value = "InvokeAgent")]
             InvokeAgent,
 
-            [EnumMember(Value = ChatOperationName)]
+            [EnumMember(Value = "ExecuteInference")]
             ExecuteInference,
 
-            [EnumMember(Value = ExecuteToolOperationName)]
+            [EnumMember(Value = "ExecuteTool")]
             ExecuteTool,
 
-            [EnumMember(Value = OutputMessagesOperationName)]
+            [EnumMember(Value = "OutputMessages")]
             OutputMessages,
 
-            [EnumMember(Value = ApplyGuardrailOperationName)]
+            [EnumMember(Value = "ApplyGuardrail")]
             ApplyGuardrail
         }
 
