@@ -91,6 +91,17 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
 
         builder.Services.AddSingleton(UseMicrosoftOpenTelemetryRegistration.Instance);
 
+        // Route ALL Statsbeat emitted in this process to the distro-owned Statsbeat
+        // ingestion endpoint (us.stats.monitor.azure.com / eudb.stats.monitor.azure.com)
+        // instead of the existing Application Insights internal resources. The switch is
+        // honored by Azure.Monitor.OpenTelemetry.Exporter's AzureMonitorStatsbeat and
+        // applies to every AzureMonitorMetricExporter constructed after this point —
+        // including the customer's own exporter when running under the distro. Must be
+        // set before any exporter is constructed (the ctor triggers Statsbeat init).
+        AppContext.SetSwitch(
+            "Azure.Monitor.OpenTelemetry.Exporter.RouteStatsbeatToDistroEndpoint",
+            true);
+
         var options = new MicrosoftOpenTelemetryOptions();
         configure(options);
 

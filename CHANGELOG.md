@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Added Feature SDKStats reporting for distro-enabled features. Publishes a `Feature` gauge on the `MicrosoftOpenTelemetryFeatureSdkStatsMeter` meter; the Azure Monitor exporter's Statsbeat MeterProvider subscribes to it and ships the metric on the existing 24-hour cadence. Reported regardless of which exporter the customer selected (Azure Monitor, OTLP, Console, or Agent365) — when Azure Monitor isn't selected, an inert `AzureMonitorMetricExporter` is held to trigger the Statsbeat pipeline and `cikey` is reported as the literal `"N/A"`. Honors `APPLICATIONINSIGHTS_STATSBEAT_DISABLED=true`.
+- All Statsbeat traffic emitted while running under the distro is routed to the distro-owned ingestion endpoints (`https://us.stats.monitor.azure.com/` and `https://eudb.stats.monitor.azure.com/`) instead of the legacy Application Insights internal resources. Implemented via the new `Azure.Monitor.OpenTelemetry.Exporter.RouteStatsbeatToDistroEndpoint` AppContext switch, which the distro sets at the top of `UseMicrosoftOpenTelemetry` before any `AzureMonitorMetricExporter` is constructed. Requires `Azure.Monitor.OpenTelemetry.Exporter` 1.9.0-beta.1 or later.
 
 ## 1.0.3 - 2026-05-22
 
