@@ -2,6 +2,9 @@ Microsoft.OpenTelemetry.Agent365Options.ClusterCategory.get -> string!
 Microsoft.OpenTelemetry.Agent365Options.ClusterCategory.set -> void
 Microsoft.OpenTelemetry.CustomAgent365ExporterMarker
 static readonly Microsoft.OpenTelemetry.CustomAgent365ExporterMarker.Instance -> Microsoft.OpenTelemetry.CustomAgent365ExporterMarker!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.GenAiActivityFilterProcessor
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.GenAiActivityFilterProcessor.GenAiActivityFilterProcessor(OpenTelemetry.BaseProcessor<System.Diagnostics.Activity!>! inner) -> void
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.GenAiActivityFilterProcessor.OnEnd(System.Diagnostics.Activity! data) -> void
 Microsoft.OpenTelemetry.Agent365Options.DomainResolver.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.TenantDomainResolver!
 Microsoft.OpenTelemetry.Agent365Options.DomainResolver.set -> void
 Microsoft.OpenTelemetry.Agent365Options.ExporterTimeoutMilliseconds.get -> int
