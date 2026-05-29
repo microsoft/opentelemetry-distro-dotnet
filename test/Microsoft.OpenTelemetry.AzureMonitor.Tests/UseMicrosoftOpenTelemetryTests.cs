@@ -559,6 +559,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
         public void CustomExporterMarker_SkipsBuiltInExporter_RegistersOptionsInDI()
         {
             var services = new ServiceCollection();
+            services.AddLogging();
             services.AddSingleton(Microsoft.OpenTelemetry.CustomAgent365ExporterMarker.Instance);
             services.AddOpenTelemetry()
                 .UseMicrosoftOpenTelemetry(o =>
@@ -568,14 +569,74 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
                         System.Threading.Tasks.Task.FromResult<string?>("token");
                 });
 
-            // Agent365ExporterOptions IS registered in DI (shim can resolve it)
-            Assert.Contains(services, s => s.ServiceType.Name == "Agent365ExporterOptions");
+            using var sp = services.BuildServiceProvider();
 
-            // Tracing configuration is still registered (instrumentation active)
-            Assert.Contains(services, s =>
-                s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder") ||
-                s.ServiceType.Name.Contains("TracerProviderBuilder"));
+            // Agent365ExporterOptions IS registered in DI (shim can resolve it)
+            var options = sp.GetService<Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions>();
+            Assert.NotNull(options);
+
+            // The built-in exporter registers via IDeferredTracerProviderBuilder.Configure which
+            // adds IConfigureTracerProviderBuilder registrations. With the marker, there should be
+            // fewer such registrations than without the marker.
+            var configureCount = services.Count(s =>
+                s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder"));
+
+            // Compare with no-marker baseline to verify the exporter configure callback was skipped
+            var servicesNoMarker = new ServiceCollection();
+            servicesNoMarker.AddLogging();
+            servicesNoMarker.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365;
+                    o.Agent365.ContextualTokenResolver = _ =>
+                        System.Threading.Tasks.Task.FromResult<string?>("token");
+                });
+
+            var configureCountNoMarker = servicesNoMarker.Count(s =>
+                s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder"));
+
+            Assert.True(configureCountNoMarker > configureCount,
+                $"Without marker: {configureCountNoMarker} configure callbacks, with marker: {configureCount}. " +
+                "The built-in exporter should add at least one extra configure callback when no marker is present.");
         }
+
+        [Fact]
+        public void NoMarker_RegistersBuiltInExporter_InProcessorChain()
+        {
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365;
+                    o.Agent365.TokenResolver = (a, t) =>
+                        System.Threading.Tasks.Task.FromResult<string?>("token");
+                });
+
+            // Without a marker, AddAgent365Exporter() is called which registers a deferred
+            // configure callback. Verify it's present (more callbacks than with marker).
+            var configureCount = services.Count(s =>
+                s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder"));
+
+            var servicesWithMarker = new ServiceCollection();
+            servicesWithMarker.AddLogging();
+            servicesWithMarker.AddSingleton(Microsoft.OpenTelemetry.CustomAgent365ExporterMarker.Instance);
+            servicesWithMarker.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365;
+                    o.Agent365.TokenResolver = (a, t) =>
+                        System.Threading.Tasks.Task.FromResult<string?>("token");
+                });
+
+            var configureCountWithMarker = servicesWithMarker.Count(s =>
+                s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder"));
+
+            Assert.True(configureCount > configureCountWithMarker,
+                $"Without marker: {configureCount} configure callbacks, with marker: {configureCountWithMarker}. " +
+                "The built-in exporter should register an additional configure callback.");
+        }
+
 
         [Fact]
         public void CustomExporterMarker_ExporterOptionsResolvable_WithTokenResolver()
@@ -591,7 +652,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
                         System.Threading.Tasks.Task.FromResult<string?>("resolved-token");
                 });
 
-            var sp = services.BuildServiceProvider();
+            using var sp = services.BuildServiceProvider();
             var options = sp.GetService<Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions>();
 
             Assert.NotNull(options);
@@ -612,27 +673,11 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
                         System.Threading.Tasks.Task.FromResult<string?>("contextual-token");
                 });
 
-            var sp = services.BuildServiceProvider();
+            using var sp = services.BuildServiceProvider();
             var options = sp.GetService<Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions>();
 
             Assert.NotNull(options);
             Assert.NotNull(options!.ContextualTokenResolver);
-        }
-
-        [Fact]
-        public void NoMarker_RegistersBuiltInExporter()
-        {
-            var services = new ServiceCollection();
-            services.AddOpenTelemetry()
-                .UseMicrosoftOpenTelemetry(o =>
-                {
-                    o.Exporters = ExportTarget.Agent365;
-                    o.Agent365.TokenResolver = (a, t) =>
-                        System.Threading.Tasks.Task.FromResult<string?>("token");
-                });
-
-            // Built-in exporter is registered (no marker present)
-            Assert.Contains(services, s => s.ServiceType.Name == "Agent365ExporterOptions");
         }
 
         [Fact]
