@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Support custom A365 exporter via DI marker detection and add `GenAiActivityFilterProcessor` to pre-filter non-GenAI spans ([#110](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/110))
+
 ## 1.0.3 - 2026-05-22
 
 - Fix `gen_ai.tool.arguments` attribute name to `gen_ai.tool.call.arguments` ([#88](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/88))
