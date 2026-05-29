@@ -3,7 +3,6 @@
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
 {
-    using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
     using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
     using global::OpenTelemetry;
     using System;
@@ -21,16 +20,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
     /// </remarks>
     public sealed class GenAiActivityFilterProcessor : BaseProcessor<Activity>
     {
-        private static readonly HashSet<string> GenAiOperationNames = new HashSet<string>(StringComparer.Ordinal)
-        {
-            InvokeAgentScope.OperationName,
-            ExecuteToolScope.OperationName,
-            OutputScope.OperationName,
-            OpenTelemetryConstants.ApplyGuardrailOperationName,
-            "chat",
-            nameof(InferenceOperationType.Chat),
-        };
-
         private readonly BaseProcessor<Activity> _inner;
 
         /// <summary>
@@ -83,7 +72,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
                 operationName = activity.GetBaggageItem(OpenTelemetryConstants.GenAiOperationNameKey);
             }
 
-            return !string.IsNullOrEmpty(operationName) && GenAiOperationNames.Contains(operationName!);
+            return !string.IsNullOrEmpty(operationName) && OpenTelemetryConstants.GenAiOperationNames.Contains(operationName!);
         }
     }
 }

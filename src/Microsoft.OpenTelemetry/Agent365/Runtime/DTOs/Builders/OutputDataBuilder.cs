@@ -14,8 +14,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
     /// </summary>
     public class OutputDataBuilder : BaseDataBuilder<OutputData>
     {
-        private const string OutputMessagesOperationName = "output_messages";
-
         /// <summary>
         /// Builds complete data for an output_messages operation.
         /// </summary>
@@ -63,7 +61,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             AddSdkAttributes(attributes);
 
             // Operation name
-            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiOperationNameKey, OutputMessagesOperationName);
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiOperationNameKey, OpenTelemetryConstants.OutputMessagesOperationName);
             
             AddAgentDetails(attributes, agentDetails);
 

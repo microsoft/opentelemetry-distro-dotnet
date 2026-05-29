@@ -76,8 +76,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
                 activity.CoalesceTag(key, Baggage.Current.GetBaggage(key));
             }
 
-            if (activity.OperationName == InvokeAgentScope.OperationName ||
-                (activity.DisplayName != null && activity.DisplayName.StartsWith(InvokeAgentScope.OperationName)))
+            if (activity.OperationName == OpenTelemetryConstants.InvokeAgentOperationName ||
+                (activity.DisplayName != null && activity.DisplayName.StartsWith(OpenTelemetryConstants.InvokeAgentOperationName)))
             {
                 foreach (var key in InvokeAgentAttributeKeys)
                 {
