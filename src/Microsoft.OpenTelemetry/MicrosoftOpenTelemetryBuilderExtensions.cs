@@ -376,18 +376,20 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
                     Microsoft.OpenTelemetry.AzureMonitor.Internals.EnvironmentVariableConstants.APPLICATIONINSIGHTS_SDKSTATS_DISABLED);
                 var customerSdkStatsEnabled = string.Equals(customerSdkStatsDisabled, "false", StringComparison.OrdinalIgnoreCase);
 
-                // Snapshot the distro options (captured by the outer call) and patch the
-                // connection string from the post-DI AzureMonitorOptions if the caller didn't
-                // provide one directly.
-                var effectiveConnectionString = ResolveEffectiveConnectionString(sp, options.AzureMonitor.ConnectionString);
-                if (!string.IsNullOrEmpty(effectiveConnectionString)
-                    && string.IsNullOrEmpty(options.AzureMonitor.ConnectionString))
-                {
-                    options.AzureMonitor.ConnectionString = effectiveConnectionString;
-                }
+                // Resolve the effective connection string the exporter will use at transmit
+                // time without writing it back into the caller-supplied options instance.
+                // The customer's MicrosoftOpenTelemetryOptions is treated as immutable once
+                // configure(options) returns; mutating it from a deferred callback would be
+                // a surprising side effect on an object that may still be referenced by user
+                // code or other configurators.
+                var effectiveConnectionString =
+                    !string.IsNullOrEmpty(options.AzureMonitor.ConnectionString)
+                        ? options.AzureMonitor.ConnectionString
+                        : ResolveEffectiveConnectionString(sp);
 
                 var snapshot = Microsoft.OpenTelemetry.AzureMonitor.SdkStats.DistroFeatureSnapshot.Build(
                     options,
+                    effectiveConnectionString,
                     effectiveExporters,
                     customerSdkStatsEnabled,
                     a365OnlyMode,
@@ -465,13 +467,8 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         }
     }
 
-    private static string? ResolveEffectiveConnectionString(IServiceProvider sp, string? directConnectionString)
+    private static string? ResolveEffectiveConnectionString(IServiceProvider sp)
     {
-        if (!string.IsNullOrEmpty(directConnectionString))
-        {
-            return directConnectionString;
-        }
-
         try
         {
             // The distro's AzureMonitorOptions is bound from IConfiguration and the

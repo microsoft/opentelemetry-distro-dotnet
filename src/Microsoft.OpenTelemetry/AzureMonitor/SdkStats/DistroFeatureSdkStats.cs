@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Threading;
 using Microsoft.OpenTelemetry.AzureMonitor.Internals;
@@ -24,8 +25,11 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
     /// surface of the class minimal and matches the lifecycle of the singleton MeterProvider.
     /// </para>
     /// <para>
-    /// Per the SDKStats specification, the gauge returns an empty measurement when the
-    /// configured features bit mask is <see cref="DistroFeature.None"/>.
+    /// Per the SDKStats specification, the gauge returns no measurements when the
+    /// configured features bit mask is <see cref="DistroFeature.None"/>. The
+    /// <see cref="Func{TResult}"/> of <see cref="IEnumerable{T}"/> overload is used (not the
+    /// single-<c>Measurement</c> overload) so an empty result actually skips emission
+    /// instead of publishing a phantom zero-valued data point with no tags.
     /// </para>
     /// </remarks>
     internal sealed class DistroFeatureSdkStats : IDisposable
@@ -45,14 +49,21 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
         private static DistroFeatureSdkStats? s_instance;
         private static readonly object s_lock = new();
 
+        private static readonly IEnumerable<Measurement<long>> EmptyMeasurements = Array.Empty<Measurement<long>>();
+
         private readonly Meter _meter;
-        private DistroFeatureSnapshot? _snapshot;
+        private DistroFeatureSnapshot _snapshot;
         private IDisposable? _statsbeatExporterPin;
 
-        private DistroFeatureSdkStats()
+        private DistroFeatureSdkStats(DistroFeatureSnapshot snapshot)
         {
+            // Snapshot is assigned before the meter is created and before the instance is
+            // published to s_instance, so any reader that observes the instance via the
+            // public Instance property is guaranteed to see a fully-initialized object
+            // (no narrow window where _snapshot is null).
+            _snapshot = snapshot;
             _meter = new Meter(MeterName, MeterVersion);
-            _meter.CreateObservableGauge(MetricName, this.Observe);
+            _meter.CreateObservableGauge<long>(MetricName, this.Observe);
         }
 
         /// <summary>The active singleton, if <see cref="Initialize"/> has been called.</summary>
@@ -80,29 +91,42 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
                 throw new ArgumentNullException(nameof(snapshot));
             }
 
-            if (s_instance is null)
+            DistroFeatureSdkStats current;
+            lock (s_lock)
             {
-                lock (s_lock)
+                if (s_instance is null)
                 {
-                    s_instance ??= new DistroFeatureSdkStats();
+                    // First call: construct with the snapshot already set, then publish.
+                    // The ordering here matters — assigning s_instance only after the
+                    // constructor returns guarantees Instance never exposes a partially
+                    // initialized object.
+                    s_instance = new DistroFeatureSdkStats(snapshot);
+                }
+                else
+                {
+                    // Subsequent call: swap snapshot under the lock so writes are ordered
+                    // with respect to instance publish. Observe() pairs this with a
+                    // Volatile.Read for cross-thread visibility on platforms with weak
+                    // memory models.
+                    Volatile.Write(ref s_instance._snapshot, snapshot);
+                }
+
+                current = s_instance;
+
+                // The first pin wins for the process lifetime. If a second call supplies a
+                // pin while one is already held, dispose the redundant one immediately —
+                // the cached transmitter behind it lives in TransmitterFactory and will
+                // continue to serve the already-attached Statsbeat MeterProvider.
+                if (statsbeatExporterPin != null)
+                {
+                    if (Interlocked.CompareExchange(ref current._statsbeatExporterPin, statsbeatExporterPin, null) != null)
+                    {
+                        try { statsbeatExporterPin.Dispose(); } catch { /* best effort */ }
+                    }
                 }
             }
 
-            Volatile.Write(ref s_instance!._snapshot, snapshot);
-
-            // The first pin wins for the process lifetime. If a second call supplies a pin
-            // while one is already held, dispose the redundant one immediately — the cached
-            // transmitter behind it lives in TransmitterFactory and will continue to serve
-            // the already-attached Statsbeat MeterProvider.
-            if (statsbeatExporterPin != null)
-            {
-                if (Interlocked.CompareExchange(ref s_instance._statsbeatExporterPin, statsbeatExporterPin, null) != null)
-                {
-                    try { statsbeatExporterPin.Dispose(); } catch { /* best effort */ }
-                }
-            }
-
-            return s_instance;
+            return current;
         }
 
         /// <summary>
@@ -124,19 +148,30 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             try { _statsbeatExporterPin?.Dispose(); } catch { /* best effort */ }
         }
 
-        private Measurement<long> Observe()
+        private IEnumerable<Measurement<long>> Observe()
         {
+            DistroFeatureSnapshot snapshot;
             try
             {
-                var snapshot = Volatile.Read(ref _snapshot);
-                if (snapshot is null || snapshot.Features == DistroFeature.None)
+                snapshot = Volatile.Read(ref _snapshot);
+                if (snapshot.Features == DistroFeature.None)
                 {
                     // SDKStats spec: "Don't send feature/instrumentation SDKStats when the
-                    // feature/instrumentation list is empty."
-                    return new Measurement<long>();
+                    // feature/instrumentation list is empty." Returning an empty enumerable
+                    // (not a default Measurement) is required to truly skip emission for
+                    // this collection cycle.
+                    return EmptyMeasurements;
                 }
+            }
+            catch (Exception ex)
+            {
+                AzureMonitorAspNetCoreEventSource.Log.DistroFeatureSdkStatsCallbackFailed(ex);
+                return EmptyMeasurements;
+            }
 
-                return new Measurement<long>(
+            try
+            {
+                var measurement = new Measurement<long>(
                     (long)snapshot.Features,
                     new KeyValuePair<string, object?>("rp", ResourceProviderHelper.GetResourceProvider()),
                     new KeyValuePair<string, object?>("attach", ResourceProviderHelper.GetAttachMode()),
@@ -146,11 +181,13 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
                     new KeyValuePair<string, object?>("os", ResourceProviderHelper.GetOperatingSystem()),
                     new KeyValuePair<string, object?>("language", "dotnet"),
                     new KeyValuePair<string, object?>("version", snapshot.DistroVersion));
+
+                return new[] { measurement };
             }
             catch (Exception ex)
             {
                 AzureMonitorAspNetCoreEventSource.Log.DistroFeatureSdkStatsCallbackFailed(ex);
-                return new Measurement<long>();
+                return EmptyMeasurements;
             }
         }
     }

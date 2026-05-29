@@ -22,6 +22,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             var snapshot = DistroFeatureSnapshot.Build(
                 options,
+                connectionString: null,
                 ExportTarget.Otlp,
                 customerSdkStatsEnabled: false,
                 a365OnlyMode: false,
@@ -51,6 +52,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             var snapshot = DistroFeatureSnapshot.Build(
                 options,
+                ValidConnectionString,
                 ExportTarget.None,
                 customerSdkStatsEnabled: false,
                 a365OnlyMode: false,
@@ -74,6 +76,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             var snapshot = DistroFeatureSnapshot.Build(
                 options,
+                ValidConnectionString,
                 ExportTarget.AzureMonitor,
                 customerSdkStatsEnabled: false,
                 a365OnlyMode: false,
@@ -102,6 +105,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             var snapshot = DistroFeatureSnapshot.Build(
                 options,
+                ValidConnectionString,
                 ExportTarget.AzureMonitor | ExportTarget.Otlp | ExportTarget.Agent365 | ExportTarget.Console,
                 customerSdkStatsEnabled: true,
                 a365OnlyMode: false,
@@ -123,6 +127,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             var snapshot = DistroFeatureSnapshot.Build(
                 options,
+                ValidConnectionString,
                 ExportTarget.Agent365,
                 customerSdkStatsEnabled: false,
                 a365OnlyMode: true,

@@ -26,6 +26,19 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             this.DistroVersion = distroVersion;
         }
 
+        /// <summary>
+        /// Test-only factory that constructs a snapshot with an arbitrary feature bit mask.
+        /// <see cref="Build"/> always sets at least
+        /// <see cref="DistroFeature.Distro"/> | <see cref="DistroFeature.AgentFramework"/>, so
+        /// tests that need to exercise the spec-mandated empty-features short-circuit (which
+        /// <see cref="Build"/> can never produce) use this entry point.
+        /// </summary>
+        internal static DistroFeatureSnapshot CreateForTesting(
+            DistroFeature features,
+            string customerInstrumentationKey,
+            string distroVersion) =>
+            new DistroFeatureSnapshot(features, customerInstrumentationKey, distroVersion);
+
         /// <summary>Bit map of distro features enabled in the current process.</summary>
         internal DistroFeature Features { get; }
 
@@ -37,19 +50,26 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 
         /// <summary>
         /// Builds a snapshot from a fully-finalized set of distro options. The customer
-        /// instrumentation key is extracted from the Azure Monitor connection string when
+        /// instrumentation key is extracted from the supplied connection string when
         /// present; for OTLP-only, Console-only, or Agent365-only deployments where no
         /// connection string is configured, <see cref="CustomerInstrumentationKey"/> is set
         /// to the literal <c>"N/A"</c> (per the SDKStats spec convention for Network stats,
         /// extended here for consistency).
         /// </summary>
         /// <param name="options">The distro options after defaults and auto-detection have been applied.</param>
+        /// <param name="connectionString">
+        /// The effective Azure Monitor connection string for the process. Passed explicitly so
+        /// the caller can resolve it from <see cref="MicrosoftOpenTelemetryOptions"/>,
+        /// <c>IConfiguration</c>, or environment variables without the snapshot writing back
+        /// into the user-supplied options instance.
+        /// </param>
         /// <param name="effectiveExporters">The exporter selection resolved by the distro.</param>
         /// <param name="customerSdkStatsEnabled">Whether customer-facing SDK stats are enabled.</param>
         /// <param name="a365OnlyMode">Whether the distro entered Agent365-only mode.</param>
         /// <param name="distroVersion">The distro assembly version string.</param>
         internal static DistroFeatureSnapshot? Build(
             MicrosoftOpenTelemetryOptions options,
+            string? connectionString,
             ExportTarget effectiveExporters,
             bool customerSdkStatsEnabled,
             bool a365OnlyMode,
@@ -60,7 +80,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
                 return null;
             }
 
-            var ikey = TryExtractInstrumentationKey(options.AzureMonitor.ConnectionString);
+            var ikey = TryExtractInstrumentationKey(connectionString);
             if (string.IsNullOrEmpty(ikey))
             {
                 // No customer connection string (OTLP/Console/A365-only deployment).

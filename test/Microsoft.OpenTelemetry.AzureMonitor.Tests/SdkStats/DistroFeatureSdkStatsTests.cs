@@ -27,6 +27,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             var snapshot = DistroFeatureSnapshot.Build(
                 options,
+                ValidConnectionString,
                 ExportTarget.AzureMonitor,
                 customerSdkStatsEnabled: false,
                 a365OnlyMode: false,
@@ -51,13 +52,24 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         }
 
         [Fact]
-        public void Observe_WhenFeaturesAreNone_ReturnsEmptyMeasurement()
+        public void Observe_WhenFeaturesAreNone_EmitsNoMeasurement()
         {
-            // Without Initialize being called, the singleton hasn't been created yet, so the
-            // meter has no instruments — the collected list should contain no measurement
-            // attributed to our meter (the helper filters by meter name).
-            var collected = CollectObservableMeasurements();
-            Assert.Empty(collected);
+            // Exercises the spec-mandated short-circuit: when the snapshot's feature mask is
+            // DistroFeature.None, the observable gauge MUST return zero measurements (not a
+            // default Measurement<long>(), which would still publish a phantom zero data point
+            // with no tags). Use the internal test factory to construct a None-masked snapshot
+            // directly — DistroFeatureSnapshot.Build always sets at least Distro|AgentFramework
+            // so it cannot produce a None snapshot through the normal code path.
+            var snapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.None,
+                customerInstrumentationKey: "N/A",
+                distroVersion: "9.9.9-none");
+
+            DistroFeatureSdkStats.Initialize(snapshot);
+
+            var measurements = CollectObservableMeasurements();
+
+            Assert.Empty(measurements);
         }
 
         [Fact]
@@ -71,6 +83,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             var snapshot = DistroFeatureSnapshot.Build(
                 options,
+                connectionString: null,
                 ExportTarget.Otlp,
                 customerSdkStatsEnabled: false,
                 a365OnlyMode: false,
@@ -94,7 +107,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             var options = new MicrosoftOpenTelemetryOptions();
             options.AzureMonitor.ConnectionString = ValidConnectionString;
             var snapshot = DistroFeatureSnapshot.Build(
-                options, ExportTarget.AzureMonitor, false, false, "9.9.9-pin")!;
+                options, ValidConnectionString, ExportTarget.AzureMonitor, false, false, "9.9.9-pin")!;
 
             var pin = new TrackingDisposable();
             DistroFeatureSdkStats.Initialize(snapshot, pin);
@@ -114,7 +127,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             var options = new MicrosoftOpenTelemetryOptions();
             options.AzureMonitor.ConnectionString = ValidConnectionString;
             var snapshot = DistroFeatureSnapshot.Build(
-                options, ExportTarget.AzureMonitor, false, false, "9.9.9-pin")!;
+                options, ValidConnectionString, ExportTarget.AzureMonitor, false, false, "9.9.9-pin")!;
 
             var firstPin = new TrackingDisposable();
             var secondPin = new TrackingDisposable();
