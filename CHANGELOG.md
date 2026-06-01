@@ -2,7 +2,11 @@
 
 ## Unreleased
 
+## 1.0.4 - 2026-06-01
+
+- Add `ApplyGuardrailScope` for security guardrail evaluation tracing ([#109](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/109))
 - Support custom A365 exporter via DI marker detection and add `GenAiActivityFilterProcessor` to pre-filter non-GenAI spans ([#110](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/110))
+- Fix duplicate key exception in ExportFormatter ([#112](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/112))
 
 ## 1.0.3 - 2026-05-22
 
