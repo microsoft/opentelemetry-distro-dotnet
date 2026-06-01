@@ -5,10 +5,12 @@
 
 using System;
 using System.Linq;
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using OpenTelemetry;
+using OpenTelemetry.Trace;
 using Xunit;
 
 namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
@@ -575,29 +577,12 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
             var options = sp.GetService<Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions>();
             Assert.NotNull(options);
 
-            // The built-in exporter registers via IDeferredTracerProviderBuilder.Configure which
-            // adds IConfigureTracerProviderBuilder registrations. With the marker, there should be
-            // fewer such registrations than without the marker.
-            var configureCount = services.Count(s =>
-                s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder"));
-
-            // Compare with no-marker baseline to verify the exporter configure callback was skipped
-            var servicesNoMarker = new ServiceCollection();
-            servicesNoMarker.AddLogging();
-            servicesNoMarker.AddOpenTelemetry()
-                .UseMicrosoftOpenTelemetry(o =>
-                {
-                    o.Exporters = ExportTarget.Agent365;
-                    o.Agent365.ContextualTokenResolver = _ =>
-                        System.Threading.Tasks.Task.FromResult<string?>("token");
-                });
-
-            var configureCountNoMarker = servicesNoMarker.Count(s =>
-                s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder"));
-
-            Assert.True(configureCountNoMarker > configureCount,
-                $"Without marker: {configureCountNoMarker} configure callbacks, with marker: {configureCount}. " +
-                "The built-in exporter should add at least one extra configure callback when no marker is present.");
+            // With the marker present, the deferred callback skips AddAgent365Exporter(),
+            // so no GenAiActivityFilterProcessor should be in the processor chain.
+            var tracerProvider = sp.GetRequiredService<TracerProvider>();
+            Assert.False(
+                HasProcessorOfType(tracerProvider, "GenAiActivityFilterProcessor"),
+                "With marker: the built-in GenAiActivityFilterProcessor should NOT be registered.");
         }
 
         [Fact]
@@ -613,28 +598,14 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
                         System.Threading.Tasks.Task.FromResult<string?>("token");
                 });
 
-            // Without a marker, AddAgent365Exporter() is called which registers a deferred
-            // configure callback. Verify it's present (more callbacks than with marker).
-            var configureCount = services.Count(s =>
-                s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder"));
+            using var sp = services.BuildServiceProvider();
 
-            var servicesWithMarker = new ServiceCollection();
-            servicesWithMarker.AddLogging();
-            servicesWithMarker.AddSingleton(Microsoft.OpenTelemetry.CustomAgent365ExporterMarker.Instance);
-            servicesWithMarker.AddOpenTelemetry()
-                .UseMicrosoftOpenTelemetry(o =>
-                {
-                    o.Exporters = ExportTarget.Agent365;
-                    o.Agent365.TokenResolver = (a, t) =>
-                        System.Threading.Tasks.Task.FromResult<string?>("token");
-                });
-
-            var configureCountWithMarker = servicesWithMarker.Count(s =>
-                s.ServiceType.Name.Contains("IConfigureTracerProviderBuilder"));
-
-            Assert.True(configureCount > configureCountWithMarker,
-                $"Without marker: {configureCount} configure callbacks, with marker: {configureCountWithMarker}. " +
-                "The built-in exporter should register an additional configure callback.");
+            // Without a marker, the deferred callback calls AddAgent365Exporter(),
+            // which wraps the batch processor in a GenAiActivityFilterProcessor.
+            var tracerProvider = sp.GetRequiredService<TracerProvider>();
+            Assert.True(
+                HasProcessorOfType(tracerProvider, "GenAiActivityFilterProcessor"),
+                "Without marker: the built-in GenAiActivityFilterProcessor should be registered.");
         }
 
 
@@ -729,6 +700,60 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
             Assert.False(captured.EnableHttpClientInstrumentation);
             Assert.False(captured.EnableSqlClientInstrumentation);
             Assert.False(captured.EnableAzureSdkInstrumentation);
+        }
+        /// <summary>
+        /// Walks the TracerProvider's internal processor chain via reflection
+        /// to check whether a processor of the given type name is present.
+        /// </summary>
+        private static bool HasProcessorOfType(TracerProvider provider, string typeName)
+        {
+            // TracerProviderSdk.Processor is internal.
+            var processorProp = provider.GetType().GetProperty("Processor",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            var processor = processorProp?.GetValue(provider);
+            return WalkProcessorChain(processor, typeName);
+        }
+
+        private static bool WalkProcessorChain(object? processor, string typeName)
+        {
+            while (processor != null)
+            {
+                if (processor.GetType().Name == typeName)
+                    return true;
+
+                // CompositeProcessor<T> has an internal readonly field "Head" of type DoublyLinkedListNode.
+                var headField = processor.GetType().GetField("Head",
+                    BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+                if (headField != null)
+                {
+                    var node = headField.GetValue(processor);
+                    while (node != null)
+                    {
+                        // DoublyLinkedListNode.Value is a public readonly field.
+                        var valueField = node.GetType().GetField("Value",
+                            BindingFlags.Public | BindingFlags.Instance);
+                        var value = valueField?.GetValue(node);
+                        if (value != null && value.GetType().Name == typeName)
+                            return true;
+                        if (value != null && WalkProcessorChain(value, typeName))
+                            return true;
+
+                        // DoublyLinkedListNode.Next is a public property.
+                        var nextProp = node.GetType().GetProperty("Next",
+                            BindingFlags.Public | BindingFlags.Instance);
+                        node = nextProp?.GetValue(node);
+                    }
+
+                    return false;
+                }
+
+                // Single processor wrappers may have an inner processor field.
+                var innerField = processor.GetType().GetField("_inner",
+                    BindingFlags.NonPublic | BindingFlags.Instance);
+                processor = innerField?.GetValue(processor);
+            }
+
+            return false;
         }
     }
 }
