@@ -19,11 +19,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
     public sealed class ExecuteToolScope : OpenTelemetryScope
     {
         /// <summary>
-        /// The operation name for tool execution tracing.
-        /// </summary>
-        internal const string OperationName = "execute_tool";
-
-        /// <summary>
         /// Creates and starts a new scope for tool execution tracing.
         /// </summary>
         /// <param name="request">Request details for the tool execution.</param>
@@ -49,8 +44,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
 
         private ExecuteToolScope(Request request, ToolCallDetails details, AgentDetails agentDetails, UserDetails? userDetails, SpanDetails? spanDetails, ThreatDiagnosticsSummary? threatDiagnosticsSummary)
             : base(
-                operationName: OperationName,
-                activityName: $"{OperationName} {details.ToolName}",
+                operationName: OpenTelemetryConstants.ExecuteToolOperationName,
+                activityName: $"{OpenTelemetryConstants.ExecuteToolOperationName} {details.ToolName}",
                 agentDetails: agentDetails,
                 spanDetails: new SpanDetails(spanDetails?.SpanKind ?? ActivityKind.Internal, spanDetails?.ParentContext, spanDetails?.StartTime, spanDetails?.EndTime, spanDetails?.SpanLinks),
                 userDetails: userDetails)

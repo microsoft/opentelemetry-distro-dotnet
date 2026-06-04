@@ -15,8 +15,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
     /// </summary>
     public class ExecuteToolDataBuilder : BaseDataBuilder<ExecuteToolData>
     {
-        private const string ExecuteToolOperationName = "execute_tool";
-
         /// <summary>
         /// Builds complete data for an execute_tool operation.
         /// </summary>
@@ -65,8 +63,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
         {
             var attributes = new Dictionary<string, object?>();
 
+            // SDK attributes
+            AddSdkAttributes(attributes);
+
             // Operation name
-            AddIfNotNull(attributes, GenAiOperationNameKey, ExecuteToolDataBuilder.ExecuteToolOperationName);
+            AddIfNotNull(attributes, GenAiOperationNameKey, OpenTelemetryConstants.ExecuteToolOperationName);
 
             AddAgentDetails(attributes, agentDetails);
 

@@ -22,11 +22,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
     public sealed class OutputScope : OpenTelemetryScope
     {
         /// <summary>
-        /// The operation name for output tracing.
-        /// </summary>
-        internal const string OperationName = "output_messages";
-
-        /// <summary>
         /// Creates and starts a new scope for output tracing.
         /// </summary>
         /// <param name="request">Request details for the output operation.</param>
@@ -40,8 +35,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
 
         private OutputScope(Request request, Response response, AgentDetails agentDetails, UserDetails? userDetails, SpanDetails? spanDetails)
             : base(
-                operationName: OperationName,
-                activityName: $"{OperationName} {agentDetails.AgentId}",
+                operationName: OpenTelemetryConstants.OutputMessagesOperationName,
+                activityName: $"{OpenTelemetryConstants.OutputMessagesOperationName} {agentDetails.AgentId}",
                 agentDetails: agentDetails,
                 spanDetails: spanDetails ?? new SpanDetails(ActivityKind.Client),
                 userDetails: userDetails)

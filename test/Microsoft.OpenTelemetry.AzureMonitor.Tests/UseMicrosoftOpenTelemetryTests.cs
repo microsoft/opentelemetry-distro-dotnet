@@ -5,10 +5,12 @@
 
 using System;
 using System.Linq;
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using OpenTelemetry;
+using OpenTelemetry.Trace;
 using Xunit;
 
 namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
@@ -549,6 +551,209 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
             Assert.True(captured.EnableHttpClientInstrumentation);
             Assert.True(captured.EnableSqlClientInstrumentation);
             Assert.True(captured.EnableAzureSdkInstrumentation);
+        }
+    }
+
+    [Collection("EnvironmentVariableTests")]
+    public class UseCustomExporterTests
+    {
+        [Fact]
+        public void CustomExporterMarker_SkipsBuiltInExporter_RegistersOptionsInDI()
+        {
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddSingleton(Microsoft.OpenTelemetry.CustomAgent365ExporterMarker.Instance);
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365;
+                    o.Agent365.ContextualTokenResolver = _ =>
+                        System.Threading.Tasks.Task.FromResult<string?>("token");
+                });
+
+            using var sp = services.BuildServiceProvider();
+
+            // Agent365ExporterOptions IS registered in DI (shim can resolve it)
+            var options = sp.GetService<Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions>();
+            Assert.NotNull(options);
+
+            // With the marker present, the deferred callback skips AddAgent365Exporter(),
+            // so no GenAiActivityFilterProcessor should be in the processor chain.
+            var tracerProvider = sp.GetRequiredService<TracerProvider>();
+            Assert.False(
+                HasProcessorOfType(tracerProvider, "GenAiActivityFilterProcessor"),
+                "With marker: the built-in GenAiActivityFilterProcessor should NOT be registered.");
+        }
+
+        [Fact]
+        public void NoMarker_RegistersBuiltInExporter_InProcessorChain()
+        {
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365;
+                    o.Agent365.TokenResolver = (a, t) =>
+                        System.Threading.Tasks.Task.FromResult<string?>("token");
+                });
+
+            using var sp = services.BuildServiceProvider();
+
+            // Without a marker, the deferred callback calls AddAgent365Exporter(),
+            // which wraps the batch processor in a GenAiActivityFilterProcessor.
+            var tracerProvider = sp.GetRequiredService<TracerProvider>();
+            Assert.True(
+                HasProcessorOfType(tracerProvider, "GenAiActivityFilterProcessor"),
+                "Without marker: the built-in GenAiActivityFilterProcessor should be registered.");
+        }
+
+
+        [Fact]
+        public void CustomExporterMarker_ExporterOptionsResolvable_WithTokenResolver()
+        {
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddSingleton(Microsoft.OpenTelemetry.CustomAgent365ExporterMarker.Instance);
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365;
+                    o.Agent365.TokenResolver = (agentId, tenantId) =>
+                        System.Threading.Tasks.Task.FromResult<string?>("resolved-token");
+                });
+
+            using var sp = services.BuildServiceProvider();
+            var options = sp.GetService<Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions>();
+
+            Assert.NotNull(options);
+            Assert.NotNull(options!.TokenResolver);
+        }
+
+        [Fact]
+        public void CustomExporterMarker_ExporterOptionsResolvable_WithContextualTokenResolver()
+        {
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddSingleton(Microsoft.OpenTelemetry.CustomAgent365ExporterMarker.Instance);
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365;
+                    o.Agent365.ContextualTokenResolver = ctx =>
+                        System.Threading.Tasks.Task.FromResult<string?>("contextual-token");
+                });
+
+            using var sp = services.BuildServiceProvider();
+            var options = sp.GetService<Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions>();
+
+            Assert.NotNull(options);
+            Assert.NotNull(options!.ContextualTokenResolver);
+        }
+
+        [Fact]
+        public void CustomExporterMarker_WithSkipExporter_NoOptionsInDI()
+        {
+            const string envVar = "APPLICATIONINSIGHTS_CONNECTION_STRING";
+            var original = Environment.GetEnvironmentVariable(envVar);
+            try
+            {
+                Environment.SetEnvironmentVariable(envVar, null);
+
+                var services = new ServiceCollection();
+                services.AddSingleton(Microsoft.OpenTelemetry.CustomAgent365ExporterMarker.Instance);
+                services.AddOpenTelemetry()
+                    .UseMicrosoftOpenTelemetry(o =>
+                    {
+                        o.Exporters = ExportTarget.Console; // Agent365 NOT in target
+                        o.Agent365.TokenResolver = (a, t) =>
+                            System.Threading.Tasks.Task.FromResult<string?>("token");
+                    });
+
+                // Agent365ExporterOptions NOT registered (SkipExporter takes precedence)
+                Assert.DoesNotContain(services, s => s.ServiceType.Name == "Agent365ExporterOptions");
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(envVar, original);
+            }
+        }
+
+        [Fact]
+        public void CustomExporterMarker_A365OnlyMode_InfraStillSuppressed()
+        {
+            var services = new ServiceCollection();
+            InstrumentationOptions? captured = null;
+
+            services.AddSingleton(Microsoft.OpenTelemetry.CustomAgent365ExporterMarker.Instance);
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365;
+                    o.Agent365.ContextualTokenResolver = _ =>
+                        System.Threading.Tasks.Task.FromResult<string?>("token");
+                    captured = o.Instrumentation;
+                });
+
+            Assert.NotNull(captured);
+            Assert.False(captured!.EnableAspNetCoreInstrumentation);
+            Assert.False(captured.EnableHttpClientInstrumentation);
+            Assert.False(captured.EnableSqlClientInstrumentation);
+            Assert.False(captured.EnableAzureSdkInstrumentation);
+        }
+        /// <summary>
+        /// Walks the TracerProvider's internal processor chain via reflection
+        /// to check whether a processor of the given type name is present.
+        /// </summary>
+        private static bool HasProcessorOfType(TracerProvider provider, string typeName)
+        {
+            // TracerProviderSdk.Processor is internal.
+            var processorProp = provider.GetType().GetProperty("Processor",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            var processor = processorProp?.GetValue(provider);
+            return WalkProcessorChain(processor, typeName);
+        }
+
+        private static bool WalkProcessorChain(object? processor, string typeName)
+        {
+            while (processor != null)
+            {
+                if (processor.GetType().Name == typeName)
+                    return true;
+
+                // CompositeProcessor<T> has an internal readonly field "Head" of type DoublyLinkedListNode.
+                var headField = processor.GetType().GetField("Head",
+                    BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+                if (headField != null)
+                {
+                    var node = headField.GetValue(processor);
+                    while (node != null)
+                    {
+                        // DoublyLinkedListNode.Value is a public readonly field.
+                        var valueField = node.GetType().GetField("Value",
+                            BindingFlags.Public | BindingFlags.Instance);
+                        var value = valueField?.GetValue(node);
+                        if (value != null && value.GetType().Name == typeName)
+                            return true;
+                        if (value != null && WalkProcessorChain(value, typeName))
+                            return true;
+
+                        // DoublyLinkedListNode.Next is a public property.
+                        var nextProp = node.GetType().GetProperty("Next",
+                            BindingFlags.Public | BindingFlags.Instance);
+                        node = nextProp?.GetValue(node);
+                    }
+
+                    return false;
+                }
+
+                // Single processor wrappers may have an inner processor field.
+                var innerField = processor.GetType().GetField("_inner",
+                    BindingFlags.NonPublic | BindingFlags.Instance);
+                processor = innerField?.GetValue(processor);
+            }
+
+            return false;
         }
     }
 }

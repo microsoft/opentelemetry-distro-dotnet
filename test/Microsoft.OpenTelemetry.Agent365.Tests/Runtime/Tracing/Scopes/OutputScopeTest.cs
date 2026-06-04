@@ -29,8 +29,8 @@ public sealed class OutputScopeTest : ActivityTest
         });
 
         // Assert - operation name and activity name
-        activity.ShouldHaveTag(OpenTelemetryConstants.GenAiOperationNameKey, OutputScope.OperationName);
-        activity.DisplayName.Should().Be($"{OutputScope.OperationName} {agentDetails.AgentId}");
+        activity.ShouldHaveTag(OpenTelemetryConstants.GenAiOperationNameKey, OpenTelemetryConstants.OutputMessagesOperationName);
+        activity.DisplayName.Should().Be($"{OpenTelemetryConstants.OutputMessagesOperationName} {agentDetails.AgentId}");
 
         // Assert - agent details
         activity.ShouldHaveTag(OpenTelemetryConstants.GenAiAgentIdKey, agentDetails.AgentId!);
@@ -95,7 +95,7 @@ public sealed class OutputScopeTest : ActivityTest
 
         // Assert - child activity should have the parent set
         childActivity.ParentSpanId.ToString().Should().NotBeNullOrEmpty();
-        childActivity.ShouldHaveTag(OpenTelemetryConstants.GenAiOperationNameKey, OutputScope.OperationName);
+        childActivity.ShouldHaveTag(OpenTelemetryConstants.GenAiOperationNameKey, OpenTelemetryConstants.OutputMessagesOperationName);
         childActivity.ShouldHaveTagContaining(OpenTelemetryConstants.GenAiOutputMessagesKey, "Test message");
     }
 

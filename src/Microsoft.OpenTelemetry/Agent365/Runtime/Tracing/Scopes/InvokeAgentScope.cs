@@ -23,7 +23,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// <see href="https://learn.microsoft.com/microsoft-agent-365/developer/observability?tabs=dotnet#agent-invocation">Learn more about Agent Invocation</see>
         /// </para>
         /// </remarks>
-        internal const string OperationName = "invoke_agent";
 
         /// <summary>
         /// Creates and starts a new scope for agent invocation tracing.
@@ -64,9 +63,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             SpanDetails? spanDetails,
             ThreatDiagnosticsSummary? threatDiagnosticsSummary)
             : base(
-                operationName: OperationName,
+                operationName: OpenTelemetryConstants.InvokeAgentOperationName,
                 activityName: string.IsNullOrWhiteSpace(agentDetails?.AgentName)
-                    ? OperationName
+                    ? OpenTelemetryConstants.InvokeAgentOperationName
                     : $"invoke_agent {agentDetails!.AgentName}",
                 agentDetails: agentDetails!,
                 spanDetails: new SpanDetails(spanDetails?.SpanKind ?? ActivityKind.Client, spanDetails?.ParentContext, spanDetails?.StartTime, spanDetails?.EndTime, spanDetails?.SpanLinks),

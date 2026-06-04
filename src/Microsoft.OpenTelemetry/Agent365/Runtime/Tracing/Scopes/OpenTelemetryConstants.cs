@@ -49,8 +49,36 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             ExecuteTool,
 
             [EnumMember(Value = "OutputMessages")]
-            OutputMessages
+            OutputMessages,
+
+            [EnumMember(Value = "ApplyGuardrail")]
+            ApplyGuardrail
         }
+
+        /// <summary>
+        /// The operation name value for apply_guardrail spans.
+        /// </summary>
+        public const string ApplyGuardrailOperationName = "apply_guardrail";
+
+        /// <summary>
+        /// The operation name value for invoke_agent spans.
+        /// </summary>
+        public const string InvokeAgentOperationName = "invoke_agent";
+
+        /// <summary>
+        /// The operation name value for execute_tool spans.
+        /// </summary>
+        public const string ExecuteToolOperationName = "execute_tool";
+
+        /// <summary>
+        /// The operation name value for output_messages spans.
+        /// </summary>
+        public const string OutputMessagesOperationName = "output_messages";
+
+        /// <summary>
+        /// The operation name value for chat/inference spans.
+        /// </summary>
+        public const string ChatOperationName = "chat";
 
         // Channel dimensions (renamed from gen_ai.channel.* to microsoft.channel.*)
         public const string ChannelNameKey = "microsoft.channel.name";
@@ -102,7 +130,20 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         ///  The GenAI operation name key.
         /// </summary>
         public const string GenAiOperationNameKey = "gen_ai.operation.name";
-        
+
+        /// <summary>
+        /// The set of recognized genAI operation names used to identify A365-exportable spans.
+        /// Comparison is case-insensitive.
+        /// </summary>
+        internal static readonly HashSet<string> GenAiOperationNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            InvokeAgentOperationName,
+            ExecuteToolOperationName,
+            OutputMessagesOperationName,
+            ApplyGuardrailOperationName,
+            ChatOperationName,
+        };
+
         /// <summary>
         /// The error message key.
         /// </summary>
@@ -160,6 +201,123 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// </summary>
         public const string GenAiAgentThoughtProcessKey = "microsoft.a365.agent.thought.process";
 
+        #endregion
+
+        #region guardrail keys
+        /// <summary>
+        /// The guardian identifier key.
+        /// </summary>
+        public const string GenAiGuardianIdKey = "microsoft.guardian.id";
+
+        /// <summary>
+        /// The guardian name key.
+        /// </summary>
+        public const string GenAiGuardianNameKey = "microsoft.guardian.name";
+
+        /// <summary>
+        /// The guardian provider name key.
+        /// </summary>
+        public const string GenAiGuardianProviderNameKey = "microsoft.guardian.provider.name";
+
+        /// <summary>
+        /// The guardian version key.
+        /// </summary>
+        public const string GenAiGuardianVersionKey = "microsoft.guardian.version";
+
+        /// <summary>
+        /// The security decision type key.
+        /// </summary>
+        public const string GenAiSecurityDecisionTypeKey = "microsoft.security.decision.type";
+
+        /// <summary>
+        /// The security decision reason key.
+        /// </summary>
+        public const string GenAiSecurityDecisionReasonKey = "microsoft.security.decision.reason";
+
+        /// <summary>
+        /// The security decision code key.
+        /// </summary>
+        public const string GenAiSecurityDecisionCodeKey = "microsoft.security.decision.code";
+
+        /// <summary>
+        /// The security target type key.
+        /// </summary>
+        public const string GenAiSecurityTargetTypeKey = "microsoft.security.target.type";
+
+        /// <summary>
+        /// The security target identifier key.
+        /// </summary>
+        public const string GenAiSecurityTargetIdKey = "microsoft.security.target.id";
+
+        /// <summary>
+        /// The security policy identifier key.
+        /// </summary>
+        public const string GenAiSecurityPolicyIdKey = "microsoft.security.policy.id";
+
+        /// <summary>
+        /// The security policy name key.
+        /// </summary>
+        public const string GenAiSecurityPolicyNameKey = "microsoft.security.policy.name";
+
+        /// <summary>
+        /// The security policy version key.
+        /// </summary>
+        public const string GenAiSecurityPolicyVersionKey = "microsoft.security.policy.version";
+
+        /// <summary>
+        /// The security content input hash key.
+        /// </summary>
+        public const string GenAiSecurityContentInputHashKey = "microsoft.security.content.input.hash";
+
+        /// <summary>
+        /// The security content modified key.
+        /// </summary>
+        public const string GenAiSecurityContentModifiedKey = "microsoft.security.content.modified";
+
+        /// <summary>
+        /// The security external event identifier key for SIEM correlation.
+        /// </summary>
+        public const string GenAiSecurityExternalEventIdKey = "microsoft.security.external_event_id";
+
+        /// <summary>
+        /// The security content input value key (opt-in).
+        /// </summary>
+        public const string GenAiSecurityContentInputValueKey = "microsoft.security.content.input.value";
+
+        /// <summary>
+        /// The security content output value key (opt-in).
+        /// </summary>
+        public const string GenAiSecurityContentOutputValueKey = "microsoft.security.content.output.value";
+
+        /// <summary>
+        /// The security finding event name.
+        /// </summary>
+        public const string GenAiSecurityFindingEventName = "microsoft.security.finding";
+
+        /// <summary>
+        /// The security risk category key.
+        /// </summary>
+        public const string GenAiSecurityRiskCategoryKey = "microsoft.security.risk.category";
+
+        /// <summary>
+        /// The security risk severity key.
+        /// </summary>
+        public const string GenAiSecurityRiskSeverityKey = "microsoft.security.risk.severity";
+
+        /// <summary>
+        /// The security risk score key.
+        /// </summary>
+        public const string GenAiSecurityRiskScoreKey = "microsoft.security.risk.score";
+
+        /// <summary>
+        /// The security risk metadata key.
+        /// </summary>
+        public const string GenAiSecurityRiskMetadataKey = "microsoft.security.risk.metadata";
+
+        /// <summary>
+        /// The security policy decision type key (per-finding decision).
+        /// </summary>
+        public const string GenAiSecurityPolicyDecisionTypeKey = "microsoft.security.policy.decision.type";
         #endregion
     }
     #pragma warning restore CS1591

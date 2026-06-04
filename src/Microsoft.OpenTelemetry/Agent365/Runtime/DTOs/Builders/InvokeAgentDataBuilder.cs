@@ -14,8 +14,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
     /// </summary>
     public class InvokeAgentDataBuilder : BaseDataBuilder<InvokeAgentData>
     {
-        private const string InvokeAgentOperationName = "invoke_agent";
-
         /// <summary>
         /// Builds complete data for an invoke_agent operation.
         /// </summary>
@@ -94,8 +92,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
         {
             var attributes = new Dictionary<string, object?>();
 
+            // SDK attributes
+            AddSdkAttributes(attributes);
+
             // Operation name
-            AddIfNotNull(attributes, GenAiOperationNameKey, InvokeAgentDataBuilder.InvokeAgentOperationName);
+            AddIfNotNull(attributes, GenAiOperationNameKey, OpenTelemetryConstants.InvokeAgentOperationName);
 
             // Add agent details (includes tenant ID)
             AddAgentDetails(attributes, agentDetails);

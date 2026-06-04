@@ -32,15 +32,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         // gen_ai.operation.name through unchanged. Both the lowercase canonical value and the
         // InferenceOperationType.Chat enum name are accepted in this set so that activities
         // tagged with either form are not filtered out by PartitionByIdentity.
-        private static readonly HashSet<string> GenAiOperationNames = new HashSet<string>(StringComparer.Ordinal)
-        {
-            InvokeAgentScope.OperationName,
-            ExecuteToolScope.OperationName,
-            OutputScope.OperationName,
-            "chat",
-            nameof(InferenceOperationType.Chat),
-        };
-
         private enum AddResult { Added, NonGenAI, MissingIdentity, Null }
 
         /// <summary>
@@ -274,7 +265,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             if (activity is null) return AddResult.Null;
 
             var operationName = activity.GetAttributeOrBaggage(OpenTelemetryConstants.GenAiOperationNameKey);
-            if (string.IsNullOrEmpty(operationName) || !GenAiOperationNames.Contains(operationName!))
+            if (string.IsNullOrEmpty(operationName) || !OpenTelemetryConstants.GenAiOperationNames.Contains(operationName!))
                 return AddResult.NonGenAI;
 
             var tenant = activity.GetAttributeOrBaggage(OpenTelemetryConstants.TenantIdKey);

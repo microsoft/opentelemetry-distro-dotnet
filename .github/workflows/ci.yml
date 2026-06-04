@@ -41,8 +41,15 @@ jobs:
         run: dotnet test Microsoft.OpenTelemetry.slnx --no-build --configuration Release --verbosity normal --results-directory ${{ github.workspace }}/TestResults --logger "trx;logfileprefix=testResults_"
 
       - name: Retry failed tests
+        id: test-retry
         if: steps.test1.outcome == 'failure'
         run: pwsh -f ./.scripts/build_RetryTests.ps1 -TestResultsDirectory ${{ github.workspace }}/TestResults -WorkingDirectory ${{ github.workspace }}
+
+      - name: Fail if tests failed after retries
+        if: steps.test1.outcome == 'failure' && steps.test-retry.outcome == 'failure'
+        run: |
+          echo "::error::Tests failed after retries"
+          exit 1
 
       - name: Upload test results
         if: always()

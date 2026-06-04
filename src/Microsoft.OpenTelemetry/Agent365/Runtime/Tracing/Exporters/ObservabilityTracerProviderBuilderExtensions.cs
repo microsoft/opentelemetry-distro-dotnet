@@ -82,20 +82,22 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             switch (exporterType)
             {
                 case Agent365ExporterType.Agent365ExporterAsync:
-                    builder.AddProcessor(new BatchActivityExportProcessorAsync(
+                    var asyncBatchProcessor = new BatchActivityExportProcessorAsync(
                         new Agent365ExporterAsync(core: exporterCore, logger: logger, options: exporterOptions, resource: null, httpClient: httpClient),
                         maxQueueSize: exporterOptions.MaxQueueSize,
                         scheduledDelayMilliseconds: exporterOptions.ScheduledDelayMilliseconds,
-                        maxExportBatchSize: exporterOptions.MaxExportBatchSize));
+                        maxExportBatchSize: exporterOptions.MaxExportBatchSize);
+                    builder.AddProcessor(new GenAiActivityFilterProcessor(asyncBatchProcessor));
                     break;
 
                 case Agent365ExporterType.Agent365Exporter:
-                    builder.AddProcessor(new BatchActivityExportProcessor(
+                    var batchProcessor = new BatchActivityExportProcessor(
                         new Agent365Exporter(core: exporterCore, logger: logger, options: exporterOptions, resource: null, httpClient: httpClient),
                         maxQueueSize: exporterOptions.MaxQueueSize,
                         scheduledDelayMilliseconds: exporterOptions.ScheduledDelayMilliseconds,
                         exporterTimeoutMilliseconds: exporterOptions.ExporterTimeoutMilliseconds,
-                        maxExportBatchSize: exporterOptions.MaxExportBatchSize));
+                        maxExportBatchSize: exporterOptions.MaxExportBatchSize);
+                    builder.AddProcessor(new GenAiActivityFilterProcessor(batchProcessor));
                     break;
 
                 default:
