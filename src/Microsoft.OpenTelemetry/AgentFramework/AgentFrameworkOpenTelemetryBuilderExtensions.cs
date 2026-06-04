@@ -55,7 +55,7 @@ internal static class AgentFrameworkOpenTelemetryBuilderExtensions
             {
                 // Default Microsoft Agent Framework activity sources, plus the
                 // Microsoft.Extensions.AI source the agent's underlying IChatClient emits the
-                // `chat` (inference) span on when instrumented with the default `.UseOpenTelemetry()`.
+                // `chat` (inference) span when instrumented with the default `.UseOpenTelemetry()`.
                 tracing
                     .AddSource(AgentFrameworkConstants.DefaultSource)
                     .AddSource(AgentFrameworkConstants.AgentSource)
