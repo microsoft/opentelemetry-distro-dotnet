@@ -175,7 +175,7 @@ public class SemanticKernelAutoInstrumentationTests
             Kernel = kernel,
             Arguments = new KernelArguments(new PromptExecutionSettings
             {
-                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(),
+                FunctionChoiceBehavior = FunctionChoiceBehavior.Required(),
             }),
         };
     }
