@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,13 +35,13 @@ public class SemanticKernelAutoInstrumentationTests
         !string.IsNullOrEmpty(ApiKey) &&
         !string.IsNullOrEmpty(Deployment);
 
-    private List<Activity> _exportedActivities = new();
+    private ConcurrentQueue<Activity> _exportedActivities = new();
     private ServiceProvider? _serviceProvider;
 
     [TestInitialize]
     public void Setup()
     {
-        _exportedActivities = new List<Activity>();
+        _exportedActivities = new ConcurrentQueue<Activity>();
 
         var services = new ServiceCollection();
         services.AddLogging();
@@ -51,7 +52,7 @@ public class SemanticKernelAutoInstrumentationTests
         services.AddOpenTelemetry()
             .UseMicrosoftOpenTelemetry(o => o.Exporters = ExportTarget.Console)
             .WithTracing(tracing => tracing
-                .AddProcessor(new SimpleActivityExportProcessor(new ActivityCapturingExporter(_exportedActivities))));
+                .AddProcessor(new SimpleActivityExportProcessor(new ConcurrentQueueActivityExporter(_exportedActivities))));
 
         _serviceProvider = services.BuildServiceProvider();
         _serviceProvider.GetService<TracerProvider>();
@@ -227,6 +228,28 @@ public class SemanticKernelAutoInstrumentationTests
         {
             Assert.Inconclusive(
                 "Skipped: set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT env vars to run.");
+        }
+    }
+
+    /// <summary>
+    /// Exporter that enqueues activities into a thread-safe <see cref="ConcurrentQueue{T}"/> at
+    /// export time. Span export/end callbacks can occur on different threads, so a thread-safe
+    /// collection avoids races (and enumeration faults while <c>DumpAllActivities</c> iterates).
+    /// </summary>
+    private sealed class ConcurrentQueueActivityExporter : BaseExporter<Activity>
+    {
+        private readonly ConcurrentQueue<Activity> _activities;
+
+        public ConcurrentQueueActivityExporter(ConcurrentQueue<Activity> activities) => _activities = activities;
+
+        public override ExportResult Export(in Batch<Activity> batch)
+        {
+            foreach (var activity in batch)
+            {
+                _activities.Enqueue(activity);
+            }
+
+            return ExportResult.Success;
         }
     }
 
