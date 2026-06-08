@@ -59,6 +59,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Common
 
         private readonly Dictionary<string, string?> _pairs = new Dictionary<string, string?>();
 
+        private readonly HashSet<string> _customKeys = new HashSet<string>(StringComparer.Ordinal);
+
         /// <summary>
         /// Sets the tenant ID baggage value.
         /// </summary>
@@ -311,6 +313,31 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Common
                     Baggage.Current = Baggage.Current.SetBaggage(kvp.Key, kvp.Value);
                 }
             }
+
+            // Record custom keys (set via CustomAttribute) in a reserved baggage entry so the
+            // ActivityProcessor knows to coalesce them onto every GenAI span. Merge with any
+            // custom keys already present in the ambient baggage to support nested scopes.
+            if (_customKeys.Count > 0)
+            {
+                var merged = new HashSet<string>(_customKeys, StringComparer.Ordinal);
+                var existing = Baggage.Current.GetBaggage(OpenTelemetryConstants.CustomBaggageKeysKey);
+                if (!string.IsNullOrEmpty(existing))
+                {
+                    foreach (var key in existing!.Split(','))
+                    {
+                        var trimmedKey = key.Trim();
+                        if (trimmedKey.Length > 0)
+                        {
+                            merged.Add(trimmedKey);
+                        }
+                    }
+                }
+
+                Baggage.Current = Baggage.Current.SetBaggage(
+                    OpenTelemetryConstants.CustomBaggageKeysKey,
+                    string.Join(",", merged));
+            }
+
             return new Scope(previous);
         }
 
@@ -328,6 +355,46 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Common
             foreach (var kvp in pairs)
             {
                 Set(kvp.Key, kvp.Value?.ToString());
+            }
+            return this;
+        }
+
+        /// <summary>
+        /// Adds a custom baggage key/value pair that is coalesced onto every GenAI span
+        /// (in addition to being propagated in baggage), unlike the strongly-typed members
+        /// which follow the SDK's curated per-span attribute routing.
+        /// </summary>
+        /// <remarks>
+        /// The value is only recorded when both the key and value are non-null and non-whitespace.
+        /// Custom keys are propagated across process boundaries via W3C baggage, so they must not
+        /// contain secrets or PII. A value set directly on a span always takes precedence over a
+        /// custom baggage value when keys clash.
+        /// </remarks>
+        /// <param name="key">The custom attribute key.</param>
+        /// <param name="value">The custom attribute value.</param>
+        /// <returns>The current builder instance for method chaining.</returns>
+        public BaggageBuilder CustomAttribute(string key, string? value)
+        {
+            if (!string.IsNullOrWhiteSpace(key) && !string.IsNullOrWhiteSpace(value))
+            {
+                Set(key, value);
+                _customKeys.Add(key);
+            }
+            return this;
+        }
+
+        /// <summary>
+        /// Adds multiple custom baggage key/value pairs that are coalesced onto every GenAI span.
+        /// See <see cref="CustomAttribute(string, string?)"/> for details.
+        /// </summary>
+        /// <param name="pairs">The custom attribute key/value pairs.</param>
+        /// <returns>The current builder instance for method chaining.</returns>
+        public BaggageBuilder CustomAttributes(IEnumerable<KeyValuePair<string, object?>> pairs)
+        {
+            if (pairs == null) return this;
+            foreach (var kvp in pairs)
+            {
+                CustomAttribute(kvp.Key, kvp.Value?.ToString());
             }
             return this;
         }

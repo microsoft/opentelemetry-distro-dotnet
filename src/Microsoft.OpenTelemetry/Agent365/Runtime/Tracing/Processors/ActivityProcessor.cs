@@ -51,9 +51,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
         };
 
         /// <summary>
-        /// Called when an activity starts, adds tags for attributes listed in AttributeKeys.
-        /// Any span with an allowlisted <c>gen_ai.operation.name</c> tag is processed;
-        /// all other activities pass through unmodified.
+        /// Called when an activity starts, adds tags for attributes listed in AttributeKeys,
+        /// plus any custom baggage keys (set via <c>BaggageBuilder.CustomAttribute</c>) that are
+        /// recorded in the <c>microsoft.baggage.custom_keys</c> baggage entry. Any span with an
+        /// allowlisted <c>gen_ai.operation.name</c> tag is processed; all other activities pass
+        /// through unmodified. Tags already set directly on the span take precedence over baggage.
         /// </summary>
         /// <param name="activity">The activity that is starting.</param>
         public override void OnStart(Activity activity)
@@ -82,6 +84,20 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
                 foreach (var key in InvokeAgentAttributeKeys)
                 {
                     activity.CoalesceTag(key, Baggage.Current.GetBaggage(key));
+                }
+            }
+
+            // Coalesce any user-defined custom baggage keys onto every GenAI span.
+            var customKeys = Baggage.Current.GetBaggage(OpenTelemetryConstants.CustomBaggageKeysKey);
+            if (!string.IsNullOrEmpty(customKeys))
+            {
+                foreach (var key in customKeys!.Split(','))
+                {
+                    var trimmedKey = key.Trim();
+                    if (trimmedKey.Length > 0)
+                    {
+                        activity.CoalesceTag(trimmedKey, Baggage.Current.GetBaggage(trimmedKey));
+                    }
                 }
             }
 

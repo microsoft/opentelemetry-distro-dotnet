@@ -171,6 +171,26 @@ public sealed class InferenceScopeTest : ActivityTest
     }
 
     [TestMethod]
+    public void Start_SetsSessionId_WhenProvidedOnRequest()
+    {
+        var sessionId = "session-inf-123";
+        var details = new InferenceCallDetails(
+            InferenceOperationType.Chat,
+            "gpt-4o",
+            "openai");
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = InferenceScope.Start(
+                new Request(sessionId: sessionId),
+                details,
+                Util.GetAgentDetails());
+        });
+
+        activity.ShouldHaveTag(OpenTelemetryConstants.SessionIdKey, sessionId);
+    }
+
+    [TestMethod]
     public void Start_SetsChannel_Tags()
     {
         var details = new InferenceCallDetails(

@@ -4,6 +4,7 @@
 namespace Microsoft.Agents.A365.Observability.Tests.Tracing;
 
 using System.Diagnostics;
+using System.Collections.Generic;
 using FluentAssertions;
 using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
@@ -168,6 +169,195 @@ public sealed class ActivityProcessorTests : ActivityTest
                 activity.GetTagItem(TelemetrySdkNameKey).Should().Be(TelemetrySdkNameValue,
                     because: "GenAI spans must receive the telemetry.sdk.name tag");
             }
+        }
+    }
+
+    /// <summary>
+    /// A custom baggage key set via <see cref="BaggageBuilder.CustomAttribute"/> must be
+    /// coalesced onto GenAI spans, even though it is not part of the curated allowlist.
+    /// </summary>
+    [TestMethod]
+    public void OnStart_CoalescesCustomAttributeKeys_OntoGenAiSpans()
+    {
+        // Arrange
+        using var tracerProvider = ConstructTracerProvider();
+
+        // Act - set a custom attribute with no strongly-typed builder method
+        using (new BaggageBuilder()
+            .CustomAttribute("custom.app.key", "custom-value")
+            .Build())
+        {
+            var activity = ListenForActivity(() =>
+            {
+                using var scope = InferenceScope.Start(
+                    new Request(),
+                    new InferenceCallDetails(InferenceOperationType.Chat, "model-name", "provider-name"),
+                    new AgentDetails("agent-1"));
+            });
+
+            // Assert
+            activity.GetTagItem("custom.app.key").Should().Be("custom-value",
+                because: "custom attribute keys must be propagated onto GenAI spans");
+        }
+    }
+
+    /// <summary>
+    /// A custom attribute must NOT overwrite a value already set directly on the span
+    /// (here, an agent attribute applied by the scope before the span starts).
+    /// </summary>
+    [TestMethod]
+    public void OnStart_CustomAttribute_DoesNotOverwrite_SpanSetTag()
+    {
+        // Arrange
+        using var tracerProvider = ConstructTracerProvider();
+
+        // Act - custom attribute uses the same key the scope already sets from AgentDetails
+        using (new BaggageBuilder()
+            .CustomAttribute(GenAiAgentIdKey, "custom-agent")
+            .Build())
+        {
+            var activity = ListenForActivity(() =>
+            {
+                using var scope = InferenceScope.Start(
+                    new Request(),
+                    new InferenceCallDetails(InferenceOperationType.Chat, "model-name", "provider-name"),
+                    new AgentDetails("real-agent"));
+            });
+
+            // Assert
+            activity.GetTagItem(GenAiAgentIdKey).Should().Be("real-agent",
+                because: "a custom attribute must not overwrite a value set directly on the span");
+        }
+    }
+
+    /// <summary>
+    /// A custom attribute must NOT overwrite a value supplied through the request/scope,
+    /// even when it shares the key with an allowlisted attribute.
+    /// </summary>
+    [TestMethod]
+    public void OnStart_CustomAttribute_DoesNotOverwrite_RequestSuppliedValue()
+    {
+        // Arrange
+        using var tracerProvider = ConstructTracerProvider();
+
+        // Act - custom attribute clashes with the conversation id supplied on the request
+        using (new BaggageBuilder()
+            .CustomAttribute(GenAiConversationIdKey, "custom-conversation")
+            .Build())
+        {
+            var activity = ListenForActivity(() =>
+            {
+                using var scope = InferenceScope.Start(
+                    new Request(conversationId: "request-conversation"),
+                    new InferenceCallDetails(InferenceOperationType.Chat, "model-name", "provider-name"),
+                    new AgentDetails("agent-1"));
+            });
+
+            // Assert
+            activity.GetTagItem(GenAiConversationIdKey).Should().Be("request-conversation",
+                because: "a custom attribute must not overwrite a value supplied via the request");
+        }
+    }
+
+    /// <summary>
+    /// A generic baggage key set via <see cref="BaggageBuilder.SetRange"/> (not marked as a
+    /// custom attribute and not on the allowlist) must NOT be coalesced onto spans.
+    /// </summary>
+    [TestMethod]
+    public void OnStart_DoesNotCoalesce_NonCustomNonAllowlistedKeys()
+    {
+        // Arrange
+        using var tracerProvider = ConstructTracerProvider();
+
+        // Act - set an arbitrary key via SetRange (used for known keys, not custom routing)
+        using (new BaggageBuilder()
+            .SetRange(new[] { new KeyValuePair<string, object?>("unmarked.key", "unmarked-value") })
+            .Build())
+        {
+            var activity = ListenForActivity(() =>
+            {
+                using var scope = InferenceScope.Start(
+                    new Request(),
+                    new InferenceCallDetails(InferenceOperationType.Chat, "model-name", "provider-name"),
+                    new AgentDetails("agent-1"));
+            });
+
+            // Assert
+            activity.GetTagItem("unmarked.key").Should().BeNull(
+                because: "only custom-attribute or allowlisted keys are coalesced onto spans");
+        }
+    }
+
+    /// <summary>
+    /// When a key is set both directly on the span and in baggage, the value set
+    /// directly on the span must take precedence.
+    /// </summary>
+    [TestMethod]
+    public void OnStart_SpanTagTakesPrecedence_OverBaggageOnClash()
+    {
+        // Arrange
+        using var tracerProvider = ConstructTracerProvider();
+
+        // Act - conversation id is set on the span via Request and also in baggage
+        using (new BaggageBuilder()
+            .ConversationId("baggage-conversation")
+            .Build())
+        {
+            var activity = ListenForActivity(() =>
+            {
+                using var scope = InferenceScope.Start(
+                    new Request(conversationId: "span-conversation"),
+                    new InferenceCallDetails(InferenceOperationType.Chat, "model-name", "provider-name"),
+                    new AgentDetails("agent-1"));
+            });
+
+            // Assert
+            activity.GetTagItem(GenAiConversationIdKey).Should().Be("span-conversation",
+                because: "values set directly on the span must win over baggage values");
+        }
+    }
+
+    /// <summary>
+    /// Span-specific baggage (the invoke_agent server attributes) must only be coalesced onto
+    /// invoke_agent spans and must not leak onto other GenAI span types.
+    /// </summary>
+    [TestMethod]
+    public void OnStart_RetainsSpanSpecificBaggage_ForInvokeAgentOnly()
+    {
+        // Arrange
+        using var tracerProvider = ConstructTracerProvider();
+
+        // Act - server address/port baggage is span-specific to invoke_agent
+        using (new BaggageBuilder()
+            .InvokeAgentServer("agent-host", 8443)
+            .Build())
+        {
+            var invokeAgentActivity = ListenForActivity(() =>
+            {
+                using var scope = InvokeAgentScope.Start(
+                    new Request(),
+                    new InvokeAgentScopeDetails(endpoint: null),
+                    new AgentDetails("agent-1"));
+            });
+
+            var inferenceActivity = ListenForActivity(() =>
+            {
+                using var scope = InferenceScope.Start(
+                    new Request(),
+                    new InferenceCallDetails(InferenceOperationType.Chat, "model-name", "provider-name"),
+                    new AgentDetails("agent-1"));
+            });
+
+            // Assert
+            invokeAgentActivity.GetTagItem(ServerAddressKey).Should().Be("agent-host",
+                because: "invoke_agent spans must receive server.address from baggage");
+            invokeAgentActivity.GetTagItem(ServerPortKey).Should().Be("8443",
+                because: "invoke_agent spans must receive server.port from baggage");
+
+            inferenceActivity.GetTagItem(ServerAddressKey).Should().BeNull(
+                because: "invoke_agent-specific server.address must not leak onto inference spans");
+            inferenceActivity.GetTagItem(ServerPortKey).Should().BeNull(
+                because: "invoke_agent-specific server.port must not leak onto inference spans");
         }
     }
 }

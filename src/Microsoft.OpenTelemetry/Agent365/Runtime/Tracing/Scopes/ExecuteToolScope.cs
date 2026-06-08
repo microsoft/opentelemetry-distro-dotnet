@@ -50,7 +50,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
                 spanDetails: new SpanDetails(spanDetails?.SpanKind ?? ActivityKind.Internal, spanDetails?.ParentContext, spanDetails?.StartTime, spanDetails?.EndTime, spanDetails?.SpanLinks),
                 userDetails: userDetails)
         {
-            var (toolName, arguments, toolCallId, description, toolType, endpoint, toolServerName) = details;
+            var (toolName, arguments, toolCallId, description, toolType, endpoint, _) = details;
             SetTagMaybe(OpenTelemetryConstants.GenAiToolNameKey, toolName);
 
             // Per OTEL spec: arguments SHOULD be recorded in structured form.
@@ -75,9 +75,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             SetTagMaybe(OpenTelemetryConstants.GenAiToolTypeKey, toolType);
             SetTagMaybe(OpenTelemetryConstants.GenAiToolCallIdKey, toolCallId);
             SetTagMaybe(OpenTelemetryConstants.GenAiToolDescriptionKey, description);
-            SetTagMaybe(OpenTelemetryConstants.GenAiToolServerNameKey, toolServerName);
             SetTagMaybe(OpenTelemetryConstants.ThreatDiagnosticsSummaryKey, threatDiagnosticsSummary?.ToJson());
             SetTagMaybe(OpenTelemetryConstants.GenAiConversationIdKey, request?.ConversationId);
+            SetTagMaybe(OpenTelemetryConstants.SessionIdKey, request?.SessionId);
 
             if (endpoint != null)
             {

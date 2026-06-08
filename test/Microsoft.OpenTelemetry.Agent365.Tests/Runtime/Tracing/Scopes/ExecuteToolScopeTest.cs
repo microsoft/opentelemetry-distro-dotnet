@@ -85,6 +85,21 @@ public sealed class ExecuteToolScopeTest : ActivityTest
     }
 
     [TestMethod]
+    public void Start_SetsSessionId_WhenProvidedOnRequest()
+    {
+        var sessionId = "session-tool-123";
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                new Request(sessionId: sessionId),
+                new ToolCallDetails("TestTool", "args"),
+                Util.GetAgentDetails());
+        });
+
+        activity.ShouldHaveTag(OpenTelemetryConstants.SessionIdKey, sessionId);
+    }
+
+    [TestMethod]
     public void Start_SetsChannel_Tags()
     {
         var metadata = new Channel(name: "ChannelY", link: "https://channel/link/y");
@@ -173,27 +188,6 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         tagValue.Should().Contain("\"reasonCode\":200");
         tagValue.Should().Contain("\"reason\":\"Blocked due to policy violation.\"");
         tagValue.Should().Contain("data-loss-prevention");
-    }
-
-    [TestMethod]
-    public void Start_ToolServerName_IsSetCorrectly()
-    {
-        // Arrange
-        const string expectedToolServerName = "test-tool-server";
-        var toolCallDetails = new ToolCallDetails(
-            toolName: "TestTool",
-            arguments: "args",
-            toolServerName: expectedToolServerName);
-        var agentDetails = Util.GetAgentDetails();
-
-        // Act
-        var activity = ListenForActivity(() =>
-        {
-            using var scope = ExecuteToolScope.Start(Util.GetDefaultRequest(), toolCallDetails, agentDetails);
-        });
-
-        // Assert
-        activity.ShouldHaveTag(OpenTelemetryConstants.GenAiToolServerNameKey, expectedToolServerName);
     }
 
     [TestMethod]
