@@ -22,15 +22,13 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// <param name="description">Optional description of the tool call.</param>
         /// <param name="toolType">Optional type classification for the tool.</param>
         /// <param name="endpoint">Optional endpoint for remote tool execution.</param>
-        /// <param name="toolServerName">Optional server name for the tool.</param>
         public ToolCallDetails(
             string toolName,
             string? arguments,
             string? toolCallId = null,
             string? description = null,
             string? toolType = null,
-            Uri? endpoint = null,
-            string? toolServerName = null)
+            Uri? endpoint = null)
         {
             ToolName = toolName;
             Arguments = arguments;
@@ -38,7 +36,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
             Description = description;
             ToolType = toolType;
             Endpoint = endpoint;
-            ToolServerName = toolServerName;
         }
 
         /// <summary>
@@ -52,15 +49,13 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// <param name="description">Optional description of the tool call.</param>
         /// <param name="toolType">Optional type classification for the tool.</param>
         /// <param name="endpoint">Optional endpoint for remote tool execution.</param>
-        /// <param name="toolServerName">Optional server name for the tool.</param>
         public ToolCallDetails(
             string toolName,
             IDictionary<string, object> argumentsObject,
             string? toolCallId = null,
             string? description = null,
             string? toolType = null,
-            Uri? endpoint = null,
-            string? toolServerName = null)
+            Uri? endpoint = null)
         {
             ToolName = toolName;
             ArgumentsObject = argumentsObject ?? throw new ArgumentNullException(nameof(argumentsObject));
@@ -68,7 +63,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
             Description = description;
             ToolType = toolType;
             Endpoint = endpoint;
-            ToolServerName = toolServerName;
         }
 
         /// <summary>
@@ -108,11 +102,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         public Uri? Endpoint { get; }
 
         /// <summary>
-        /// Gets the server name associated with the tool, when provided.
-        /// </summary>
-        public string? ToolServerName { get; }
-
-        /// <summary>
         /// Deconstructs this instance into individual tool call components.
         /// </summary>
         /// <param name="toolName">Receives the tool name.</param>
@@ -121,8 +110,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// <param name="description">Receives the human-readable description.</param>
         /// <param name="toolType">Receives the type hint.</param>
         /// <param name="endpoint">Receives the endpoint.</param>
-        /// <param name="toolServerName">Receives the tool server name.</param>
-        public void Deconstruct(out string toolName, out string? arguments, out string? toolCallId, out string? description, out string? toolType, out Uri? endpoint, out string? toolServerName)
+        public void Deconstruct(out string toolName, out string? arguments, out string? toolCallId, out string? description, out string? toolType, out Uri? endpoint)
         {
             toolName = ToolName;
             arguments = Arguments;
@@ -130,7 +118,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
             description = Description;
             toolType = ToolType;
             endpoint = Endpoint;
-            toolServerName = ToolServerName;
         }
 
         /// <inheritdoc/>
@@ -147,8 +134,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
                    string.Equals(ToolCallId, other.ToolCallId, StringComparison.Ordinal) &&
                    string.Equals(Description, other.Description, StringComparison.Ordinal) &&
                    string.Equals(ToolType, other.ToolType, StringComparison.Ordinal) &&
-                   EqualityComparer<Uri?>.Default.Equals(Endpoint, other.Endpoint) &&
-                   string.Equals(ToolServerName, other.ToolServerName, StringComparison.Ordinal);
+                   EqualityComparer<Uri?>.Default.Equals(Endpoint, other.Endpoint);
         }
 
         /// <inheritdoc/>
@@ -170,7 +156,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
                 hash = (hash * 31) + (Description != null ? StringComparer.Ordinal.GetHashCode(Description) : 0);
                 hash = (hash * 31) + (ToolType != null ? StringComparer.Ordinal.GetHashCode(ToolType) : 0);
                 hash = (hash * 31) + EqualityComparer<Uri?>.Default.GetHashCode(Endpoint);
-                hash = (hash * 31) + (ToolServerName != null ? StringComparer.Ordinal.GetHashCode(ToolServerName) : 0);
                 return hash;
             }
         }

@@ -339,15 +339,14 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ThreatDiagnosticsS
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.Arguments.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ArgumentsObject.get -> System.Collections.Generic.IDictionary<string!, object!>?
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.Deconstruct(out string! toolName, out string? arguments, out string? toolCallId, out string? description, out string? toolType, out System.Uri? endpoint, out string? toolServerName) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.Deconstruct(out string! toolName, out string? arguments, out string? toolCallId, out string? description, out string? toolType, out System.Uri? endpoint) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.Description.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.Endpoint.get -> System.Uri?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.Equals(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails? other) -> bool
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallDetails(string! toolName, string? arguments, string? toolCallId = null, string? description = null, string? toolType = null, System.Uri? endpoint = null, string? toolServerName = null) -> void
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallDetails(string! toolName, System.Collections.Generic.IDictionary<string!, object!>! argumentsObject, string? toolCallId = null, string? description = null, string? toolType = null, System.Uri? endpoint = null, string? toolServerName = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallDetails(string! toolName, string? arguments, string? toolCallId = null, string? description = null, string? toolType = null, System.Uri? endpoint = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallDetails(string! toolName, System.Collections.Generic.IDictionary<string!, object!>! argumentsObject, string? toolCallId = null, string? description = null, string? toolType = null, System.Uri? endpoint = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallId.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolName.get -> string!
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolServerName.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolType.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolType
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolType.ToolType() -> void

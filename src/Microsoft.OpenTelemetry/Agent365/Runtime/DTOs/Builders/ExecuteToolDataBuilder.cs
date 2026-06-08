@@ -107,7 +107,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             Dictionary<string, object?> attributes,
             ToolCallDetails toolCallDetails)
         {
-            var (toolName, arguments, toolCallId, description, toolType, endpoint, toolServerName) = toolCallDetails;
+            var (toolName, arguments, toolCallId, description, toolType, endpoint) = toolCallDetails;
             AddIfNotNull(attributes, OpenTelemetryConstants.GenAiToolNameKey, toolName);
 
             // Arguments — prefer structured dict, then ensure JSON string per OTEL spec
@@ -131,7 +131,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             AddIfNotNull(attributes, OpenTelemetryConstants.GenAiToolCallIdKey, toolCallId);
             AddIfNotNull(attributes, OpenTelemetryConstants.GenAiToolDescriptionKey, description);
             AddIfNotNull(attributes, OpenTelemetryConstants.GenAiToolTypeKey, toolType);
-            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiToolServerNameKey, toolServerName);
             if (endpoint != null)
             {
                 AddIfNotNull(attributes, OpenTelemetryConstants.ServerAddressKey, endpoint.Host);

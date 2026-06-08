@@ -50,7 +50,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
                 spanDetails: new SpanDetails(spanDetails?.SpanKind ?? ActivityKind.Internal, spanDetails?.ParentContext, spanDetails?.StartTime, spanDetails?.EndTime, spanDetails?.SpanLinks),
                 userDetails: userDetails)
         {
-            var (toolName, arguments, toolCallId, description, toolType, endpoint, _) = details;
+            var (toolName, arguments, toolCallId, description, toolType, endpoint) = details;
             SetTagMaybe(OpenTelemetryConstants.GenAiToolNameKey, toolName);
 
             // Per OTEL spec: arguments SHOULD be recorded in structured form.

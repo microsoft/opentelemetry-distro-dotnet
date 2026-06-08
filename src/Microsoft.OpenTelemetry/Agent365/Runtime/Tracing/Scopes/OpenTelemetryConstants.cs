@@ -25,7 +25,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// (set via <c>BaggageBuilder.CustomAttribute</c>) that must be coalesced onto every
         /// GenAI span, in addition to the curated allowlist.
         /// </summary>
-        public const string CustomBaggageKeysKey = "microsoft.baggage.custom_keys";
+        public const string CustomBaggageKeysKey = "_internal.custom_keys";
 
         public const string GenAiClientOperationDurationMetricName = "gen_ai.client.operation.duration";
         public const string GenAiRequestModelKey = "gen_ai.request.model";
@@ -186,11 +186,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// The GenAI tool type key.
         /// </summary>
         public const string GenAiToolTypeKey = "gen_ai.tool.type";
-
-        /// <summary>
-        /// The GenAI tool server name key.
-        /// </summary>
-        public const string GenAiToolServerNameKey = "gen_ai.tool.server.name";
 
         /// <summary>
         /// The GenAI tool call result key.

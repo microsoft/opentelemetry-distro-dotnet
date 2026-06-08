@@ -53,7 +53,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
         /// <summary>
         /// Called when an activity starts, adds tags for attributes listed in AttributeKeys,
         /// plus any custom baggage keys (set via <c>BaggageBuilder.CustomAttribute</c>) that are
-        /// recorded in the <c>microsoft.baggage.custom_keys</c> baggage entry. Any span with an
+        /// recorded in the <c>_internal.custom_keys</c> baggage entry. Any span with an
         /// allowlisted <c>gen_ai.operation.name</c> tag is processed; all other activities pass
         /// through unmodified. Tags already set directly on the span take precedence over baggage.
         /// </summary>
