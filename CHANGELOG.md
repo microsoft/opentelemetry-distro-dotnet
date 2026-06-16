@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.6 - 2026-06-16
+## Unreleased
 
 - Make the `invoke_agent` span compliant with OpenTelemetry GenAI semantic conventions v1.42: add request/response GenAI attributes (`gen_ai.request.*`, `gen_ai.data_source.id`, `gen_ai.output.type`, `gen_ai.system_instructions`, `gen_ai.response.finish_reasons`, `gen_ai.usage.*`) via reusable `GenAiRequestParameters`/`GenAiResponseParameters`, and emit `gen_ai.provider.name` on all GenAI spans. Token usage is now emitted as integers and `gen_ai.response.finish_reasons` as a string array across all spans ([#120](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/120))
 
