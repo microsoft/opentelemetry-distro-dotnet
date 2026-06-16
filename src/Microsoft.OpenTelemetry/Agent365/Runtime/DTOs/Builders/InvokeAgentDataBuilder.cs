@@ -104,6 +104,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             // Add endpoint details
             AddEndpointDetails(attributes, invokeAgentScopeDetails.Endpoint);
 
+            // Add request/response GenAI parameters (model, sampling, usage, finish reasons)
+            AddRequestParameters(attributes, invokeAgentScopeDetails.RequestParameters);
+            AddResponseParameters(attributes, invokeAgentScopeDetails.ResponseParameters);
+
             // Add request details
             AddRequestDetails(attributes, request);
 

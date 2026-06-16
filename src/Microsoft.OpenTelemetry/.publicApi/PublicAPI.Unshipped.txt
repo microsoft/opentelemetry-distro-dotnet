@@ -115,3 +115,37 @@ Microsoft.Agents.A365.Observability.Runtime.Etw.IA365EtwLogger<T>.LogApplyGuardr
 Microsoft.Agents.A365.Observability.Runtime.Etw.A365EtwLogger<T>.LogApplyGuardrail(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GuardrailDetails! guardrailDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, string! parentSpanId, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Channel? channel = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.CallerDetails? callerDetails = null, string? traceId = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryScope.AddEvent(System.Diagnostics.ActivityEvent activityEvent) -> void
 static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.BaseDataBuilder<T>.AddSdkAttributes(System.Collections.Generic.IDictionary<string!, object?>! attributes) -> void
+static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.BaseDataBuilder<T>.AddRequestParameters(System.Collections.Generic.IDictionary<string!, object?>! attributes, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters? requestParameters) -> void
+static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.BaseDataBuilder<T>.AddResponseParameters(System.Collections.Generic.IDictionary<string!, object?>! attributes, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters? responseParameters) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters.GenAiRequestParameters(string? model = null, int? seed = null, int? choiceCount = null, double? frequencyPenalty = null, int? maxTokens = null, double? presencePenalty = null, string![]? stopSequences = null, double? temperature = null, double? topP = null, string? dataSourceId = null, string? outputType = null, string? systemInstructions = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters.Model.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters.Seed.get -> int?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters.ChoiceCount.get -> int?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters.FrequencyPenalty.get -> double?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters.MaxTokens.get -> int?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters.PresencePenalty.get -> double?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters.StopSequences.get -> string![]?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters.Temperature.get -> double?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters.TopP.get -> double?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters.DataSourceId.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters.OutputType.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters.SystemInstructions.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters.Equals(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters? other) -> bool
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters.Equals(object? obj) -> bool
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters.GetHashCode() -> int
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters.GenAiResponseParameters(string![]? finishReasons = null, int? inputTokens = null, int? outputTokens = null, int? cacheCreationInputTokens = null, int? cacheReadInputTokens = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters.FinishReasons.get -> string![]?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters.InputTokens.get -> int?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters.OutputTokens.get -> int?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters.CacheCreationInputTokens.get -> int?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters.CacheReadInputTokens.get -> int?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters.Equals(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters? other) -> bool
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters.Equals(object? obj) -> bool
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters.GetHashCode() -> int
+*REMOVED*Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDetails.InvokeAgentScopeDetails(System.Uri? endpoint = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDetails.InvokeAgentScopeDetails(System.Uri? endpoint = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters? requestParameters = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters? responseParameters = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDetails.RequestParameters.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDetails.ResponseParameters.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InvokeAgentScope.RecordResponseParameters(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters! responseParameters) -> void

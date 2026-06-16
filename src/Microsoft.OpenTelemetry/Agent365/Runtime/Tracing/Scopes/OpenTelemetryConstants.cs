@@ -24,6 +24,23 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         public const string GenAiRequestModelKey = "gen_ai.request.model";
         public const string GenAiResponseFinishReasonsKey = "gen_ai.response.finish_reasons";
 
+        // Request parameters (GenAI semantic conventions)
+        public const string GenAiDataSourceIdKey = "gen_ai.data_source.id";
+        public const string GenAiOutputTypeKey = "gen_ai.output.type";
+        public const string GenAiRequestChoiceCountKey = "gen_ai.request.choice.count";
+        public const string GenAiRequestSeedKey = "gen_ai.request.seed";
+        public const string GenAiRequestFrequencyPenaltyKey = "gen_ai.request.frequency_penalty";
+        public const string GenAiRequestMaxTokensKey = "gen_ai.request.max_tokens";
+        public const string GenAiRequestPresencePenaltyKey = "gen_ai.request.presence_penalty";
+        public const string GenAiRequestStopSequencesKey = "gen_ai.request.stop_sequences";
+        public const string GenAiRequestTemperatureKey = "gen_ai.request.temperature";
+        public const string GenAiRequestTopPKey = "gen_ai.request.top_p";
+        public const string GenAiSystemInstructionsKey = "gen_ai.system_instructions";
+
+        // Usage / response parameters (GenAI semantic conventions)
+        public const string GenAiUsageCacheCreationInputTokensKey = "gen_ai.usage.cache_creation.input_tokens";
+        public const string GenAiUsageCacheReadInputTokensKey = "gen_ai.usage.cache_read.input_tokens";
+
         public const string GenAiConversationIdKey = "gen_ai.conversation.id";
         public const string GenAiConversationItemLinkKey = "microsoft.conversation.item.link";
         public const string GenAiUsageInputTokensKey = "gen_ai.usage.input_tokens";

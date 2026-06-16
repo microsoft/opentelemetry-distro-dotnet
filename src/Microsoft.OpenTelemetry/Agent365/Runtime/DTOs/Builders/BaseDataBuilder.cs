@@ -57,7 +57,20 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             OpenTelemetryConstants.GenAiUsageInputTokensKey,
             OpenTelemetryConstants.GenAiUsageOutputTokensKey,
             OpenTelemetryConstants.GenAiResponseFinishReasonsKey,
-            OpenTelemetryConstants.GenAiAgentThoughtProcessKey
+            OpenTelemetryConstants.GenAiAgentThoughtProcessKey,
+            OpenTelemetryConstants.GenAiDataSourceIdKey,
+            OpenTelemetryConstants.GenAiOutputTypeKey,
+            OpenTelemetryConstants.GenAiRequestChoiceCountKey,
+            OpenTelemetryConstants.GenAiRequestSeedKey,
+            OpenTelemetryConstants.GenAiRequestFrequencyPenaltyKey,
+            OpenTelemetryConstants.GenAiRequestMaxTokensKey,
+            OpenTelemetryConstants.GenAiRequestPresencePenaltyKey,
+            OpenTelemetryConstants.GenAiRequestStopSequencesKey,
+            OpenTelemetryConstants.GenAiRequestTemperatureKey,
+            OpenTelemetryConstants.GenAiRequestTopPKey,
+            OpenTelemetryConstants.GenAiSystemInstructionsKey,
+            OpenTelemetryConstants.GenAiUsageCacheCreationInputTokensKey,
+            OpenTelemetryConstants.GenAiUsageCacheReadInputTokensKey
         };
 
         /// <summary>
@@ -117,6 +130,44 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             {
                 AddIfNotNull(attributes, OpenTelemetryConstants.ServerPortKey, endpoint.Port.ToString());
             }
+        }
+
+        /// <summary>
+        /// Adds request-side GenAI parameters to the attributes dictionary.
+        /// </summary>
+        protected static void AddRequestParameters(IDictionary<string, object?> attributes, GenAiRequestParameters? requestParameters)
+        {
+            if (requestParameters == null) return;
+
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiRequestModelKey, requestParameters.Model);
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiRequestSeedKey, requestParameters.Seed);
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiRequestChoiceCountKey, requestParameters.ChoiceCount);
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiRequestFrequencyPenaltyKey, requestParameters.FrequencyPenalty);
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiRequestMaxTokensKey, requestParameters.MaxTokens);
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiRequestPresencePenaltyKey, requestParameters.PresencePenalty);
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiRequestStopSequencesKey, requestParameters.StopSequences);
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiRequestTemperatureKey, requestParameters.Temperature);
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiRequestTopPKey, requestParameters.TopP);
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiDataSourceIdKey, requestParameters.DataSourceId);
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiOutputTypeKey, requestParameters.OutputType);
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiSystemInstructionsKey, requestParameters.SystemInstructions);
+        }
+
+        /// <summary>
+        /// Adds response-side GenAI parameters (finish reasons and token usage) to the attributes dictionary.
+        /// </summary>
+        protected static void AddResponseParameters(IDictionary<string, object?> attributes, GenAiResponseParameters? responseParameters)
+        {
+            if (responseParameters == null) return;
+
+            AddIfNotNull(
+                attributes,
+                OpenTelemetryConstants.GenAiResponseFinishReasonsKey,
+                responseParameters.FinishReasons != null ? string.Join(",", responseParameters.FinishReasons) : null);
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiUsageInputTokensKey, responseParameters.InputTokens?.ToString());
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiUsageOutputTokensKey, responseParameters.OutputTokens?.ToString());
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiUsageCacheCreationInputTokensKey, responseParameters.CacheCreationInputTokens);
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiUsageCacheReadInputTokensKey, responseParameters.CacheReadInputTokens);
         }
 
         /// <summary>

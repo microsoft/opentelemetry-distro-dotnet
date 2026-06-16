@@ -528,5 +528,102 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
             // Assert
             data.SpanKind.Should().Be(SpanKindConstants.Server);
         }
+
+        [TestMethod]
+        public void Build_IncludesRequestParameters_WhenProvided()
+        {
+            // Arrange
+            var requestParameters = new GenAiRequestParameters(
+                model: "gpt-4",
+                seed: 42,
+                choiceCount: 3,
+                frequencyPenalty: 0.5,
+                maxTokens: 256,
+                presencePenalty: 0.25,
+                stopSequences: new[] { "STOP", "END" },
+                temperature: 0.7,
+                topP: 0.9,
+                dataSourceId: "ds-001",
+                outputType: "json",
+                systemInstructions: "Be concise.");
+            var scopeDetails = new InvokeAgentScopeDetails(
+                endpoint: new Uri("https://example.com"),
+                requestParameters: requestParameters);
+            var agentDetails = new AgentDetails("agent-123", "TestAgent");
+
+            // Act
+            var telemetry = InvokeAgentDataBuilder.Build(scopeDetails, agentDetails, "conv-req");
+
+            // Assert
+            telemetry.Attributes[OpenTelemetryConstants.GenAiRequestModelKey].Should().Be("gpt-4");
+            telemetry.Attributes[OpenTelemetryConstants.GenAiRequestSeedKey].Should().Be(42);
+            telemetry.Attributes[OpenTelemetryConstants.GenAiRequestChoiceCountKey].Should().Be(3);
+            telemetry.Attributes[OpenTelemetryConstants.GenAiRequestFrequencyPenaltyKey].Should().Be(0.5);
+            telemetry.Attributes[OpenTelemetryConstants.GenAiRequestMaxTokensKey].Should().Be(256);
+            telemetry.Attributes[OpenTelemetryConstants.GenAiRequestPresencePenaltyKey].Should().Be(0.25);
+            telemetry.Attributes[OpenTelemetryConstants.GenAiRequestStopSequencesKey].Should().BeEquivalentTo(new[] { "STOP", "END" });
+            telemetry.Attributes[OpenTelemetryConstants.GenAiRequestTemperatureKey].Should().Be(0.7);
+            telemetry.Attributes[OpenTelemetryConstants.GenAiRequestTopPKey].Should().Be(0.9);
+            telemetry.Attributes[OpenTelemetryConstants.GenAiDataSourceIdKey].Should().Be("ds-001");
+            telemetry.Attributes[OpenTelemetryConstants.GenAiOutputTypeKey].Should().Be("json");
+            telemetry.Attributes[OpenTelemetryConstants.GenAiSystemInstructionsKey].Should().Be("Be concise.");
+        }
+
+        [TestMethod]
+        public void Build_IncludesResponseParameters_WhenProvided()
+        {
+            // Arrange
+            var responseParameters = new GenAiResponseParameters(
+                finishReasons: new[] { "stop", "length" },
+                inputTokens: 100,
+                outputTokens: 180,
+                cacheCreationInputTokens: 25,
+                cacheReadInputTokens: 50);
+            var scopeDetails = new InvokeAgentScopeDetails(
+                endpoint: new Uri("https://example.com"),
+                responseParameters: responseParameters);
+            var agentDetails = new AgentDetails("agent-123", "TestAgent");
+
+            // Act
+            var telemetry = InvokeAgentDataBuilder.Build(scopeDetails, agentDetails, "conv-resp");
+
+            // Assert
+            telemetry.Attributes[OpenTelemetryConstants.GenAiResponseFinishReasonsKey].Should().Be("stop,length");
+            telemetry.Attributes[OpenTelemetryConstants.GenAiUsageInputTokensKey].Should().Be("100");
+            telemetry.Attributes[OpenTelemetryConstants.GenAiUsageOutputTokensKey].Should().Be("180");
+            telemetry.Attributes[OpenTelemetryConstants.GenAiUsageCacheCreationInputTokensKey].Should().Be(25);
+            telemetry.Attributes[OpenTelemetryConstants.GenAiUsageCacheReadInputTokensKey].Should().Be(50);
+        }
+
+        [TestMethod]
+        public void Build_IncludesProviderName_WhenAgentProviderSet()
+        {
+            // Arrange
+            var agentDetails = new AgentDetails(agentId: "agent-123", providerName: "openai");
+            var scopeDetails = new InvokeAgentScopeDetails(endpoint: new Uri("https://example.com"));
+
+            // Act
+            var telemetry = InvokeAgentDataBuilder.Build(scopeDetails, agentDetails, "conv-prov");
+
+            // Assert
+            telemetry.Attributes[OpenTelemetryConstants.GenAiProviderNameKey].Should().Be("openai");
+        }
+
+        [TestMethod]
+        public void Build_OmitsRequestAndResponseParameters_WhenAbsent()
+        {
+            // Arrange
+            var scopeDetails = new InvokeAgentScopeDetails(endpoint: new Uri("https://example.com"));
+            var agentDetails = new AgentDetails("agent-123", "TestAgent");
+
+            // Act
+            var telemetry = InvokeAgentDataBuilder.Build(scopeDetails, agentDetails, "conv-none");
+
+            // Assert
+            telemetry.Attributes.Should().NotContainKey(OpenTelemetryConstants.GenAiRequestModelKey);
+            telemetry.Attributes.Should().NotContainKey(OpenTelemetryConstants.GenAiRequestTemperatureKey);
+            telemetry.Attributes.Should().NotContainKey(OpenTelemetryConstants.GenAiResponseFinishReasonsKey);
+            telemetry.Attributes.Should().NotContainKey(OpenTelemetryConstants.GenAiUsageInputTokensKey);
+        }
     }
 }
