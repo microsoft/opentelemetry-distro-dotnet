@@ -163,9 +163,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             AddIfNotNull(
                 attributes,
                 OpenTelemetryConstants.GenAiResponseFinishReasonsKey,
-                responseParameters.FinishReasons != null ? string.Join(",", responseParameters.FinishReasons) : null);
-            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiUsageInputTokensKey, responseParameters.InputTokens?.ToString());
-            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiUsageOutputTokensKey, responseParameters.OutputTokens?.ToString());
+                responseParameters.FinishReasons);
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiUsageInputTokensKey, responseParameters.InputTokens);
+            AddIfNotNull(attributes, OpenTelemetryConstants.GenAiUsageOutputTokensKey, responseParameters.OutputTokens);
             AddIfNotNull(attributes, OpenTelemetryConstants.GenAiUsageCacheCreationInputTokensKey, responseParameters.CacheCreationInputTokens);
             AddIfNotNull(attributes, OpenTelemetryConstants.GenAiUsageCacheReadInputTokensKey, responseParameters.CacheReadInputTokens);
         }

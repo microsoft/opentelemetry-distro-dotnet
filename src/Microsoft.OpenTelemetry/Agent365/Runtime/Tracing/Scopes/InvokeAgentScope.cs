@@ -168,9 +168,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
 
             SetTagMaybe(
                 OpenTelemetryConstants.GenAiResponseFinishReasonsKey,
-                responseParameters.FinishReasons != null ? string.Join(",", responseParameters.FinishReasons) : null);
-            SetTagMaybe(OpenTelemetryConstants.GenAiUsageInputTokensKey, responseParameters.InputTokens?.ToString());
-            SetTagMaybe(OpenTelemetryConstants.GenAiUsageOutputTokensKey, responseParameters.OutputTokens?.ToString());
+                responseParameters.FinishReasons);
+            SetTagMaybe(OpenTelemetryConstants.GenAiUsageInputTokensKey, responseParameters.InputTokens);
+            SetTagMaybe(OpenTelemetryConstants.GenAiUsageOutputTokensKey, responseParameters.OutputTokens);
             SetTagMaybe(OpenTelemetryConstants.GenAiUsageCacheCreationInputTokensKey, responseParameters.CacheCreationInputTokens);
             SetTagMaybe(OpenTelemetryConstants.GenAiUsageCacheReadInputTokensKey, responseParameters.CacheReadInputTokens);
         }

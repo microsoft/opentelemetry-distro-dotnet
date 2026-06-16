@@ -588,9 +588,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
             var telemetry = InvokeAgentDataBuilder.Build(scopeDetails, agentDetails, "conv-resp");
 
             // Assert
-            telemetry.Attributes[OpenTelemetryConstants.GenAiResponseFinishReasonsKey].Should().Be("stop,length");
-            telemetry.Attributes[OpenTelemetryConstants.GenAiUsageInputTokensKey].Should().Be("100");
-            telemetry.Attributes[OpenTelemetryConstants.GenAiUsageOutputTokensKey].Should().Be("180");
+            telemetry.Attributes[OpenTelemetryConstants.GenAiResponseFinishReasonsKey].Should().BeEquivalentTo(new[] { "stop", "length" });
+            telemetry.Attributes[OpenTelemetryConstants.GenAiUsageInputTokensKey].Should().Be(100);
+            telemetry.Attributes[OpenTelemetryConstants.GenAiUsageOutputTokensKey].Should().Be(180);
             telemetry.Attributes[OpenTelemetryConstants.GenAiUsageCacheCreationInputTokensKey].Should().Be(25);
             telemetry.Attributes[OpenTelemetryConstants.GenAiUsageCacheReadInputTokensKey].Should().Be(50);
         }

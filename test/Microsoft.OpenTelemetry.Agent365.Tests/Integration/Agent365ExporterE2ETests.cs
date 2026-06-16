@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Net;
 using System.Text.Json;
+using System.Linq;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tests.IntegrationTests
 {
@@ -292,7 +293,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.IntegrationTests
             this.GetAttribute(attributes, "gen_ai.provider.name").Should().Be(inferenceDetails.ProviderName);
             this.GetAttribute(attributes, "gen_ai.usage.input_tokens").Should().Be("42");
             this.GetAttribute(attributes, "gen_ai.usage.output_tokens").Should().Be("84");
-            this.GetAttribute(attributes, "gen_ai.response.finish_reasons").Should().Be("stop,length");
+            attributes.GetProperty("gen_ai.response.finish_reasons").EnumerateArray()
+                .Select(e => e.GetString()).Should().BeEquivalentTo(new[] { "stop", "length" });
             var inputMessages = this.GetAttribute(attributes, "gen_ai.input.messages");
             inputMessages.Should().StartWith("[");
             inputMessages.Should().Contain("Hello").And.Contain("World");

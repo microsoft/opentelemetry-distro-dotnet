@@ -459,9 +459,9 @@ public sealed class InvokeAgentScopeTest : ActivityTest
         });
 
         // Assert
-        activity.ShouldHaveTag(GenAiResponseFinishReasonsKey, "stop,length");
-        activity.ShouldHaveTag(GenAiUsageInputTokensKey, "100");
-        activity.ShouldHaveTag(GenAiUsageOutputTokensKey, "180");
+        activity.GetTagItem(GenAiResponseFinishReasonsKey).Should().BeEquivalentTo(new[] { "stop", "length" });
+        activity.GetTagItem(GenAiUsageInputTokensKey).Should().Be(100);
+        activity.GetTagItem(GenAiUsageOutputTokensKey).Should().Be(180);
         activity.GetTagItem(GenAiUsageCacheCreationInputTokensKey).Should().Be(25);
         activity.GetTagItem(GenAiUsageCacheReadInputTokensKey).Should().Be(50);
     }
@@ -483,9 +483,9 @@ public sealed class InvokeAgentScopeTest : ActivityTest
         });
 
         // Assert
-        activity.ShouldHaveTag(GenAiResponseFinishReasonsKey, "stop");
-        activity.ShouldHaveTag(GenAiUsageInputTokensKey, "10");
-        activity.ShouldHaveTag(GenAiUsageOutputTokensKey, "20");
+        activity.GetTagItem(GenAiResponseFinishReasonsKey).Should().BeEquivalentTo(new[] { "stop" });
+        activity.GetTagItem(GenAiUsageInputTokensKey).Should().Be(10);
+        activity.GetTagItem(GenAiUsageOutputTokensKey).Should().Be(20);
     }
 
     [TestMethod]

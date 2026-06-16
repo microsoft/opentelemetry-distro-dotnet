@@ -112,9 +112,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             AddIfNotNull(attributes, GenAiOperationNameKey, inferenceCallDetails.OperationName.ToString().ToLowerInvariant());
             AddIfNotNull(attributes, GenAiRequestModelKey, inferenceCallDetails.Model);
             AddIfNotNull(attributes, GenAiProviderNameKey, inferenceCallDetails.ProviderName);
-            AddIfNotNull(attributes, GenAiUsageInputTokensKey, inferenceCallDetails.InputTokens?.ToString());
-            AddIfNotNull(attributes, GenAiUsageOutputTokensKey, inferenceCallDetails.OutputTokens?.ToString());
-            AddIfNotNull(attributes, GenAiResponseFinishReasonsKey, inferenceCallDetails.FinishReasons != null ? string.Join(",", inferenceCallDetails.FinishReasons) : null);
+            AddIfNotNull(attributes, GenAiUsageInputTokensKey, inferenceCallDetails.InputTokens);
+            AddIfNotNull(attributes, GenAiUsageOutputTokensKey, inferenceCallDetails.OutputTokens);
+            AddIfNotNull(attributes, GenAiResponseFinishReasonsKey, inferenceCallDetails.FinishReasons);
         }
     }
 }
