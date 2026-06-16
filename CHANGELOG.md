@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.6 - 2026-06-16
+
+- Make the `invoke_agent` span compliant with OpenTelemetry GenAI semantic conventions v1.42: add request/response GenAI attributes (`gen_ai.request.*`, `gen_ai.data_source.id`, `gen_ai.output.type`, `gen_ai.system_instructions`, `gen_ai.response.finish_reasons`, `gen_ai.usage.*`) via reusable `GenAiRequestParameters`/`GenAiResponseParameters`, and emit `gen_ai.provider.name` on all GenAI spans. Token usage is now emitted as integers and `gen_ai.response.finish_reasons` as a string array across all spans ([#120](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/120))
+
 ## 1.0.5 - 2026-06-12
 
 - Bootstrap SDK Stats eagerly in `UseMicrosoftOpenTelemetry` so Attach + Feature SDK Stats are reported when the Azure Monitor exporter is not selected (OTLP-only, Console-only, Agent365-only).
