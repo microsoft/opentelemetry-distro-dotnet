@@ -145,6 +145,7 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParam
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters.Equals(object? obj) -> bool
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters.GetHashCode() -> int
 *REMOVED*Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDetails.InvokeAgentScopeDetails(System.Uri? endpoint = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDetails.InvokeAgentScopeDetails(System.Uri? endpoint) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDetails.InvokeAgentScopeDetails(System.Uri? endpoint = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters? requestParameters = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters? responseParameters = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDetails.RequestParameters.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiRequestParameters?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InvokeAgentScopeDetails.ResponseParameters.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GenAiResponseParameters?

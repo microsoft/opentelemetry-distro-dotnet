@@ -13,6 +13,17 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
     public sealed class InvokeAgentScopeDetails : IEquatable<InvokeAgentScopeDetails>
     {
         /// <summary>
+        /// Initializes a new instance of the <see cref="InvokeAgentScopeDetails"/> class
+        /// with only an endpoint. Preserved for binary compatibility with consumers
+        /// compiled against the original single-parameter constructor.
+        /// </summary>
+        /// <param name="endpoint">Optional endpoint URI of the agent to invoke.</param>
+        public InvokeAgentScopeDetails(Uri? endpoint)
+            : this(endpoint, null, null)
+        {
+        }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="InvokeAgentScopeDetails"/> class.
         /// </summary>
         /// <param name="endpoint">Optional endpoint URI of the agent to invoke.</param>
