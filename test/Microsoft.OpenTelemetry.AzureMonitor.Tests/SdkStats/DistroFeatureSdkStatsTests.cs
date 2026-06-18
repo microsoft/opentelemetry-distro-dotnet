@@ -1,8 +1,10 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
+using System.Reflection;
 using Microsoft.OpenTelemetry.AzureMonitor.SdkStats;
 using Xunit;
 
@@ -99,6 +101,81 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             var match = Assert.Single(measurements, m => m.tags.TryGetValue("version", out var v) && (string?)v == "9.9.9-otlp-only");
             Assert.Equal("N/A", match.tags["cikey"]);
             Assert.Equal((long)snapshot.Features, match.value);
+        }
+
+        [Fact]
+        public void Observe_ThrottlesToSingleEmission_AcrossRapidCollections()
+        {
+            // The exporter collects this gauge on the shared 15-minute reader. Verify the
+            // throttle holds it to one emission per 24 hr window so Feature stats don't ship
+            // every 15 min.
+            var options = new MicrosoftOpenTelemetryOptions();
+            options.AzureMonitor.ConnectionString = ValidConnectionString;
+
+            var snapshot = DistroFeatureSnapshot.Build(
+                options,
+                ValidConnectionString,
+                ExportTarget.AzureMonitor,
+                customerSdkStatsEnabled: false,
+                a365OnlyMode: false,
+                distroVersion: "9.9.9-throttle")!;
+
+            DistroFeatureSdkStats.Initialize(snapshot);
+
+            const int simulatedCollections = 5;
+            int emissions = 0;
+            using var listener = new MeterListener
+            {
+                InstrumentPublished = (instrument, l) =>
+                {
+                    if (instrument.Meter.Name == DistroFeatureSdkStats.MeterName
+                        && instrument.Name == DistroFeatureSdkStats.MetricName)
+                    {
+                        l.EnableMeasurementEvents(instrument);
+                    }
+                },
+            };
+            listener.SetMeasurementEventCallback<long>((_, _, _, _) => emissions++);
+            listener.Start();
+
+            for (int i = 0; i < simulatedCollections; i++)
+            {
+                listener.RecordObservableInstruments();
+            }
+
+            // 5 collections at the 15-min cadence, but the throttle allows only one until the
+            // 24 hr window elapses.
+            Assert.Equal(1, emissions);
+        }
+
+        [Fact]
+        public void Observe_EmitsAgain_WhenClockJumpsBackwards()
+        {
+            // Simulate the last emission being recorded ~48 hr in the future, i.e. the wall
+            // clock has since jumped backwards (NTP/VM sync). The backwards-jump guard must
+            // allow an emission now instead of suppressing until wall-clock time catches up.
+            var options = new MicrosoftOpenTelemetryOptions();
+            options.AzureMonitor.ConnectionString = ValidConnectionString;
+
+            var snapshot = DistroFeatureSnapshot.Build(
+                options,
+                ValidConnectionString,
+                ExportTarget.AzureMonitor,
+                customerSdkStatsEnabled: false,
+                a365OnlyMode: false,
+                distroVersion: "9.9.9-clockback")!;
+
+            DistroFeatureSdkStats.Initialize(snapshot);
+
+            var instance = DistroFeatureSdkStats.Instance!;
+            long futureTicks = DateTime.UtcNow.Ticks + TimeSpan.FromHours(48).Ticks;
+            typeof(DistroFeatureSdkStats)
+                .GetField("_lastEmissionTicks", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .SetValue(instance, futureTicks);
+
+            var measurements = CollectObservableMeasurements();
+
+            Assert.Single(measurements);
         }
 
         private static List<(long value, Dictionary<string, object?> tags)> CollectObservableMeasurements()

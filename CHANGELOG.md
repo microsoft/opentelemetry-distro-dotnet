@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Make the `invoke_agent` span compliant with OpenTelemetry GenAI semantic conventions v1.42: add request/response GenAI attributes (`gen_ai.request.*`, `gen_ai.data_source.id`, `gen_ai.output.type`, `gen_ai.system_instructions`, `gen_ai.response.finish_reasons`, `gen_ai.usage.*`) via reusable `GenAiRequestParameters`/`GenAiResponseParameters`, and emit `gen_ai.provider.name` on spans that carry agent details (e.g. `invoke_agent`, inference). Token usage is now emitted as integers and `gen_ai.response.finish_reasons` as a string array across all spans ([#120](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/120))
+- Throttle distro Feature SDK Stats to a 24-hour emission cadence. The exporter now collects Feature SDK Stats on the shared 15-minute Network SDK Stats reader, so the observable gauge applies an emission-ticks throttle (mirroring the Attach gauge) to avoid emitting every 15 minutes.
 
 ## 1.0.5 - 2026-06-12
 
