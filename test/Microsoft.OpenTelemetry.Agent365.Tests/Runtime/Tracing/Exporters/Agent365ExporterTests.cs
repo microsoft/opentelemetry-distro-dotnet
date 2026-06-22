@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
@@ -11,6 +12,7 @@ using OpenTelemetry.Resources;
 using System.Diagnostics;
 using System.Reflection;
 using System.Net;
+using System.Text;
 
 namespace Microsoft.Agents.A365.Observability.Tests.Tracing.Exporters;
 
@@ -1343,6 +1345,87 @@ public sealed class Agent365ExporterTests
 
     #endregion
 
+    #region HTTP 403 Actionable Error Message Tests
+
+    [TestMethod]
+    public void Export_Http403_InsufficientScope_LogsActionableErrorMessage()
+    {
+        // Arrange
+        var handler = new TestHttpMessageHandler(req =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.Forbidden);
+            response.Headers.Add("x-ms-correlation-id", "test-correlation-id");
+            response.Headers.WwwAuthenticate.ParseAdd(
+                "Bearer error=\"insufficient_scope\", " +
+                "error_description=\"Required app role: Agent365.Observability.OtelWrite\", " +
+                "scope=\"Agent365.Observability.OtelWrite\"");
+            return response;
+        });
+        var httpClient = new HttpClient(handler);
+
+        var options = new Agent365ExporterOptions
+        {
+            TokenResolver = (_, _) => Task.FromResult<string?>("test-token"),
+            UseS2SEndpoint = false,
+            DomainResolver = _ => "test.example.com"
+        };
+
+        var resource = ResourceBuilder.CreateEmpty()
+            .AddService("unit-test-service", serviceVersion: "1.0.0")
+            .Build();
+
+        var inMemoryLogger = new InMemoryLogger();
+
+        var core = new Agent365ExporterCore(new ExportFormatter(NullLogger<ExportFormatter>.Instance), inMemoryLogger);
+
+        var exporter = new Agent365Exporter(
+            core,
+            NullLogger<Agent365Exporter>.Instance,
+            options,
+            resource,
+            httpClient);
+
+        using var activity = CreateActivity(tenantId: "tenant-403", agentId: "agent-403");
+        var batch = CreateBatch(activity);
+
+        // Act
+        var result = exporter.Export(in batch);
+
+        // Assert
+        result.Should().Be(ExportResult.Failure);
+        var errorLogs = inMemoryLogger.LogMessages.Where(m => m.Contains("Agent365.Observability.OtelWrite")).ToList();
+        errorLogs.Should().NotBeEmpty("a 403 with insufficient_scope should log an actionable error message");
+        var msg = errorLogs.First();
+        msg.Should().Contain("Agent365.Observability.OtelWrite");
+        msg.Should().Contain("https://learn.microsoft.com/microsoft-agent-365/developer/observability");
+        msg.Should().Contain("https://learn.microsoft.com/azure/foundry/agents/how-to/grant-agent-365-permissions");
+        msg.Should().Contain("Foundry");
+    }
+
+    [TestMethod]
+    public void ExtractTokenIdentity_ValidJwt_ReturnsAppIdAndObjectId()
+    {
+        // Create a minimal JWT with appid and oid claims
+        var header = Convert.ToBase64String(Encoding.UTF8.GetBytes("{\"alg\":\"RS256\",\"typ\":\"JWT\"}")).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes("{\"appid\":\"test-app-id\",\"oid\":\"test-object-id\"}")).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        var signature = "fake-signature";
+        var token = $"{header}.{payload}.{signature}";
+
+        var result = Agent365ExporterCore.ExtractTokenIdentity(token);
+
+        result.Should().Contain("app ID: test-app-id");
+        result.Should().Contain("object ID: test-object-id");
+    }
+
+    [TestMethod]
+    public void ExtractTokenIdentity_InvalidToken_ReturnsEmpty()
+    {
+        var result = Agent365ExporterCore.ExtractTokenIdentity("not-a-jwt");
+        result.Should().BeEmpty();
+    }
+
+    #endregion
+
     private class TestHttpMessageHandler : HttpMessageHandler
     {
         private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;
@@ -1354,6 +1437,25 @@ public sealed class Agent365ExporterTests
         {
             return Task.FromResult(_handler(request));
         }
+    }
+
+    private class InMemoryLogger : ILogger<Agent365ExporterCore>
+    {
+        public List<string> LogMessages { get; } = new();
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            LogMessages.Add(formatter(state, exception));
+        }
+    }
+
+    private class InMemoryLoggerProvider : ILoggerProvider
+    {
+        public ILogger CreateLogger(string categoryName) => new InMemoryLogger();
+        public void Dispose() { }
     }
 
 }
