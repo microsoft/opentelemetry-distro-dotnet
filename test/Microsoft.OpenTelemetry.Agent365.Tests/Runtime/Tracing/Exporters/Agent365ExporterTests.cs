@@ -1397,8 +1397,8 @@ public sealed class Agent365ExporterTests
         errorLogs.Should().NotBeEmpty("a 403 with insufficient_scope should log an actionable error message");
         var msg = errorLogs.First();
         msg.Should().Contain("Agent365.Observability.OtelWrite");
-        msg.Should().Contain("https://learn.microsoft.com/microsoft-agent-365/developer/observability");
-        msg.Should().Contain("https://learn.microsoft.com/azure/foundry/agents/how-to/grant-agent-365-permissions");
+        msg.Should().Contain("https://aka.ms/a365-403");
+        msg.Should().Contain("https://aka.ms/foundry-grant-agent-365-permissions");
         msg.Should().Contain("Foundry");
     }
 

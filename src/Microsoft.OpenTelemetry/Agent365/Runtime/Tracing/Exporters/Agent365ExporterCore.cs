@@ -27,6 +27,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
     public class Agent365ExporterCore
     {
         private const string CorrelationIdHeaderKey = "x-ms-correlation-id";
+        private const string DocsUrl403 = "https://aka.ms/a365-403";
+        private const string FoundryUrl403 = "https://aka.ms/foundry-grant-agent-365-permissions";
         private readonly ExportFormatter _formatter;
         private readonly ILogger<Agent365ExporterCore> _logger;
 
@@ -312,10 +314,12 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                     "'Agent365.Observability.OtelWrite' app role. " +
                     "Grant the 'Agent365.Observability.OtelWrite' role to{Identity} " +
                     "and ensure admin consent has been granted. " +
-                    "| Setup instructions: https://learn.microsoft.com/microsoft-agent-365/developer/observability?tabs=dotnet#http-403-forbidden " +
-                    "| For Foundry: https://learn.microsoft.com/azure/foundry/agents/how-to/grant-agent-365-permissions " +
+                    "| Setup instructions: {DocsUrl} " +
+                    "| For Foundry: {FoundryUrl} " +
                     "| Correlation ID: {CorrelationId}.",
                     identityDescription,
+                    DocsUrl403,
+                    FoundryUrl403,
                     correlationId ?? "N/A");
             }
             else
