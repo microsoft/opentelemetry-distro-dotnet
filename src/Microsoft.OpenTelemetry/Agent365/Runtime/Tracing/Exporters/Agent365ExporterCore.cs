@@ -325,7 +325,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             else
             {
                 _logger?.LogError(
-                    "Agent365ExporterCore: HTTP {StatusCode} non-retryable error. " +
+                    "Agent365ExporterCore: HTTP {StatusCode} error. " +
                     "Chunk {ChunkIndex} of {ChunkCount} failed; aborting batch. " +
                     "WWW-Authenticate: {WwwAuthenticate}. Correlation ID: {CorrelationId}.",
                     (int)resp.StatusCode,

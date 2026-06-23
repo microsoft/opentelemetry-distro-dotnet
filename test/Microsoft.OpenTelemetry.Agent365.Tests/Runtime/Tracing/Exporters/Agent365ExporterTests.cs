@@ -1395,6 +1395,8 @@ public sealed class Agent365ExporterTests
         result.Should().Be(ExportResult.Failure);
         var errorLogs = inMemoryLogger.LogMessages.Where(m => m.Contains("Agent365.Observability.OtelWrite")).ToList();
         errorLogs.Should().NotBeEmpty("a 403 with insufficient_scope should log an actionable error message");
+        var errorIndex = inMemoryLogger.LogMessages.IndexOf(errorLogs.First());
+        inMemoryLogger.LogLevels[errorIndex].Should().Be(LogLevel.Error, "the 403 message must be logged at Error level");
         var msg = errorLogs.First();
         msg.Should().Contain("Agent365.Observability.OtelWrite");
         msg.Should().Contain("https://aka.ms/a365-403");
@@ -1442,6 +1444,7 @@ public sealed class Agent365ExporterTests
     private class InMemoryLogger : ILogger<Agent365ExporterCore>
     {
         public List<string> LogMessages { get; } = new();
+        public List<LogLevel> LogLevels { get; } = new();
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => true;
@@ -1449,13 +1452,8 @@ public sealed class Agent365ExporterTests
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
             LogMessages.Add(formatter(state, exception));
+            LogLevels.Add(logLevel);
         }
-    }
-
-    private class InMemoryLoggerProvider : ILoggerProvider
-    {
-        public ILogger CreateLogger(string categoryName) => new InMemoryLogger();
-        public void Dispose() { }
     }
 
 }
