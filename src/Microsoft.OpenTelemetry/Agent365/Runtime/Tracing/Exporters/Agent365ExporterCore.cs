@@ -310,17 +310,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                     : " your application's service principal";
 
                 _logger?.LogError(
-                    "HTTP 403 authorization error: the token is missing the required " +
-                    "'Agent365.Observability.OtelWrite' app role. " +
-                    "Grant the 'Agent365.Observability.OtelWrite' role to{Identity} " +
-                    "and ensure admin consent has been granted. " +
-                    "| Setup instructions: {DocsUrl} " +
-                    "| For Foundry: {FoundryUrl} " +
-                    "| Correlation ID: {CorrelationId}.",
-                    identityDescription,
-                    DocsUrl403,
-                    FoundryUrl403,
-                    correlationId ?? "N/A");
+                    $"HTTP 403 authorization error: the token is missing the required 'Agent365.Observability.OtelWrite' app role. Grant the 'Agent365.Observability.OtelWrite' role to{identityDescription} and ensure admin consent has been granted. | Setup instructions: {DocsUrl403} | For Foundry: {FoundryUrl403} | Correlation ID: {correlationId ?? "N/A"}.");
             }
             else
             {
