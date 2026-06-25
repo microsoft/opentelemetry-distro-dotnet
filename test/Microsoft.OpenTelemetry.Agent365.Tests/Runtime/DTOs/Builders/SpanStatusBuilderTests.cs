@@ -15,7 +15,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
     public class SpanStatusBuilderTests
     {
         [TestMethod]
-        public void FromError_NullError_ReturnsUnset_AndDoesNotTouchAttributes()
+        public void FromError_NullError_ReturnsUnset_AndDoesNotAddErrorType()
         {
             var attributes = new Dictionary<string, object?>();
 
@@ -24,6 +24,22 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
             status.Code.Should().Be(SpanStatusCode.Unset);
             status.Message.Should().BeNull();
             attributes.Should().NotContainKey(OpenTelemetryConstants.ErrorTypeKey);
+        }
+
+        [TestMethod]
+        public void FromError_NullError_RemovesPreExistingErrorType()
+        {
+            var attributes = new Dictionary<string, object?>
+            {
+                { OpenTelemetryConstants.ErrorTypeKey, "System.TimeoutException" },
+                { "other", "kept" }
+            };
+
+            var status = SpanStatusBuilder.FromError(null, attributes);
+
+            status.Code.Should().Be(SpanStatusCode.Unset);
+            attributes.Should().NotContainKey(OpenTelemetryConstants.ErrorTypeKey);
+            attributes.Should().ContainKey("other");
         }
 
         [TestMethod]

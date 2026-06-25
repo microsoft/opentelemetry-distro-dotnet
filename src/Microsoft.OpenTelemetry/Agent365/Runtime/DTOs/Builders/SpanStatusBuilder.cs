@@ -23,7 +23,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
         /// </summary>
         /// <param name="error">
         /// The exception to record. When <c>null</c>, an <see cref="SpanStatusCode.Unset"/> status is
-        /// returned and <paramref name="attributes"/> is left untouched.
+        /// returned and any pre-existing <c>error.type</c> attribute is removed so it is never emitted
+        /// without an accompanying error status.
         /// </param>
         /// <param name="attributes">
         /// Optional span attributes dictionary. When an error is supplied and this is non-<c>null</c>, the
@@ -37,6 +38,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
         {
             if (error == null)
             {
+                // Ensure error.type is never emitted without an accompanying error status, even if a
+                // caller passed it through extraAttributes (it is not part of the reserved-key filter).
+                attributes?.Remove(OpenTelemetryConstants.ErrorTypeKey);
                 return new SpanStatus(SpanStatusCode.Unset);
             }
 
