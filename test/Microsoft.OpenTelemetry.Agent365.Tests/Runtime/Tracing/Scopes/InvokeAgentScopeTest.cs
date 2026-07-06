@@ -379,4 +379,128 @@ public sealed class InvokeAgentScopeTest : ActivityTest
             activity.ShouldHaveTag(ServerPortKey, serverPort);
         }
     }
+
+    [TestMethod]
+    public void ProviderName_IsSetOnInvokeAgentSpan_WhenProvided()
+    {
+        // Arrange
+        var agentDetails = new AgentDetails(agentId: "agent-provider", providerName: "openai");
+
+        // Act
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = InvokeAgentScope.Start(Util.GetDefaultRequest(), ScopeDetails, agentDetails);
+        });
+
+        // Assert
+        activity.ShouldHaveTag(GenAiProviderNameKey, "openai");
+    }
+
+    [TestMethod]
+    public void RequestParameters_AreSetOnSpan_WhenProvided()
+    {
+        // Arrange
+        var requestParameters = new GenAiRequestParameters(
+            model: "gpt-4",
+            seed: 42,
+            choiceCount: 3,
+            frequencyPenalty: 0.5,
+            maxTokens: 256,
+            presencePenalty: 0.25,
+            stopSequences: new[] { "STOP", "END" },
+            temperature: 0.7,
+            topP: 0.9,
+            dataSourceId: "ds-001",
+            outputType: "json",
+            systemInstructions: "Be concise.");
+        var scopeDetails = new InvokeAgentScopeDetails(
+            endpoint: new Uri("https://example.com"),
+            requestParameters: requestParameters);
+
+        // Act
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = InvokeAgentScope.Start(Util.GetDefaultRequest(), scopeDetails, TestAgentDetails);
+        });
+
+        // Assert
+        activity.GetTagItem(GenAiRequestModelKey).Should().Be("gpt-4");
+        activity.GetTagItem(GenAiRequestSeedKey).Should().Be(42);
+        activity.GetTagItem(GenAiRequestChoiceCountKey).Should().Be(3);
+        activity.GetTagItem(GenAiRequestFrequencyPenaltyKey).Should().Be(0.5);
+        activity.GetTagItem(GenAiRequestMaxTokensKey).Should().Be(256);
+        activity.GetTagItem(GenAiRequestPresencePenaltyKey).Should().Be(0.25);
+        activity.GetTagItem(GenAiRequestStopSequencesKey).Should().BeEquivalentTo(new[] { "STOP", "END" });
+        activity.GetTagItem(GenAiRequestTemperatureKey).Should().Be(0.7);
+        activity.GetTagItem(GenAiRequestTopPKey).Should().Be(0.9);
+        activity.GetTagItem(GenAiDataSourceIdKey).Should().Be("ds-001");
+        activity.GetTagItem(GenAiOutputTypeKey).Should().Be("json");
+        activity.GetTagItem(GenAiSystemInstructionsKey).Should().Be("Be concise.");
+    }
+
+    [TestMethod]
+    public void ResponseParameters_AreSetOnSpan_WhenProvided()
+    {
+        // Arrange
+        var responseParameters = new GenAiResponseParameters(
+            finishReasons: new[] { "stop", "length" },
+            inputTokens: 100,
+            outputTokens: 180,
+            cacheCreationInputTokens: 25,
+            cacheReadInputTokens: 50);
+        var scopeDetails = new InvokeAgentScopeDetails(
+            endpoint: new Uri("https://example.com"),
+            responseParameters: responseParameters);
+
+        // Act
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = InvokeAgentScope.Start(Util.GetDefaultRequest(), scopeDetails, TestAgentDetails);
+        });
+
+        // Assert
+        activity.GetTagItem(GenAiResponseFinishReasonsKey).Should().BeEquivalentTo(new[] { "stop", "length" });
+        activity.GetTagItem(GenAiUsageInputTokensKey).Should().Be(100);
+        activity.GetTagItem(GenAiUsageOutputTokensKey).Should().Be(180);
+        activity.GetTagItem(GenAiUsageCacheCreationInputTokensKey).Should().Be(25);
+        activity.GetTagItem(GenAiUsageCacheReadInputTokensKey).Should().Be(50);
+    }
+
+    [TestMethod]
+    public void RecordResponseParameters_SetsTagsCorrectly()
+    {
+        // Arrange
+        var responseParameters = new GenAiResponseParameters(
+            finishReasons: new[] { "stop" },
+            inputTokens: 10,
+            outputTokens: 20);
+
+        // Act
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = InvokeAgentScope.Start(Util.GetDefaultRequest(), ScopeDetails, TestAgentDetails);
+            scope.RecordResponseParameters(responseParameters);
+        });
+
+        // Assert
+        activity.GetTagItem(GenAiResponseFinishReasonsKey).Should().BeEquivalentTo(new[] { "stop" });
+        activity.GetTagItem(GenAiUsageInputTokensKey).Should().Be(10);
+        activity.GetTagItem(GenAiUsageOutputTokensKey).Should().Be(20);
+    }
+
+    [TestMethod]
+    public void RequestAndResponseParameters_AreNotSet_WhenAbsent()
+    {
+        // Act
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = InvokeAgentScope.Start(Util.GetDefaultRequest(), ScopeDetails, TestAgentDetails);
+        });
+
+        // Assert
+        activity.GetTagItem(GenAiRequestModelKey).Should().BeNull();
+        activity.GetTagItem(GenAiRequestTemperatureKey).Should().BeNull();
+        activity.GetTagItem(GenAiResponseFinishReasonsKey).Should().BeNull();
+        activity.GetTagItem(GenAiUsageInputTokensKey).Should().BeNull();
+    }
 }

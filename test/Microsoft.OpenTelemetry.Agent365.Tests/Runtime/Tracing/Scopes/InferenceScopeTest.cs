@@ -32,9 +32,9 @@ public sealed class InferenceScopeTest : ActivityTest
         activity.ShouldHaveTag(OpenTelemetryConstants.GenAiOperationNameKey, details.OperationName.ToString());
         activity.ShouldHaveTag(OpenTelemetryConstants.GenAiRequestModelKey, details.Model);
         activity.ShouldHaveTag(OpenTelemetryConstants.GenAiProviderNameKey, details.ProviderName);
-        activity.ShouldHaveTag(OpenTelemetryConstants.GenAiUsageInputTokensKey, details.InputTokens!.Value.ToString());
-        activity.ShouldHaveTag(OpenTelemetryConstants.GenAiUsageOutputTokensKey, details.OutputTokens!.Value.ToString());
-        activity.ShouldHaveTag(OpenTelemetryConstants.GenAiResponseFinishReasonsKey, string.Join(",", details.FinishReasons!));
+        activity.GetTagItem(OpenTelemetryConstants.GenAiUsageInputTokensKey).Should().Be(details.InputTokens!.Value);
+        activity.GetTagItem(OpenTelemetryConstants.GenAiUsageOutputTokensKey).Should().Be(details.OutputTokens!.Value);
+        activity.GetTagItem(OpenTelemetryConstants.GenAiResponseFinishReasonsKey).Should().BeEquivalentTo(details.FinishReasons!);
     }
 
     [TestMethod]
@@ -50,7 +50,7 @@ public sealed class InferenceScopeTest : ActivityTest
             using var scope = InferenceScope.Start(Util.GetDefaultRequest(), details, Util.GetAgentDetails())!;
             scope.RecordInputTokens(inputTokens);
         });
-        activity.ShouldHaveTag(OpenTelemetryConstants.GenAiUsageInputTokensKey, inputTokens.ToString());
+        activity.GetTagItem(OpenTelemetryConstants.GenAiUsageInputTokensKey).Should().Be(inputTokens);
     }
 
     [TestMethod]
@@ -66,7 +66,7 @@ public sealed class InferenceScopeTest : ActivityTest
             using var scope = InferenceScope.Start(Util.GetDefaultRequest(), details, Util.GetAgentDetails())!;
             scope.RecordOutputTokens(outputTokens);
         });
-        activity.ShouldHaveTag(OpenTelemetryConstants.GenAiUsageOutputTokensKey, outputTokens.ToString());
+        activity.GetTagItem(OpenTelemetryConstants.GenAiUsageOutputTokensKey).Should().Be(outputTokens);
     }
 
     [TestMethod]
@@ -83,7 +83,7 @@ public sealed class InferenceScopeTest : ActivityTest
             using var scope = InferenceScope.Start(Util.GetDefaultRequest(), details, Util.GetAgentDetails())!;
             scope.RecordFinishReasons(finishReasons);
         });
-        activity.ShouldHaveTag(OpenTelemetryConstants.GenAiResponseFinishReasonsKey, string.Join(",", finishReasons));
+        activity.GetTagItem(OpenTelemetryConstants.GenAiResponseFinishReasonsKey).Should().BeEquivalentTo(finishReasons);
     }
 
     [TestMethod]
