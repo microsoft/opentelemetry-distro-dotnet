@@ -1,8 +1,10 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
+using System.Reflection;
 using Microsoft.OpenTelemetry.AzureMonitor.SdkStats;
 using Xunit;
 
@@ -102,48 +104,78 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         }
 
         [Fact]
-        public void Initialize_WithStatsbeatPin_DisposesPinOnReset()
+        public void Observe_ThrottlesToSingleEmission_AcrossRapidCollections()
         {
+            // The exporter collects this gauge on the shared 15-minute reader. Verify the
+            // throttle holds it to one emission per 24 hr window so Feature stats don't ship
+            // every 15 min.
             var options = new MicrosoftOpenTelemetryOptions();
             options.AzureMonitor.ConnectionString = ValidConnectionString;
+
             var snapshot = DistroFeatureSnapshot.Build(
-                options, ValidConnectionString, ExportTarget.AzureMonitor, false, false, "9.9.9-pin")!;
+                options,
+                ValidConnectionString,
+                ExportTarget.AzureMonitor,
+                customerSdkStatsEnabled: false,
+                a365OnlyMode: false,
+                distroVersion: "9.9.9-throttle")!;
 
-            var pin = new TrackingDisposable();
-            DistroFeatureSdkStats.Initialize(snapshot, pin);
+            DistroFeatureSdkStats.Initialize(snapshot);
 
-            Assert.False(pin.Disposed);
+            const int simulatedCollections = 5;
+            int emissions = 0;
+            using var listener = new MeterListener
+            {
+                InstrumentPublished = (instrument, l) =>
+                {
+                    if (instrument.Meter.Name == DistroFeatureSdkStats.MeterName
+                        && instrument.Name == DistroFeatureSdkStats.MetricName)
+                    {
+                        l.EnableMeasurementEvents(instrument);
+                    }
+                },
+            };
+            listener.SetMeasurementEventCallback<long>((_, _, _, _) => emissions++);
+            listener.Start();
 
-            DistroFeatureSdkStats.ResetForTesting();
+            for (int i = 0; i < simulatedCollections; i++)
+            {
+                listener.RecordObservableInstruments();
+            }
 
-            Assert.True(pin.Disposed);
+            // 5 collections at the 15-min cadence, but the throttle allows only one until the
+            // 24 hr window elapses.
+            Assert.Equal(1, emissions);
         }
 
         [Fact]
-        public void Initialize_SecondPin_IsDisposedImmediately()
+        public void Observe_EmitsAgain_WhenClockJumpsBackwards()
         {
-            // The first pin wins for the process lifetime; a second pin supplied while one
-            // is already held must be disposed immediately so we don't leak a transmitter.
+            // Simulate the last emission being recorded ~48 hr in the future, i.e. the wall
+            // clock has since jumped backwards (NTP/VM sync). The backwards-jump guard must
+            // allow an emission now instead of suppressing until wall-clock time catches up.
             var options = new MicrosoftOpenTelemetryOptions();
             options.AzureMonitor.ConnectionString = ValidConnectionString;
+
             var snapshot = DistroFeatureSnapshot.Build(
-                options, ValidConnectionString, ExportTarget.AzureMonitor, false, false, "9.9.9-pin")!;
+                options,
+                ValidConnectionString,
+                ExportTarget.AzureMonitor,
+                customerSdkStatsEnabled: false,
+                a365OnlyMode: false,
+                distroVersion: "9.9.9-clockback")!;
 
-            var firstPin = new TrackingDisposable();
-            var secondPin = new TrackingDisposable();
+            DistroFeatureSdkStats.Initialize(snapshot);
 
-            DistroFeatureSdkStats.Initialize(snapshot, firstPin);
-            DistroFeatureSdkStats.Initialize(snapshot, secondPin);
+            var instance = DistroFeatureSdkStats.Instance!;
+            long futureTicks = DateTime.UtcNow.Ticks + TimeSpan.FromHours(48).Ticks;
+            typeof(DistroFeatureSdkStats)
+                .GetField("_lastEmissionTicks", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .SetValue(instance, futureTicks);
 
-            Assert.False(firstPin.Disposed);
-            Assert.True(secondPin.Disposed);
-        }
+            var measurements = CollectObservableMeasurements();
 
-        private sealed class TrackingDisposable : System.IDisposable
-        {
-            public bool Disposed { get; private set; }
-
-            public void Dispose() => Disposed = true;
+            Assert.Single(measurements);
         }
 
         private static List<(long value, Dictionary<string, object?> tags)> CollectObservableMeasurements()

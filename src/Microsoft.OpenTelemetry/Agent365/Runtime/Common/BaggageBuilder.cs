@@ -375,11 +375,33 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Common
         /// <returns>The current builder instance for method chaining.</returns>
         public BaggageBuilder CustomAttribute(string key, string? value)
         {
-            if (!string.IsNullOrWhiteSpace(key) && !string.IsNullOrWhiteSpace(value))
+            if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(value))
             {
-                Set(key, value);
-                _customKeys.Add(key);
+                return this;
             }
+
+            // Normalize the key so it matches how the ActivityProcessor looks it up (the processor
+            // trims each entry it reads from the reserved baggage list). Without this, a key with
+            // leading/trailing whitespace would be stored untrimmed yet looked up trimmed, so its
+            // value would never be coalesced onto spans.
+            var trimmedKey = key.Trim();
+
+            // Commas delimit keys in the reserved baggage list. A key containing a comma would be
+            // split into multiple bogus lookups by the processor, so reject it outright.
+            if (trimmedKey.IndexOf(',') >= 0)
+            {
+                return this;
+            }
+
+            // The reserved meta-key tracks the set of custom keys; it must never be registered as a
+            // custom attribute or the internal key list could be emitted as a span tag.
+            if (string.Equals(trimmedKey, OpenTelemetryConstants.CustomBaggageKeysKey, StringComparison.Ordinal))
+            {
+                return this;
+            }
+
+            Set(trimmedKey, value);
+            _customKeys.Add(trimmedKey);
             return this;
         }
 

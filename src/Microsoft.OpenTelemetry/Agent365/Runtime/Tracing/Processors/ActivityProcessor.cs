@@ -5,6 +5,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
     using Microsoft.Agents.A365.Observability.Runtime.Common;
     using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
     using global::OpenTelemetry;
+    using System;
     using System.Diagnostics;
 
     /// <summary>
@@ -42,6 +43,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
             OpenTelemetryConstants.UserNameKey,
             OpenTelemetryConstants.UserEmailKey,
             OpenTelemetryConstants.CallerClientIpKey,
+            OpenTelemetryConstants.ServiceNameKey,
         };
 
         private static readonly string[] InvokeAgentAttributeKeys = new[]
@@ -94,7 +96,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
                 foreach (var key in customKeys!.Split(','))
                 {
                     var trimmedKey = key.Trim();
-                    if (trimmedKey.Length > 0)
+                    if (trimmedKey.Length > 0 &&
+                        !string.Equals(trimmedKey, OpenTelemetryConstants.CustomBaggageKeysKey, StringComparison.Ordinal))
                     {
                         activity.CoalesceTag(trimmedKey, Baggage.Current.GetBaggage(trimmedKey));
                     }

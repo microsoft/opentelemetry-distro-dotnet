@@ -112,6 +112,36 @@ public sealed class ActivityProcessorTests : ActivityTest
     }
 
     /// <summary>
+    /// BaggageBuilder.OperationSource sets service.name in baggage; the processor must
+    /// propagate it onto eligible GenAI spans via the AttributeKeys allow-list.
+    /// </summary>
+    [TestMethod]
+    public void OnStart_PropagatesServiceName_FromOperationSourceBaggage()
+    {
+        // Arrange
+        using var tracerProvider = ConstructTracerProvider();
+        const string serviceName = "ACF";
+
+        // Act - set service.name via OperationSource baggage, then start an eligible GenAI span
+        using (new BaggageBuilder()
+            .OperationSource(serviceName)
+            .Build())
+        {
+            var activity = ListenForActivity(() =>
+            {
+                using var scope = InvokeAgentScope.Start(
+                    new Request(),
+                    new InvokeAgentScopeDetails(endpoint: null),
+                    new AgentDetails("agent-1"));
+            });
+
+            // Assert - processor must coalesce service.name onto the GenAI span
+            activity.GetTagItem(ServiceNameKey).Should().Be(serviceName,
+                because: "BaggageBuilder.OperationSource() must propagate service.name onto eligible GenAI spans");
+        }
+    }
+
+    /// <summary>
     /// The four GenAI scope types (invoke_agent, execute_tool, inference, output_messages)
     /// must have baggage-backed tags coalesced onto them by the processor.
     /// </summary>
@@ -358,6 +388,102 @@ public sealed class ActivityProcessorTests : ActivityTest
                 because: "invoke_agent-specific server.address must not leak onto inference spans");
             inferenceActivity.GetTagItem(ServerPortKey).Should().BeNull(
                 because: "invoke_agent-specific server.port must not leak onto inference spans");
+        }
+    }
+
+    /// <summary>
+    /// A custom attribute key with surrounding whitespace must still be coalesced onto spans:
+    /// the builder normalizes the key so it matches the trimmed key the processor looks up.
+    /// </summary>
+    [TestMethod]
+    public void OnStart_CoalescesCustomAttributeKeys_WhenKeyHasSurroundingWhitespace()
+    {
+        // Arrange
+        using var tracerProvider = ConstructTracerProvider();
+
+        // Act - custom key is supplied with leading/trailing whitespace
+        using (new BaggageBuilder()
+            .CustomAttribute("  custom.spaced.key  ", "spaced-value")
+            .Build())
+        {
+            var activity = ListenForActivity(() =>
+            {
+                using var scope = InferenceScope.Start(
+                    new Request(),
+                    new InferenceCallDetails(InferenceOperationType.Chat, "model-name", "provider-name"),
+                    new AgentDetails("agent-1"));
+            });
+
+            // Assert
+            activity.GetTagItem("custom.spaced.key").Should().Be("spaced-value",
+                because: "custom keys are trimmed so they resolve against the processor's lookup");
+        }
+    }
+
+    /// <summary>
+    /// The reserved internal meta-key must never be registered as a custom attribute nor
+    /// emitted as a span tag, even if a caller passes it explicitly.
+    /// </summary>
+    [TestMethod]
+    public void OnStart_DoesNotEmitReservedMetaKey_WhenPassedAsCustomAttribute()
+    {
+        // Arrange
+        using var tracerProvider = ConstructTracerProvider();
+
+        // Act - caller maliciously/accidentally passes the reserved meta-key
+        using (new BaggageBuilder()
+            .CustomAttribute(CustomBaggageKeysKey, "leaked-plumbing")
+            .Build())
+        {
+            var activity = ListenForActivity(() =>
+            {
+                using var scope = InferenceScope.Start(
+                    new Request(),
+                    new InferenceCallDetails(InferenceOperationType.Chat, "model-name", "provider-name"),
+                    new AgentDetails("agent-1"));
+            });
+
+            // Assert
+            activity.GetTagItem(CustomBaggageKeysKey).Should().BeNull(
+                because: "the reserved internal meta-key must never surface as a span tag");
+        }
+    }
+
+    /// <summary>
+    /// The reserved meta-key must not be coalesced onto spans even when it is present inside
+    /// the custom-keys list itself (e.g. ambient baggage set manually/maliciously).
+    /// </summary>
+    [TestMethod]
+    public void OnStart_DoesNotEmitReservedMetaKey_WhenPresentInAmbientCustomKeysList()
+    {
+        // Arrange
+        using var tracerProvider = ConstructTracerProvider();
+
+        // Act - manually set ambient baggage that lists the reserved key among the custom keys
+        var previous = Baggage.Current;
+        try
+        {
+            Baggage.Current = Baggage.Current
+                .SetBaggage("custom.real.key", "real-value")
+                .SetBaggage(CustomBaggageKeysKey, $"custom.real.key,{CustomBaggageKeysKey}");
+
+            var activity = ListenForActivity(() =>
+            {
+                using var scope = InferenceScope.Start(
+                    new Request(),
+                    new InferenceCallDetails(InferenceOperationType.Chat, "model-name", "provider-name"),
+                    new AgentDetails("agent-1"));
+            });
+
+            // Assert
+            activity.GetTagItem("custom.real.key").Should().Be("real-value",
+                because: "legitimate custom keys must still be coalesced onto spans");
+            activity.GetTagItem(CustomBaggageKeysKey).Should().BeNull(
+                because: "the reserved meta-key must be skipped even if it appears in the custom-keys list");
+        }
+        finally
+        {
+            Baggage.Current = previous;
         }
     }
 }

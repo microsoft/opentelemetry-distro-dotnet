@@ -85,6 +85,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
                 }
             }
 
+            SetRequestParameters(scopeDetails?.RequestParameters);
+            SetResponseParameters(scopeDetails?.ResponseParameters);
+
             // Set request metadata
             if (request?.Channel != null)
             {
@@ -124,6 +127,52 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         public void RecordResponse(string response)
         {
             this.RecordOutputMessages(messages: new string[] { response });
+        }
+
+        /// <summary>
+        /// Records response-side GenAI parameters (finish reasons and token usage) for telemetry tracking.
+        /// </summary>
+        /// <param name="responseParameters">The response parameters to record.</param>
+        public void RecordResponseParameters(GenAiResponseParameters responseParameters)
+        {
+            SetResponseParameters(responseParameters);
+        }
+
+        private void SetRequestParameters(GenAiRequestParameters? requestParameters)
+        {
+            if (requestParameters == null)
+            {
+                return;
+            }
+
+            SetTagMaybe(OpenTelemetryConstants.GenAiRequestModelKey, requestParameters.Model);
+            SetTagMaybe(OpenTelemetryConstants.GenAiRequestSeedKey, requestParameters.Seed);
+            SetTagMaybe(OpenTelemetryConstants.GenAiRequestChoiceCountKey, requestParameters.ChoiceCount);
+            SetTagMaybe(OpenTelemetryConstants.GenAiRequestFrequencyPenaltyKey, requestParameters.FrequencyPenalty);
+            SetTagMaybe(OpenTelemetryConstants.GenAiRequestMaxTokensKey, requestParameters.MaxTokens);
+            SetTagMaybe(OpenTelemetryConstants.GenAiRequestPresencePenaltyKey, requestParameters.PresencePenalty);
+            SetTagMaybe(OpenTelemetryConstants.GenAiRequestStopSequencesKey, requestParameters.StopSequences);
+            SetTagMaybe(OpenTelemetryConstants.GenAiRequestTemperatureKey, requestParameters.Temperature);
+            SetTagMaybe(OpenTelemetryConstants.GenAiRequestTopPKey, requestParameters.TopP);
+            SetTagMaybe(OpenTelemetryConstants.GenAiDataSourceIdKey, requestParameters.DataSourceId);
+            SetTagMaybe(OpenTelemetryConstants.GenAiOutputTypeKey, requestParameters.OutputType);
+            SetTagMaybe(OpenTelemetryConstants.GenAiSystemInstructionsKey, requestParameters.SystemInstructions);
+        }
+
+        private void SetResponseParameters(GenAiResponseParameters? responseParameters)
+        {
+            if (responseParameters == null)
+            {
+                return;
+            }
+
+            SetTagMaybe(
+                OpenTelemetryConstants.GenAiResponseFinishReasonsKey,
+                responseParameters.FinishReasons);
+            SetTagMaybe(OpenTelemetryConstants.GenAiUsageInputTokensKey, responseParameters.InputTokens);
+            SetTagMaybe(OpenTelemetryConstants.GenAiUsageOutputTokensKey, responseParameters.OutputTokens);
+            SetTagMaybe(OpenTelemetryConstants.GenAiUsageCacheCreationInputTokensKey, responseParameters.CacheCreationInputTokens);
+            SetTagMaybe(OpenTelemetryConstants.GenAiUsageCacheReadInputTokensKey, responseParameters.CacheReadInputTokens);
         }
 
         /// <summary>

@@ -13,8 +13,9 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
     /// Owns the distro's Feature SDKStats meter and observable gauge. The Azure Monitor
     /// exporter's Statsbeat <c>MeterProvider</c> subscribes to the meter name advertised by
     /// this class (see <c>StatsbeatConstants.DistroFeatureSdkStatsMeterName</c> in the
-    /// exporter), so measurements are exported on the existing 24-hour Statsbeat cadence
-    /// without any further wiring on the distro side.
+    /// exporter). That provider collects on the shared 15-minute reader, so this gauge
+    /// throttles to one emission per <see cref="EmissionInterval"/> (24 hr) instead of
+    /// shipping every 15 min.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -46,6 +47,13 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
         /// <summary>Meter version reported alongside <see cref="MeterName"/>.</summary>
         internal const string MeterVersion = "1.0";
 
+        /// <summary>
+        /// Minimum time between Feature SDKStats emissions. Feature stats share the exporter's
+        /// 15-minute reader but must ship on the 24 hr cadence, so <see cref="Observe"/>
+        /// throttles to one emission per interval (matches the exporter's Attach gauge).
+        /// </summary>
+        internal static readonly TimeSpan EmissionInterval = TimeSpan.FromHours(24);
+
         private static DistroFeatureSdkStats? s_instance;
         private static readonly object s_lock = new();
 
@@ -53,7 +61,10 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 
         private readonly Meter _meter;
         private DistroFeatureSnapshot _snapshot;
-        private IDisposable? _statsbeatExporterPin;
+
+        // Throttle so the Feature gauge emits at most once per EmissionInterval even though
+        // the shared reader collects every 15 min.
+        private long _lastEmissionTicks;
 
         private DistroFeatureSdkStats(DistroFeatureSnapshot snapshot)
         {
@@ -74,24 +85,21 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
         /// snapshot. Safe to call repeatedly; the most recent snapshot wins.
         /// </summary>
         /// <param name="snapshot">Bit map + cikey + distro version describing the configuration.</param>
-        /// <param name="statsbeatExporterPin">
-        /// Optional <see cref="IDisposable"/> kept alive for the lifetime of this singleton.
-        /// Used by the distro to pin an inert <c>AzureMonitorMetricExporter</c> whose
-        /// construction side-effect creates the Statsbeat <c>MeterProvider</c> that ships
-        /// our <c>Feature</c> measurement when the customer hasn't selected the Azure
-        /// Monitor exporter. Pass <see langword="null"/> when the customer's own Azure
-        /// Monitor exporter already triggers Statsbeat for the process.
-        /// </param>
-        internal static DistroFeatureSdkStats Initialize(
-            DistroFeatureSnapshot snapshot,
-            IDisposable? statsbeatExporterPin = null)
+        /// <remarks>
+        /// The Statsbeat <c>MeterProvider</c> that ships our <c>Feature</c> measurement is
+        /// brought up either by the customer's own <c>AzureMonitorMetricExporter</c> (when
+        /// Azure Monitor is selected) or by the distro's process-wide
+        /// <c>SdkStatsPin</c> (eagerly created in
+        /// <c>MicrosoftOpenTelemetryBuilderExtensions.TryEnsureSdkStatsPin</c>) when
+        /// it is not. Either way, the pin's lifetime is managed outside this class.
+        /// </remarks>
+        internal static DistroFeatureSdkStats Initialize(DistroFeatureSnapshot snapshot)
         {
             if (snapshot is null)
             {
                 throw new ArgumentNullException(nameof(snapshot));
             }
 
-            DistroFeatureSdkStats current;
             lock (s_lock)
             {
                 if (s_instance is null)
@@ -111,22 +119,8 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
                     Volatile.Write(ref s_instance._snapshot, snapshot);
                 }
 
-                current = s_instance;
-
-                // The first pin wins for the process lifetime. If a second call supplies a
-                // pin while one is already held, dispose the redundant one immediately —
-                // the cached transmitter behind it lives in TransmitterFactory and will
-                // continue to serve the already-attached Statsbeat MeterProvider.
-                if (statsbeatExporterPin != null)
-                {
-                    if (Interlocked.CompareExchange(ref current._statsbeatExporterPin, statsbeatExporterPin, null) != null)
-                    {
-                        try { statsbeatExporterPin.Dispose(); } catch { /* best effort */ }
-                    }
-                }
+                return s_instance;
             }
-
-            return current;
         }
 
         /// <summary>
@@ -145,7 +139,6 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
         public void Dispose()
         {
             _meter.Dispose();
-            try { _statsbeatExporterPin?.Dispose(); } catch { /* best effort */ }
         }
 
         private IEnumerable<Measurement<long>> Observe()
@@ -169,6 +162,24 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
                 return EmptyMeasurements;
             }
 
+            // Throttle to the 24 hr cadence: skip collections inside the window. Delta
+            // temporality means a skipped collection exports nothing. A negative elapsed value
+            // means the wall clock jumped backwards (e.g. NTP/VM sync); treat that as eligible
+            // so a backwards jump re-anchors the window instead of suppressing for up to 24 hr.
+            long previousTicks = Volatile.Read(ref _lastEmissionTicks);
+            long nowTicks = DateTime.UtcNow.Ticks;
+            long elapsedTicks = nowTicks - previousTicks;
+            if (previousTicks != 0 && elapsedTicks >= 0 && elapsedTicks < EmissionInterval.Ticks)
+            {
+                return EmptyMeasurements;
+            }
+
+            // CAS so a racing collection can't double-emit.
+            if (Interlocked.CompareExchange(ref _lastEmissionTicks, nowTicks, previousTicks) != previousTicks)
+            {
+                return EmptyMeasurements;
+            }
+
             try
             {
                 var measurement = new Measurement<long>(
@@ -187,6 +198,8 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             catch (Exception ex)
             {
                 AzureMonitorAspNetCoreEventSource.Log.DistroFeatureSdkStatsCallbackFailed(ex);
+                // Rewind so we retry on the next collection.
+                Volatile.Write(ref _lastEmissionTicks, previousTicks);
                 return EmptyMeasurements;
             }
         }
