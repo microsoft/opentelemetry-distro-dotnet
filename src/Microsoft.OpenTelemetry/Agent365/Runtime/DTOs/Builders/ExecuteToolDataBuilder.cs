@@ -15,8 +15,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
     /// </summary>
     public class ExecuteToolDataBuilder : BaseDataBuilder<ExecuteToolData>
     {
-        private const string ExecuteToolOperationName = "execute_tool";
-
         /// <summary>
         /// Builds complete data for an execute_tool operation.
         /// </summary>
@@ -33,6 +31,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
         /// <param name="extraAttributes">Optional dictionary of extra attributes.</param>
         /// <param name="spanKind">Optional span kind override. Use <see cref="SpanKindConstants.Internal"/> or <see cref="SpanKindConstants.Client"/> as appropriate.</param>
         /// <param name="traceId">Optional trace ID for distributed tracing.</param>
+        /// <param name="error">Optional exception describing a failure; sets an OTel error status and the <c>error.type</c> attribute.</param>
         /// <returns>An ExecuteToolData object containing all telemetry data.</returns>
         public static ExecuteToolData Build(
             ToolCallDetails toolCallDetails,
@@ -47,11 +46,12 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             CallerDetails? callerDetails = null,
             IDictionary<string, object?>? extraAttributes = null,
             string? spanKind = null,
-            string? traceId = null)
+            string? traceId = null,
+            Exception? error = null)
         {
             var attributes = BuildAttributes(toolCallDetails, agentDetails, conversationId, responseContent, channel, callerDetails, extraAttributes);
 
-            return new ExecuteToolData(attributes, startTime, endTime, spanId, parentSpanId, spanKind, traceId);
+            return ApplyStatus(new ExecuteToolData(attributes, startTime, endTime, spanId, parentSpanId, spanKind, traceId), error);
         }
 
         private static Dictionary<string, object?> BuildAttributes(
@@ -65,8 +65,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
         {
             var attributes = new Dictionary<string, object?>();
 
+            // SDK attributes
+            AddSdkAttributes(attributes);
+
             // Operation name
-            AddIfNotNull(attributes, GenAiOperationNameKey, ExecuteToolDataBuilder.ExecuteToolOperationName);
+            AddIfNotNull(attributes, GenAiOperationNameKey, OpenTelemetryConstants.ExecuteToolOperationName);
 
             AddAgentDetails(attributes, agentDetails);
 

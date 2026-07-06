@@ -79,6 +79,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
                 SetTagMaybe(GenAiAgentNameKey, agentDetails.AgentName);
                 SetTagMaybe(GenAiAgentDescriptionKey, agentDetails.AgentDescription);
                 SetTagMaybe(GenAiAgentVersionKey, agentDetails.AgentVersion);
+                SetTagMaybe(GenAiProviderNameKey, agentDetails.ProviderName);
                 SetTagMaybe(AgentAUIDKey, agentDetails.AgenticUserId);
                 SetTagMaybe(AgentEmailKey, agentDetails.AgenticUserEmail);
                 SetTagMaybe(AgentBlueprintIdKey, agentDetails.AgentBlueprintId);
@@ -235,6 +236,15 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         protected void AddBaggage(string key, string value)
         {
             activity?.AddBaggage(key, value);
+        }
+
+        /// <summary>
+        /// Adds an event to the current activity.
+        /// </summary>
+        /// <param name="activityEvent">The event to add.</param>
+        protected void AddEvent(ActivityEvent activityEvent)
+        {
+            activity?.AddEvent(activityEvent);
         }
 
         /// <summary>

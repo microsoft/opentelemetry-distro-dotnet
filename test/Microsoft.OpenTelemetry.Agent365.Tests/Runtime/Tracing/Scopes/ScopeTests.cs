@@ -35,7 +35,7 @@ public sealed class ScopeTests : ActivityTest
         activity.Should().NotBeNull();
         activity.Kind.Should().Be(ActivityKind.Internal);
         activity.TagObjects.Should().ContainKey(GenAiOperationNameKey)
-            .WhoseValue.Should().Be(ExecuteToolScope.OperationName);
+            .WhoseValue.Should().Be(OpenTelemetryConstants.ExecuteToolOperationName);
         activity.TagObjects.Should().ContainKey(GenAiAgentIdKey)
             .WhoseValue.Should().BeOfType<string>()
             .Which.Should().Be(AgentId);

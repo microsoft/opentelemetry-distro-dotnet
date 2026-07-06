@@ -30,6 +30,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
         /// <param name="callerDetails">Optional details about the caller.</param>
         /// <param name="extraAttributes">Optional dictionary of extra attributes.</param>
         /// <param name="traceId">Optional trace ID for distributed tracing.</param>
+        /// <param name="error">Optional exception describing a failure; sets an OTel error status and the <c>error.type</c> attribute.</param>
         /// <returns>An ExecuteInferenceData object containing all telemetry data.</returns>
         public static ExecuteInferenceData Build(
             InferenceCallDetails inferenceCallDetails,
@@ -45,7 +46,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             string? thoughtProcess = null,
             CallerDetails? callerDetails = null,
             IDictionary<string, object?>? extraAttributes = null,
-            string? traceId = null)
+            string? traceId = null,
+            Exception? error = null)
         {
             var attributes = BuildAttributes(
                 inferenceCallDetails,
@@ -58,7 +60,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
                 callerDetails,
                 extraAttributes);
 
-            return new ExecuteInferenceData(attributes, startTime, endTime, spanId, parentSpanId, traceId);
+            return ApplyStatus(new ExecuteInferenceData(attributes, startTime, endTime, spanId, parentSpanId, traceId), error);
         }
 
         private static Dictionary<string, object?> BuildAttributes(
@@ -73,6 +75,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             IDictionary<string, object?>? extraAttributes = null)
         {
             var attributes = new Dictionary<string, object?>();
+
+            // SDK attributes
+            AddSdkAttributes(attributes);
 
             // Agent details (includes tenant ID)
             AddAgentDetails(attributes, agentDetails);
@@ -109,9 +114,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             AddIfNotNull(attributes, GenAiOperationNameKey, inferenceCallDetails.OperationName.ToString().ToLowerInvariant());
             AddIfNotNull(attributes, GenAiRequestModelKey, inferenceCallDetails.Model);
             AddIfNotNull(attributes, GenAiProviderNameKey, inferenceCallDetails.ProviderName);
-            AddIfNotNull(attributes, GenAiUsageInputTokensKey, inferenceCallDetails.InputTokens?.ToString());
-            AddIfNotNull(attributes, GenAiUsageOutputTokensKey, inferenceCallDetails.OutputTokens?.ToString());
-            AddIfNotNull(attributes, GenAiResponseFinishReasonsKey, inferenceCallDetails.FinishReasons != null ? string.Join(",", inferenceCallDetails.FinishReasons) : null);
+            AddIfNotNull(attributes, GenAiUsageInputTokensKey, inferenceCallDetails.InputTokens);
+            AddIfNotNull(attributes, GenAiUsageOutputTokensKey, inferenceCallDetails.OutputTokens);
+            AddIfNotNull(attributes, GenAiResponseFinishReasonsKey, inferenceCallDetails.FinishReasons);
         }
     }
 }

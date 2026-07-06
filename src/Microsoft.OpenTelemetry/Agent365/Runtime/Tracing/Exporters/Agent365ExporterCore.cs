@@ -5,15 +5,18 @@ using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.OpenTelemetry.AzureMonitor.SdkStats;
 using OpenTelemetry;
 using OpenTelemetry.Resources;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
@@ -25,6 +28,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
     public class Agent365ExporterCore
     {
         private const string CorrelationIdHeaderKey = "x-ms-correlation-id";
+        private const string DocsUrl403 = "https://aka.ms/a365-403";
+        private const string FoundryUrl403 = "https://aka.ms/foundry-grant-agent-365-permissions";
         private readonly ExportFormatter _formatter;
         private readonly ILogger<Agent365ExporterCore> _logger;
 
@@ -32,15 +37,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         // gen_ai.operation.name through unchanged. Both the lowercase canonical value and the
         // InferenceOperationType.Chat enum name are accepted in this set so that activities
         // tagged with either form are not filtered out by PartitionByIdentity.
-        private static readonly HashSet<string> GenAiOperationNames = new HashSet<string>(StringComparer.Ordinal)
-        {
-            InvokeAgentScope.OperationName,
-            ExecuteToolScope.OperationName,
-            OutputScope.OperationName,
-            "chat",
-            nameof(InferenceOperationType.Chat),
-        };
-
         private enum AddResult { Added, NonGenAI, MissingIdentity, Null }
 
         /// <summary>
@@ -190,6 +186,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 var endpointPath = BuildEndpointPath(tenantId, agentId, options.UseS2SEndpoint);
                 var requestUri = BuildRequestUri(endpoint, endpointPath);
 
+                // Host used for the a365 Network SDKStats 'host' dimension (stamp is extracted
+                // by the recorder). Resolved once per identity group; null when the URI is
+                // malformed, in which case the recorder falls back to "unknown".
+                string? requestHost = Uri.TryCreate(requestUri, UriKind.Absolute, out var parsedUri) ? parsedUri.Host : null;
+
                 string? token = null;
                 try
                 {
@@ -243,24 +244,33 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
                     try
                     {
+                        var networkStats = DistroNetworkSdkStats.Instance;
+                        var stopwatch = networkStats != null ? Stopwatch.StartNew() : null;
+
                         using var resp = await sendAsync(request).ConfigureAwait(false);
+
+                        if (networkStats != null)
+                        {
+                            networkStats.TrackResponse(requestHost, (int)resp.StatusCode, stopwatch!.Elapsed.TotalMilliseconds);
+                        }
+
                         var correlationId = resp.Headers.Contains(CorrelationIdHeaderKey) ? resp.Headers.GetValues(CorrelationIdHeaderKey).FirstOrDefault() : null;
                         this._logger?.LogDebug("Agent365ExporterCore: HTTP {StatusCode} exporting spans. '{HeaderKey}': '{CorrelationId}'.", (int)resp.StatusCode, CorrelationIdHeaderKey, correlationId);
                         if (!resp.IsSuccessStatusCode)
                         {
-                            this._logger?.LogWarning(
-                                "Agent365ExporterCore: Chunk {ChunkIndex} of {ChunkCount} failed; aborting batch.",
-                                i + 1, chunks.Count);
+                            LogNonSuccessResponse(resp, correlationId, token!, i + 1, chunks.Count);
                             return ExportResult.Failure;
                         }
                     }
                     catch (HttpRequestException ex)
                     {
+                        DistroNetworkSdkStats.Instance?.TrackException(requestHost, ex.GetType().FullName);
                         this._logger?.LogError(ex, "Agent365ExporterCore: Exception exporting spans.");
                         return ExportResult.Failure;
                     }
                     catch (TaskCanceledException ex)
                     {
+                        DistroNetworkSdkStats.Instance?.TrackException(requestHost, ex.GetType().FullName);
                         this._logger?.LogError(ex, "Agent365ExporterCore: Exception exporting spans.");
                         return ExportResult.Failure;
                     }
@@ -274,7 +284,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             if (activity is null) return AddResult.Null;
 
             var operationName = activity.GetAttributeOrBaggage(OpenTelemetryConstants.GenAiOperationNameKey);
-            if (string.IsNullOrEmpty(operationName) || !GenAiOperationNames.Contains(operationName!))
+            if (string.IsNullOrEmpty(operationName) || !OpenTelemetryConstants.GenAiOperationNames.Contains(operationName!))
                 return AddResult.NonGenAI;
 
             var tenant = activity.GetAttributeOrBaggage(OpenTelemetryConstants.TenantIdKey);
@@ -303,6 +313,75 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             var skippedCount = nonGenAICount + missingIdentityCount;
             if (skippedCount > 0)
                 _logger?.LogDebug("[Agent365Exporter] Partitioned into {GroupCount} identity groups ({SkippedCount} spans skipped)", groupCount, skippedCount);
+        }
+
+        private void LogNonSuccessResponse(HttpResponseMessage resp, string? correlationId, string token, int chunkIndex, int chunkCount)
+        {
+            var wwwAuth = resp.Headers.WwwAuthenticate.ToString();
+
+            if (resp.StatusCode == HttpStatusCode.Forbidden && wwwAuth.Contains("insufficient_scope", StringComparison.OrdinalIgnoreCase))
+            {
+                var spStr = ExtractTokenIdentity(token);
+                var identityDescription = !string.IsNullOrEmpty(spStr)
+                    ? $" service principal ({spStr})"
+                    : " your application's service principal";
+
+                _logger?.LogError(
+                    $"HTTP 403 authorization error: the token is missing the required 'Agent365.Observability.OtelWrite' app role. Grant the 'Agent365.Observability.OtelWrite' role to{identityDescription} and ensure admin consent has been granted. | Setup instructions: {DocsUrl403} | For Foundry: {FoundryUrl403} | Correlation ID: {correlationId ?? "N/A"}.");
+            }
+            else
+            {
+                _logger?.LogError(
+                    "Agent365ExporterCore: HTTP {StatusCode} error. " +
+                    "Chunk {ChunkIndex} of {ChunkCount} failed; aborting batch. " +
+                    "WWW-Authenticate: {WwwAuthenticate}. Correlation ID: {CorrelationId}.",
+                    (int)resp.StatusCode,
+                    chunkIndex,
+                    chunkCount,
+                    string.IsNullOrEmpty(wwwAuth) ? "N/A" : wwwAuth,
+                    correlationId ?? "N/A");
+            }
+        }
+
+        /// <summary>
+        /// Decodes the JWT payload to extract service principal identity claims.
+        /// Returns a descriptive string like "app ID: xxx, object ID: yyy" or empty if not decodable.
+        /// </summary>
+        internal static string ExtractTokenIdentity(string token)
+        {
+            try
+            {
+                var parts = token.Split('.');
+                if (parts.Length != 3)
+                    return string.Empty;
+
+                var payloadBase64 = parts[1];
+                // Pad to valid base64
+                switch (payloadBase64.Length % 4)
+                {
+                    case 2: payloadBase64 += "=="; break;
+                    case 3: payloadBase64 += "="; break;
+                }
+
+                var payloadBytes = Convert.FromBase64String(payloadBase64.Replace('-', '+').Replace('_', '/'));
+                using var doc = JsonDocument.Parse(payloadBytes);
+                var root = doc.RootElement;
+
+                var spParts = new List<string>();
+                if (root.TryGetProperty("appid", out var appId) && appId.ValueKind == JsonValueKind.String)
+                    spParts.Add($"app ID: {appId.GetString()}");
+                else if (root.TryGetProperty("azp", out var azp) && azp.ValueKind == JsonValueKind.String)
+                    spParts.Add($"app ID: {azp.GetString()}");
+
+                if (root.TryGetProperty("oid", out var oid) && oid.ValueKind == JsonValueKind.String)
+                    spParts.Add($"object ID: {oid.GetString()}");
+
+                return string.Join(", ", spParts);
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
     }
 }

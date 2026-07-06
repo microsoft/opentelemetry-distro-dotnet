@@ -14,8 +14,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
     /// </summary>
     public class InvokeAgentDataBuilder : BaseDataBuilder<InvokeAgentData>
     {
-        private const string InvokeAgentOperationName = "invoke_agent";
-
         /// <summary>
         /// Builds complete data for an invoke_agent operation.
         /// </summary>
@@ -33,6 +31,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
         /// <param name="extraAttributes">Optional dictionary of extra attributes.</param>
         /// <param name="spanKind">Optional span kind override. Use <see cref="SpanKindConstants.Client"/> or <see cref="SpanKindConstants.Server"/> as appropriate.</param>
         /// <param name="traceId">Optional trace ID for distributed tracing.</param>
+        /// <param name="error">Optional exception describing a failure; sets an OTel error status and the <c>error.type</c> attribute.</param>
         /// <returns>An InvokeAgentData object containing all telemetry data.</returns>
         public static InvokeAgentData Build(
             InvokeAgentScopeDetails invokeAgentScopeDetails,
@@ -48,7 +47,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             string? parentSpanId = null,
             IDictionary<string, object?>? extraAttributes = null,
             string? spanKind = null,
-            string? traceId = null)
+            string? traceId = null,
+            Exception? error = null)
         {
             var attributes = BuildAttributes(
                 invokeAgentScopeDetails,
@@ -60,14 +60,14 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
                 outputMessages,
                 extraAttributes);
 
-            return new InvokeAgentData(
+            return ApplyStatus(new InvokeAgentData(
                 attributes,
                 startTime,
                 endTime,
                 spanId,
                 parentSpanId,
                 spanKind,
-                traceId);
+                traceId), error);
         }
 
         /// <summary>
@@ -94,14 +94,21 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
         {
             var attributes = new Dictionary<string, object?>();
 
+            // SDK attributes
+            AddSdkAttributes(attributes);
+
             // Operation name
-            AddIfNotNull(attributes, GenAiOperationNameKey, InvokeAgentDataBuilder.InvokeAgentOperationName);
+            AddIfNotNull(attributes, GenAiOperationNameKey, OpenTelemetryConstants.InvokeAgentOperationName);
 
             // Add agent details (includes tenant ID)
             AddAgentDetails(attributes, agentDetails);
 
             // Add endpoint details
             AddEndpointDetails(attributes, invokeAgentScopeDetails.Endpoint);
+
+            // Add request/response GenAI parameters (model, sampling, usage, finish reasons)
+            AddRequestParameters(attributes, invokeAgentScopeDetails.RequestParameters);
+            AddResponseParameters(attributes, invokeAgentScopeDetails.ResponseParameters);
 
             // Add request details
             AddRequestDetails(attributes, request);

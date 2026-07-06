@@ -5,6 +5,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.OpenTelemetry.AzureMonitor.Internals;
+using Microsoft.OpenTelemetry.AzureMonitor.SdkStats;
 using global::OpenTelemetry;
 using global::OpenTelemetry.Trace;
 using global::OpenTelemetry.Metrics;
@@ -89,6 +92,16 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         }
 
         builder.Services.AddSingleton(UseMicrosoftOpenTelemetryRegistration.Instance);
+
+        // Route SDK statistics emitted in this process to the distro-owned ingestion
+        // endpoints instead of the legacy internal Application Insights resources. The
+        // switch is honored by Azure.Monitor.OpenTelemetry.Exporter's SDK Stats subsystem
+        // and applies to every AzureMonitorMetricExporter constructed after this point —
+        // including the customer's own exporter when running under the distro. Must be set
+        // before any exporter is constructed (the ctor triggers SDK statistics init).
+        AppContext.SetSwitch(
+            "Azure.Monitor.OpenTelemetry.Exporter.RouteSdkStatsToDistroEndpoint",
+            true);
 
         var options = new MicrosoftOpenTelemetryOptions();
         configure(options);
@@ -309,7 +322,118 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             }
         }
 
+        // Bootstrap SDK Stats eagerly when no Azure Monitor exporter is selected so that
+        // Attach + Feature SDK Stats are reported in OTLP-only / Console-only / Agent365-only
+        // deployments. Must be called after `exporters` is finalized (to avoid double-pinning
+        // when AzureMonitor is selected) and after the AppContext switch above is set (so
+        // SDK Stats routes to the distro-owned ingestion endpoint).
+        SdkStatsPin.EnsureIfApplicable(exporters);
+        RegisterDistroFeatureSdkStats(builder.Services, options, exporters, a365OnlyMode);
+
         return builder;
+    }
+
+    private static void RegisterDistroFeatureSdkStats(
+        IServiceCollection services,
+        MicrosoftOpenTelemetryOptions options,
+        ExportTarget effectiveExporters,
+        bool a365OnlyMode)
+    {
+        // Kill switch is checked at registration time so we don't even attach the MeterProvider
+        // configurator when stats are disabled.
+        string? disabled;
+        try
+        {
+            disabled = Environment.GetEnvironmentVariable(
+                EnvironmentVariableConstants.APPLICATIONINSIGHTS_STATSBEAT_DISABLED);
+        }
+        catch (Exception)
+        {
+            disabled = null;
+        }
+
+        if (string.Equals(disabled, "true", StringComparison.OrdinalIgnoreCase))
+        {
+            AzureMonitorAspNetCoreEventSource.Log.DistroFeatureSdkStatsDisabledByEnvVar();
+            return;
+        }
+
+        // Defer snapshot construction until the MeterProvider builds: by then the exporter's
+        // AzureMonitorOptions has been populated from IConfiguration and environment variables,
+        // so the connection string (and the customer iKey we extract from it) is the same value
+        // the exporter is actually using.
+        services.ConfigureOpenTelemetryMeterProvider((sp, _) =>
+        {
+            try
+            {
+                // Mirror the exporter's opt-in semantics: APPLICATIONINSIGHTS_SDKSTATS_DISABLED
+                // must be set to "false" to enable customer SDK stats.
+                var customerSdkStatsDisabled = Environment.GetEnvironmentVariable(
+                    EnvironmentVariableConstants.APPLICATIONINSIGHTS_SDKSTATS_DISABLED);
+                var customerSdkStatsEnabled = string.Equals(customerSdkStatsDisabled, "false", StringComparison.OrdinalIgnoreCase);
+
+                // Resolve the effective connection string the exporter will use at transmit
+                // time without writing it back into the caller-supplied options instance.
+                // The customer's MicrosoftOpenTelemetryOptions is treated as immutable once
+                // configure(options) returns; mutating it from a deferred callback would be
+                // a surprising side effect on an object that may still be referenced by user
+                // code or other configurators.
+                var effectiveConnectionString =
+                    !string.IsNullOrEmpty(options.AzureMonitor.ConnectionString)
+                        ? options.AzureMonitor.ConnectionString
+                        : ResolveEffectiveConnectionString(sp);
+
+                var snapshot = DistroFeatureSnapshot.Build(
+                    options,
+                    effectiveConnectionString,
+                    effectiveExporters,
+                    customerSdkStatsEnabled,
+                    a365OnlyMode,
+                    SdkVersion.Value);
+
+                if (snapshot is null)
+                {
+                    return;
+                }
+
+                // The SDK Stats pin (eagerly created in TryEnsureSdkStatsPin
+                // above) already brought up SDK Stats; nothing left for this callback to do
+                // on the pin side.
+                DistroFeatureSdkStats.Initialize(snapshot);
+
+                // Network SDKStats: the Azure Monitor exporter only records Network stats for
+                // its own Breeze transmitter. When the Agent365 exporter is active, the distro
+                // owns the a365 Network signal and records it itself (see Agent365ExporterCore).
+                // Other languages don't yet support Network SDKStats for OTLP, so this is scoped
+                // to Agent365 only.
+                if (effectiveExporters.HasFlag(ExportTarget.Agent365))
+                {
+                    DistroNetworkSdkStats.Initialize(snapshot.CustomerInstrumentationKey, snapshot.DistroVersion);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Stats are best-effort; never let registration failures break user instrumentation.
+                AzureMonitorAspNetCoreEventSource.Log.DistroFeatureSdkStatsCallbackFailed(ex);
+            }
+        });
+    }
+
+    private static string? ResolveEffectiveConnectionString(IServiceProvider sp)
+    {
+        try
+        {
+            // The distro's AzureMonitorOptions is bound from IConfiguration and the
+            // APPLICATIONINSIGHTS_CONNECTION_STRING env var by DefaultAzureMonitorOptions.
+            // Reading IOptions<AzureMonitorOptions> from DI yields the same effective
+            // connection string the exporter will use at transmit time.
+            var amOptions = sp.GetService<IOptions<Microsoft.OpenTelemetry.AzureMonitorOptions>>()?.Value;
+            return amOptions?.ConnectionString;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     /// <summary>

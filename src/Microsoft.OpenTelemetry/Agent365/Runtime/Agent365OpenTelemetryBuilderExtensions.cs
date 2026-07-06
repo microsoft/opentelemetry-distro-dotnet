@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System.Linq;
 using Microsoft.Agents.A365.Observability.Runtime;
 using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.A365.Observability.Extensions.SemanticKernel;
@@ -91,14 +92,6 @@ internal static class Agent365OpenTelemetryBuilderExtensions
                     localParentNotSampled: new global::OpenTelemetry.Trace.AlwaysOnSampler(),
                     remoteParentNotSampled: new global::OpenTelemetry.Trace.AlwaysOnSampler()));
 
-            // Agent365 scopes + baggage processor
-            if (instrumentationOptions.EnableAgent365Instrumentation)
-            {
-                tracing
-                    .AddSource(OpenTelemetryConstants.SourceName)
-                    .AddProcessor<ActivityProcessor>();
-            }
-
             // Semantic Kernel
             if (instrumentationOptions.EnableSemanticKernelInstrumentation)
             {
@@ -116,11 +109,47 @@ internal static class Agent365OpenTelemetryBuilderExtensions
                     .AddSource("Experimental.Microsoft.Extensions.AI");
             }
 
-            // Agent365 Exporter (enabled when not skipped)
+            // Agent365 scopes + baggage processor — registered last because processors
+            // are called in order of addition; this ensures OnStart runs after SK and
+            // other instrumentation processors.
+            if (instrumentationOptions.EnableAgent365Instrumentation)
+            {
+                tracing
+                    .AddSource(OpenTelemetryConstants.SourceName)
+                    .AddProcessor<ActivityProcessor>();
+            }
+
+            // Agent365 Exporter options (available via DI for built-in or custom shim exporter)
             if (!options.SkipExporter)
             {
                 builder.Services.AddSingleton(options.ExporterOptions);
-                tracing.AddAgent365Exporter();
+
+                // Defer the marker check to provider build time so that
+                // AddCustomAgent365Exporter can be called AFTER UseMicrosoftOpenTelemetry.
+                if (tracing is IDeferredTracerProviderBuilder deferredTracing)
+                {
+                    deferredTracing.Configure((sp, tracerBuilder) =>
+                    {
+                        var shimRegistered = sp.GetService<CustomAgent365ExporterMarker>() != null;
+                        if (!shimRegistered)
+                        {
+                            tracerBuilder.AddAgent365Exporter();
+                        }
+                    });
+                }
+                else
+                {
+                    // Fallback: check services at call time (legacy behavior)
+                    var shimRegistered = builder.Services.Any(s =>
+                        s.ImplementationInstance is CustomAgent365ExporterMarker ||
+                        s.ServiceType == typeof(CustomAgent365ExporterMarker) ||
+                        s.ImplementationType == typeof(CustomAgent365ExporterMarker));
+
+                    if (!shimRegistered)
+                    {
+                        tracing.AddAgent365Exporter();
+                    }
+                }
             }
             });
         }

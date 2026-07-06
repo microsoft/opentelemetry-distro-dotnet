@@ -26,6 +26,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
         /// <param name="spanId">Optional span ID for tracing.</param>
         /// <param name="parentSpanId">Optional parent span ID for tracing.</param>
         /// <param name="traceId">Optional trace ID for distributed tracing.</param>
+        /// <param name="error">Optional exception describing a failure; sets an OTel error status and the <c>error.type</c> attribute.</param>
         public void LogInvokeAgent(
             InvokeAgentScopeDetails invokeAgentScopeDetails,
             AgentDetails agentDetails,
@@ -38,7 +39,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
             DateTimeOffset? endTime = null,
             string? spanId = null,
             string? parentSpanId = null,
-            string? traceId = null);
+            string? traceId = null,
+            Exception? error = null);
 
         /// <summary>
         /// Logs an inference event.
@@ -55,6 +57,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
         /// <param name="traceId">Optional trace ID for distributed tracing.</param>
         /// <param name="channel">Optional channel information for the inference call.</param>
         /// <param name="callerDetails">Optional details of the caller.</param>
+        /// <param name="error">Optional exception describing a failure; sets an OTel error status and the <c>error.type</c> attribute.</param>
         public void LogInferenceCall(
             InferenceCallDetails inferenceCallDetails,
             AgentDetails agentDetails,
@@ -67,7 +70,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
             string? parentSpanId = null,
             Channel? channel = null,
             CallerDetails? callerDetails = null,
-            string? traceId = null);
+            string? traceId = null,
+            Exception? error = null);
 
         /// <summary>
         /// Logs an execute_tool event.
@@ -83,6 +87,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
         /// <param name="traceId">Optional trace ID for distributed tracing.</param>
         /// <param name="channel">Optional channel information for the tool call.</param>
         /// <param name="callerDetails">Optional details of the caller.</param>
+        /// <param name="error">Optional exception describing a failure; sets an OTel error status and the <c>error.type</c> attribute.</param>
         public void LogToolCall(
             ToolCallDetails toolCallDetails,
             AgentDetails agentDetails,
@@ -94,7 +99,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
             string? parentSpanId = null,
             Channel? channel = null,
             CallerDetails? callerDetails = null,
-            string? traceId = null);
+            string? traceId = null,
+            Exception? error = null);
 
         /// <summary>
         /// Logs an output_messages event.
@@ -109,6 +115,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
         /// <param name="spanId">Optional span ID for tracing.</param>
         /// <param name="parentSpanId">Optional parent span ID for tracing.</param>
         /// <param name="traceId">Optional trace ID for distributed tracing.</param>
+        /// <param name="error">Optional exception describing a failure; sets an OTel error status and the <c>error.type</c> attribute.</param>
         public void LogOutput(
             AgentDetails agentDetails,
             Response response,
@@ -119,6 +126,34 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
             DateTimeOffset? endTime = null,
             string? spanId = null,
             string? parentSpanId = null,
-            string? traceId = null);
+            string? traceId = null,
+            Exception? error = null);
+
+        /// <summary>
+        /// Logs an apply_guardrail event.
+        /// </summary>
+        /// <param name="guardrailDetails">The details of the guardrail evaluation.</param>
+        /// <param name="agentDetails">The details of the agent (includes tenant ID).</param>
+        /// <param name="conversationId">The required conversation ID.</param>
+        /// <param name="parentSpanId">The required parent span ID for tracing.</param>
+        /// <param name="startTime">Optional start time of the guardrail evaluation.</param>
+        /// <param name="endTime">Optional end time of the guardrail evaluation.</param>
+        /// <param name="spanId">Optional span ID for tracing.</param>
+        /// <param name="channel">Optional channel information.</param>
+        /// <param name="callerDetails">Optional details of the caller.</param>
+        /// <param name="traceId">Optional trace ID for distributed tracing.</param>
+        /// <param name="error">Optional exception describing a failure; sets an OTel error status and the <c>error.type</c> attribute.</param>
+        public void LogApplyGuardrail(
+            GuardrailDetails guardrailDetails,
+            AgentDetails agentDetails,
+            string conversationId,
+            string parentSpanId,
+            DateTimeOffset? startTime = null,
+            DateTimeOffset? endTime = null,
+            string? spanId = null,
+            Channel? channel = null,
+            CallerDetails? callerDetails = null,
+            string? traceId = null,
+            Exception? error = null);
     }
 }

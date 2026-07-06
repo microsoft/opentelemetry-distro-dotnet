@@ -149,7 +149,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Common
                 SpanId = data["SpanId"],
                 ParentSpanId = data["ParentSpanId"],
                 TraceId = data.TryGetValue("TraceId", out var traceIdObj) ? traceIdObj : null,
-                Kind = data.TryGetValue("SpanKind", out var spanKindObj) && spanKindObj != null ? spanKindObj : SpanKindConstants.Client
+                Kind = data.TryGetValue("SpanKind", out var spanKindObj) && spanKindObj != null ? spanKindObj : SpanKindConstants.Client,
+                Status = data.TryGetValue("Status", out var statusObj) && statusObj != null
+                    ? statusObj
+                    : new Dictionary<string, object> { { "code", 0 }, { "message", "" } }
             };
 
             return SerializePayload(payload);
@@ -277,7 +280,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Common
 
             foreach (var tag in activity.TagObjects)
             {
-                dict.Add(tag.Key, tag.Value ?? "");
+                dict[tag.Key] = tag.Value ?? "";
             }
 
             return dict;
@@ -292,7 +295,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Common
                 var attrs = new Dictionary<string, object>();
                 foreach (var tag in ev.Tags)
                 {
-                    attrs.Add(tag.Key, tag.Value ?? "");
+                    attrs[tag.Key] = tag.Value ?? "";
                 }
 
                 events.Add(new OtlpEvent
@@ -316,7 +319,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Common
                 {
                     foreach (var tag in link.Tags)
                     {
-                        attrs.Add(tag.Key, tag.Value ?? "");
+                        attrs[tag.Key] = tag.Value ?? "";
                     }
                 }
 
@@ -338,7 +341,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Common
             var dict = new Dictionary<string, object>();
             foreach (var kvp in attrs)
             {
-                dict.Add(kvp.Key, kvp.Value ?? "");
+                dict[kvp.Key] = kvp.Value ?? "";
             }
 
             return dict;
