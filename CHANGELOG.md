@@ -1,9 +1,9 @@
 # Changelog
 
-## Unreleased
 
 ## Unreleased
 
+- Add propagation logic for microsoft.gen_ai.main_agent.*and microsoft.foundry.project.id attributes
 - Customer SDK Stats are now on by default; the distro reports the `CustomerSdkStats` feature bit unless `APPLICATIONINSIGHTS_SDKSTATS_DISABLED=true`.
 - Prefix the distro-owned SDK Stats `version` dimension with the `mot` component label (e.g. `mot1.0.6`) so Feature and Network SDK Stats report the highest-level emitting component per the SDK Version spec, matching the Azure Monitor exporter's format.
 
