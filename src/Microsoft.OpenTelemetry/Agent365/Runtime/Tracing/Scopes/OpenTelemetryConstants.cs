@@ -338,6 +338,54 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// </summary>
         public const string GenAiSecurityPolicyDecisionTypeKey = "microsoft.security.policy.decision.type";
         #endregion
+
+        #region GenAI Main Agent Constants
+        /// <summary>
+        /// The GenAI main-agent name key.
+        /// </summary>
+        public const string GenAiMainAgentNameKey = "microsoft.gen_ai.main_agent.name";
+
+        /// <summary>
+        /// The GenAI main-agent identifier key.
+        /// </summary>
+        public const string GenAiMainAgentIdKey = "microsoft.gen_ai.main_agent.id";
+
+        /// <summary>
+        /// The GenAI main-agent version key.
+        /// </summary>
+        public const string GenAiMainAgentVersionKey = "microsoft.gen_ai.main_agent.version";
+
+        /// <summary>
+        /// The GenAI main-agent conversation identifier key.
+        /// </summary>
+        public const string GenAiMainAgentConversationIdKey = "microsoft.gen_ai.main_agent.conversation_id";
+
+        /// <summary>
+        /// The common prefix shared by all GenAI main-agent attribute keys.
+        /// </summary>
+        public const string GenAiMainAgentAttributePrefix = "microsoft.gen_ai.main_agent.";
+        #endregion
+
+        #region GenAI Project Constants
+        /// <summary>
+        /// The Azure AI Foundry project identifier key.
+        /// </summary>
+        public const string GenAiAzureAiProjectIdKey = "gen_ai.azure_ai_project.id";
+
+        /// <summary>
+        /// The Microsoft Foundry project identifier key.
+        /// </summary>
+        public const string GenAiFoundryProjectIdKey = "microsoft.foundry.project.id";
+
+        /// <summary>
+        /// Project-scope attribute keys so all telemetry is attributed to the same project.
+        /// </summary>
+        public static readonly string[] GenAiProjectIdKeys =
+        {
+            GenAiAzureAiProjectIdKey,
+            GenAiFoundryProjectIdKey,
+        };
+        #endregion
     }
     #pragma warning restore CS1591
 }

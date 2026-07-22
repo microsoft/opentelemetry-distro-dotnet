@@ -172,6 +172,12 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             EnableAgent365Instrumentation = options.Instrumentation.EnableAgent365Instrumentation,
         };
 
+        // --- GenAI Main-Agent attribute propagation ---
+        // Registered BEFORE any exporter so its OnStart/OnEnd callbacks run first and
+        // downstream batch exporters (Azure Monitor, OTLP, Console) observe the enriched
+        // microsoft.gen_ai.main_agent.* and microsoft.foundry.project.id attributes.
+        builder.UseGenAIMainAgent(effectiveInstrumentation);
+
         // --- Azure Monitor (always: instrumentation; exporter gated by Exporters flag) ---
         builder.UseAzureMonitor(o =>
         {
