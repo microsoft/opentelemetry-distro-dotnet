@@ -137,6 +137,32 @@ public sealed class GenAIMainAgentSpanProcessorTests
     }
 
     [TestMethod]
+    public void OnEnd_NestedInvokeAgent_DoesNotSelfPromote_WhenParentIsInvokeAgent()
+    {
+        using var scope = BuildScope();
+
+        // Simulate a parent invoke_agent that has NO gen_ai.agent.* / main_agent.*
+        // attributes stamped yet — child inherits nothing at OnStart, so the child
+        // will end without a main-agent attribute. Prior to the fix, the child would
+        // incorrectly self-promote its own gen_ai.agent.name onto main_agent.name.
+        using var parent = scope.Source.StartActivity("invoke_agent");
+        parent!.SetTag(GenAiOperationNameKey, InvokeAgentOperationName);
+
+        using var child = scope.Source.StartActivity("invoke_agent");
+        child.Should().NotBeNull();
+        child!.SetTag(GenAiOperationNameKey, InvokeAgentOperationName);
+        child.SetTag(GenAiAgentNameKey, "nested-agent");
+        child.SetTag(GenAiAgentIdKey, "nested-agent-id");
+
+        // Parent never gets enriched (untracked-parent / late-enrichment scenario).
+        child.Stop();
+
+        child.GetTagItem(GenAiMainAgentNameKey).Should().BeNull(
+            because: "a nested invoke_agent under another invoke_agent must not self-promote");
+        child.GetTagItem(GenAiMainAgentIdKey).Should().BeNull();
+    }
+
+    [TestMethod]
     public void OnEnd_FallsBackToParent_WhenParentEnrichedAfterChildStart()
     {
         using var scope = BuildScope();

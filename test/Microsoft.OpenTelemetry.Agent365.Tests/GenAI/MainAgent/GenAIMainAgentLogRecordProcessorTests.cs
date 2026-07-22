@@ -140,6 +140,54 @@ public sealed class GenAIMainAgentLogRecordProcessorTests
         attributes.Should().ContainKey(GenAiFoundryProjectIdKey).WhoseValue.Should().Be(TestProjectArmId);
     }
 
+    [TestMethod]
+    public void OnEnd_DoesNotDuplicateOrOverwriteExistingMainAgentAttributes()
+    {
+        var exported = new List<LogRecord>();
+        using var loggerFactory = BuildLoggerFactory(exported);
+
+        // Insert a processor BEFORE ours that seeds the log record with a
+        // main-agent attribute the caller (or an upstream enricher) already set.
+        // The activity carries a DIFFERENT value for the same key — the processor
+        // must respect the pre-existing value and must not append a duplicate.
+        var exportedWithSeed = new List<LogRecord>();
+        using var seededFactory = LoggerFactory.Create(builder =>
+        {
+            builder.AddOpenTelemetry(options =>
+            {
+                options.IncludeFormattedMessage = true;
+                options.AddProcessor(new SeedAttributeProcessor(
+                    new KeyValuePair<string, object?>(GenAiMainAgentNameKey, "explicit-from-caller")));
+                options.AddProcessor(new GenAIMainAgentLogRecordProcessor());
+                options.AddInMemoryExporter(exportedWithSeed);
+            });
+        });
+        var logger = seededFactory.CreateLogger("dedup-attrs");
+
+        using var source = new ActivitySource(TestActivitySourceName);
+        using var listener = CreateAlwaysOnListener();
+        using var activity = source.StartActivity("invoke_agent");
+        activity.Should().NotBeNull();
+        activity!.SetTag(GenAiMainAgentNameKey, "from-activity");
+        activity.SetTag(GenAiMainAgentIdKey, "from-activity-id"); // not seeded — should be added
+
+        logger.LogInformation("dedup log");
+
+        FlushLogs(seededFactory);
+        var record = exportedWithSeed.Should().ContainSingle().Subject;
+        var attributes = record.Attributes ?? new List<KeyValuePair<string, object?>>();
+
+        attributes.Count(kvp => kvp.Key == GenAiMainAgentNameKey).Should().Be(
+            1,
+            because: "existing log-record keys must not be duplicated by the merge");
+        attributes.Single(kvp => kvp.Key == GenAiMainAgentNameKey).Value.Should().Be(
+            "explicit-from-caller",
+            because: "log-record attributes take precedence over ambient activity values");
+        attributes.Should().ContainSingle(kvp => kvp.Key == GenAiMainAgentIdKey)
+            .Which.Value.Should().Be("from-activity-id",
+                because: "keys not already present on the log record are still merged in");
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────
 
     private static ILoggerFactory BuildLoggerFactory(List<LogRecord> exported)
@@ -171,5 +219,33 @@ public sealed class GenAIMainAgentLogRecordProcessorTests
         };
         ActivitySource.AddActivityListener(listener);
         return listener;
+    }
+
+    // Injects a caller-set attribute onto every log record before the
+    // GenAIMainAgentLogRecordProcessor runs, to exercise the de-dup path.
+    private sealed class SeedAttributeProcessor : global::OpenTelemetry.BaseProcessor<LogRecord>
+    {
+        private readonly KeyValuePair<string, object?>[] _seed;
+
+        public SeedAttributeProcessor(params KeyValuePair<string, object?>[] seed)
+        {
+            _seed = seed;
+        }
+
+        public override void OnEnd(LogRecord data)
+        {
+            if (data == null)
+            {
+                return;
+            }
+
+            var merged = new List<KeyValuePair<string, object?>>();
+            if (data.Attributes != null)
+            {
+                merged.AddRange(data.Attributes);
+            }
+            merged.AddRange(_seed);
+            data.Attributes = merged;
+        }
     }
 }

@@ -127,8 +127,16 @@ namespace Microsoft.OpenTelemetry.GenAI.MainAgent
             {
                 // Self-promotion: top-level invoke_agent activities copy their own
                 // gen_ai.agent.* → microsoft.gen_ai.main_agent.*
+                //
+                // "Top-level" means this invoke_agent is not nested under another
+                // invoke_agent. We guard against a nested invoke_agent (whose parent
+                // was never enriched — e.g. parent tags stamped after this OnEnd, or
+                // parent produced by an untracked pipeline) incorrectly claiming to
+                // be the main agent by requiring the immediate parent to either be
+                // absent or not itself an invoke_agent.
                 if (activity.GetTagItem(OpenTelemetryConstants.GenAiOperationNameKey) is string opName &&
-                    string.Equals(opName, OpenTelemetryConstants.InvokeAgentOperationName, StringComparison.Ordinal))
+                    string.Equals(opName, OpenTelemetryConstants.InvokeAgentOperationName, StringComparison.Ordinal) &&
+                    !IsParentInvokeAgent(parent))
                 {
                     foreach (var (target, source) in GenAIMainAgentPropagation.SelfCopyTable)
                     {
@@ -171,6 +179,15 @@ namespace Microsoft.OpenTelemetry.GenAI.MainAgent
                 }
             }
         }
+
+        // Returns true when the immediate parent activity is itself a
+        // gen_ai invoke_agent span — signalling that the current activity is a
+        // nested invocation and therefore not the main (top-level) agent.
+        private static bool IsParentInvokeAgent(Activity? parent)
+        {
+            return parent?.GetTagItem(OpenTelemetryConstants.GenAiOperationNameKey) is string parentOp &&
+                string.Equals(parentOp, OpenTelemetryConstants.InvokeAgentOperationName, StringComparison.Ordinal);
+        }
     }
 
     /// <summary>
@@ -209,12 +226,37 @@ namespace Microsoft.OpenTelemetry.GenAI.MainAgent
                 return;
             }
 
+            // Merge without duplicating keys the log record already carries.
+            // Attributes on the log record are treated as authoritative — any
+            // main-agent / project-id key explicitly set by the caller wins over
+            // the value read from the ambient Activity. Appending duplicates
+            // would produce two entries with the same key, which downstream
+            // exporters and log processors handle inconsistently.
+            HashSet<string>? existingKeys = null;
+            if (data.Attributes != null)
+            {
+                existingKeys = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var kvp in data.Attributes)
+                {
+                    existingKeys.Add(kvp.Key);
+                }
+            }
+
             var merged = new List<KeyValuePair<string, object?>>();
             if (data.Attributes != null)
             {
                 merged.AddRange(data.Attributes);
             }
-            merged.AddRange(mainAgentAttributes);
+
+            foreach (var kvp in mainAgentAttributes)
+            {
+                if (existingKeys != null && existingKeys.Contains(kvp.Key))
+                {
+                    continue;
+                }
+                merged.Add(kvp);
+            }
+
             data.Attributes = merged;
         }
     }
