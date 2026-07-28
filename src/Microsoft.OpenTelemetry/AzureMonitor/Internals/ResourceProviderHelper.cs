@@ -135,8 +135,10 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Internals
 
                 if (document.RootElement.TryGetProperty("osType", out var osType) && osType.ValueKind == JsonValueKind.String)
                 {
-                    var value = osType.GetString();
-                    s_operatingSystem = string.IsNullOrEmpty(value) ? "unknown" : value!.ToLowerInvariant();
+                    // osType takes precedence when IMDS reports a concrete value; when it is
+                    // null/empty or the literal "Unknown", keep the running process OS
+                    // (already captured in s_operatingSystem via GetOs()) per spec.
+                    s_operatingSystem = ResolveOperatingSystem(osType.GetString(), s_operatingSystem);
                 }
 
                 return true;
@@ -147,6 +149,23 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Internals
                 // fall back to "unknown" — this is best-effort telemetry, not user-visible.
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Determines the effective "os" dimension. Per the SDKStats spec, the IMDS
+        /// <c>azInst_osType</c> takes precedence over the running process OS, except when it
+        /// is null/empty or the literal "Unknown" (case-insensitive), in which case the
+        /// running process OS (<paramref name="processOperatingSystem"/>) is used.
+        /// </summary>
+        internal static string ResolveOperatingSystem(string? vmOsType, string processOperatingSystem)
+        {
+            if (!string.IsNullOrEmpty(vmOsType)
+                && !string.Equals(vmOsType, "unknown", StringComparison.OrdinalIgnoreCase))
+            {
+                return vmOsType!.ToLowerInvariant();
+            }
+
+            return processOperatingSystem;
         }
 
         private static string GetOs()

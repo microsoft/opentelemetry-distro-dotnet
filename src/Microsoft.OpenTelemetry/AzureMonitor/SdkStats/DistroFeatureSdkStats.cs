@@ -48,9 +48,12 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
         internal const string MeterVersion = "1.0";
 
         /// <summary>
-        /// Minimum time between Feature SDKStats emissions. Feature stats share the exporter's
-        /// 15-minute reader but must ship on the 24 hr cadence, so <see cref="Observe"/>
-        /// throttles to one emission per interval (matches the exporter's Attach gauge).
+        /// Default minimum time between Feature SDKStats emissions. Feature stats share the
+        /// exporter's 15-minute reader but must ship on the 24 hr cadence, so <see cref="Observe"/>
+        /// throttles to one emission per interval (matches the exporter's Attach gauge). The
+        /// effective interval can be overridden via
+        /// <see cref="EnvironmentVariableConstants.APPLICATIONINSIGHTS_STATS_LONG_EXPORT_INTERVAL"/>
+        /// (spec: longInterval); see <see cref="_emissionInterval"/>.
         /// </summary>
         internal static readonly TimeSpan EmissionInterval = TimeSpan.FromHours(24);
 
@@ -60,6 +63,11 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
         private static readonly IEnumerable<Measurement<long>> EmptyMeasurements = Array.Empty<Measurement<long>>();
 
         private readonly Meter _meter;
+
+        // Effective long-interval throttle, resolved from APPLICATIONINSIGHTS_STATS_LONG_EXPORT_INTERVAL
+        // (spec: longInterval) with EmissionInterval as the default.
+        private readonly TimeSpan _emissionInterval;
+
         private DistroFeatureSnapshot _snapshot;
 
         // Throttle so the Feature gauge emits at most once per EmissionInterval even though
@@ -73,8 +81,33 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             // public Instance property is guaranteed to see a fully-initialized object
             // (no narrow window where _snapshot is null).
             _snapshot = snapshot;
+            _emissionInterval = ResolveEmissionInterval();
             _meter = new Meter(MeterName, MeterVersion);
             _meter.CreateObservableGauge<long>(MetricName, this.Observe);
+        }
+
+        // Resolve the long-interval throttle from the env var (seconds), falling back to the
+        // 24 hr default when unset, unparseable, or non-positive.
+        private static TimeSpan ResolveEmissionInterval()
+        {
+            string? value;
+            try
+            {
+                value = Environment.GetEnvironmentVariable(
+                    EnvironmentVariableConstants.APPLICATIONINSIGHTS_STATS_LONG_EXPORT_INTERVAL);
+            }
+            catch (Exception)
+            {
+                return EmissionInterval;
+            }
+
+            if (int.TryParse(value, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var seconds)
+                && seconds > 0)
+            {
+                return TimeSpan.FromSeconds(seconds);
+            }
+
+            return EmissionInterval;
         }
 
         /// <summary>The active singleton, if <see cref="Initialize"/> has been called.</summary>
@@ -169,7 +202,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             long previousTicks = Volatile.Read(ref _lastEmissionTicks);
             long nowTicks = DateTime.UtcNow.Ticks;
             long elapsedTicks = nowTicks - previousTicks;
-            if (previousTicks != 0 && elapsedTicks >= 0 && elapsedTicks < EmissionInterval.Ticks)
+            if (previousTicks != 0 && elapsedTicks >= 0 && elapsedTicks < _emissionInterval.Ticks)
             {
                 return EmptyMeasurements;
             }

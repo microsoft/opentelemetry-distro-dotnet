@@ -83,6 +83,21 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         {
             Assert.Equal("Manual", ResourceProviderHelper.GetAttachMode());
         }
+
+        [Theory]
+        // Concrete IMDS osType wins and is lower-cased.
+        [InlineData("Windows", "linux", "windows")]
+        [InlineData("Linux", "windows", "linux")]
+        [InlineData("linux", "linux", "linux")]
+        // null / empty / literal "Unknown" fall back to the running process OS.
+        [InlineData(null, "linux", "linux")]
+        [InlineData("", "windows", "windows")]
+        [InlineData("Unknown", "osx", "osx")]
+        [InlineData("unknown", "windows", "windows")]
+        public void ResolveOperatingSystem_FallsBackToProcessOsWhenUnknownOrNull(string? vmOsType, string processOs, string expected)
+        {
+            Assert.Equal(expected, ResourceProviderHelper.ResolveOperatingSystem(vmOsType, processOs));
+        }
     }
 
     [CollectionDefinition(nameof(ResourceProviderHelperCollection), DisableParallelization = true)]

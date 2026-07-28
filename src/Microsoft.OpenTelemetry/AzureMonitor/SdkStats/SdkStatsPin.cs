@@ -69,6 +69,22 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
                 return;
             }
 
+            string? disabledAll;
+            try
+            {
+                disabledAll = Environment.GetEnvironmentVariable(
+                    EnvironmentVariableConstants.APPLICATIONINSIGHTS_SDKSTATS_DISABLED_ALL);
+            }
+            catch (Exception)
+            {
+                disabledAll = null;
+            }
+
+            if (string.Equals(disabledAll, "true", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
             Ensure();
         }
 

@@ -5,6 +5,7 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenTelemetry.AzureMonitor.SdkStats;
 using OpenTelemetry;
+using OpenTelemetry.Metrics;
 using Xunit;
 
 namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
@@ -22,22 +23,28 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
     public class SdkStatsPinTests : IDisposable
     {
         private const string KillSwitchEnvVar = "APPLICATIONINSIGHTS_STATSBEAT_DISABLED";
+        private const string DisabledAllEnvVar = "APPLICATIONINSIGHTS_SDKSTATS_DISABLED_ALL";
 
         private readonly string? _previousKillSwitch;
+        private readonly string? _previousDisabledAll;
 
         public SdkStatsPinTests()
         {
             _previousKillSwitch = Environment.GetEnvironmentVariable(KillSwitchEnvVar);
+            _previousDisabledAll = Environment.GetEnvironmentVariable(DisabledAllEnvVar);
             // Default each test to "stats off" so we don't fire real HTTP traffic during
             // CI unless the test explicitly opts in by clearing the env var.
             Environment.SetEnvironmentVariable(KillSwitchEnvVar, "true");
+            Environment.SetEnvironmentVariable(DisabledAllEnvVar, null);
             SdkStatsPin.ResetForTesting();
         }
 
         public void Dispose()
         {
             SdkStatsPin.ResetForTesting();
+            DistroFeatureSdkStats.ResetForTesting();
             Environment.SetEnvironmentVariable(KillSwitchEnvVar, _previousKillSwitch);
+            Environment.SetEnvironmentVariable(DisabledAllEnvVar, _previousDisabledAll);
         }
 
         [Fact]
@@ -158,6 +165,78 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             });
 
             Assert.False(SdkStatsPin.IsInitializedForTesting);
+        }
+
+        [Fact]
+        public void EnsureIfApplicable_HonorsDisabledAllKillSwitch()
+        {
+            // APPLICATIONINSIGHTS_SDKSTATS_DISABLED_ALL (spec: disabledAll) is the internal
+            // kill switch that turns off all SDKStats completely; the eager pin must honor it.
+            Environment.SetEnvironmentVariable(KillSwitchEnvVar, null);
+            Environment.SetEnvironmentVariable(DisabledAllEnvVar, "true");
+
+            SdkStatsPin.EnsureIfApplicable(ExportTarget.Otlp);
+
+            Assert.False(SdkStatsPin.IsInitializedForTesting);
+        }
+
+        [Fact]
+        public void UseMicrosoftOpenTelemetry_HonorsDisabledAllKillSwitch()
+        {
+            Environment.SetEnvironmentVariable(KillSwitchEnvVar, null);
+            Environment.SetEnvironmentVariable(DisabledAllEnvVar, "true");
+
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry().UseMicrosoftOpenTelemetry(o =>
+            {
+                o.Exporters = ExportTarget.Otlp;
+            });
+
+            Assert.False(SdkStatsPin.IsInitializedForTesting);
+        }
+
+        [Fact]
+        public void UseMicrosoftOpenTelemetry_DisabledAll_DoesNotInitializeDistroFeatureProducer()
+        {
+            // Guards the RegisterDistroFeatureSdkStats gate: building the MeterProvider runs the
+            // deferred callback, which must NOT bring up the distro Feature producer when
+            // APPLICATIONINSIGHTS_SDKSTATS_DISABLED_ALL is set.
+            Environment.SetEnvironmentVariable(KillSwitchEnvVar, null);
+            Environment.SetEnvironmentVariable(DisabledAllEnvVar, "true");
+            DistroFeatureSdkStats.ResetForTesting();
+
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry().UseMicrosoftOpenTelemetry(o =>
+            {
+                o.Exporters = ExportTarget.Otlp;
+            });
+
+            using var sp = services.BuildServiceProvider();
+            // Forces the deferred ConfigureOpenTelemetryMeterProvider callback to execute.
+            _ = sp.GetRequiredService<MeterProvider>();
+
+            Assert.Null(DistroFeatureSdkStats.Instance);
+        }
+
+        [Fact]
+        public void UseMicrosoftOpenTelemetry_WithoutDisabledAll_InitializesDistroFeatureProducer()
+        {
+            // Positive control for the gate above: without the kill switch, building the
+            // MeterProvider must initialize the distro Feature producer.
+            Environment.SetEnvironmentVariable(KillSwitchEnvVar, null);
+            Environment.SetEnvironmentVariable(DisabledAllEnvVar, null);
+            DistroFeatureSdkStats.ResetForTesting();
+
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry().UseMicrosoftOpenTelemetry(o =>
+            {
+                o.Exporters = ExportTarget.Otlp;
+            });
+
+            using var sp = services.BuildServiceProvider();
+            _ = sp.GetRequiredService<MeterProvider>();
+
+            Assert.NotNull(DistroFeatureSdkStats.Instance);
         }
     }
 }
