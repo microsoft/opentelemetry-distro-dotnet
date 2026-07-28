@@ -13,11 +13,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
     /// <summary>
     /// Tests for <see cref="SdkStatsPin"/> and the eager-pin glue in
     /// <see cref="MicrosoftOpenTelemetryBuilderExtensions.UseMicrosoftOpenTelemetry{TBuilder}"/>.
-    /// The pin is a process-wide singleton that triggers the Azure Monitor exporter's
-    /// SDK Stats MeterProvider (and the Attach observable gauge it owns) as a ctor-time
-    /// side effect of an inert <c>AzureMonitorMetricExporter</c>. Runs in the shared
-    /// non-parallel <c>EnvironmentVariableTests</c> collection so these tests don't race with
-    /// any other env-var-mutating test on process-wide singleton or environment state.
+    /// In the shared non-parallel <c>EnvironmentVariableTests</c> collection to avoid env-var races.
     /// </summary>
     [Collection("EnvironmentVariableTests")]
     public class SdkStatsPinTests : IDisposable
@@ -170,8 +166,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         [Fact]
         public void EnsureIfApplicable_HonorsDisabledAllKillSwitch()
         {
-            // APPLICATIONINSIGHTS_SDKSTATS_DISABLED_ALL (spec: disabledAll) is the internal
-            // kill switch that turns off all SDKStats completely; the eager pin must honor it.
+            // The pin must honor the disabled-all kill switch.
             Environment.SetEnvironmentVariable(KillSwitchEnvVar, null);
             Environment.SetEnvironmentVariable(DisabledAllEnvVar, "true");
 
@@ -198,9 +193,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         [Fact]
         public void UseMicrosoftOpenTelemetry_DisabledAll_DoesNotInitializeDistroFeatureProducer()
         {
-            // Guards the RegisterDistroFeatureSdkStats gate: building the MeterProvider runs the
-            // deferred callback, which must NOT bring up the distro Feature producer when
-            // APPLICATIONINSIGHTS_SDKSTATS_DISABLED_ALL is set.
+            // Disabled-all must also gate the deferred Feature producer registration.
             Environment.SetEnvironmentVariable(KillSwitchEnvVar, null);
             Environment.SetEnvironmentVariable(DisabledAllEnvVar, "true");
             DistroFeatureSdkStats.ResetForTesting();
@@ -212,7 +205,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             });
 
             using var sp = services.BuildServiceProvider();
-            // Forces the deferred ConfigureOpenTelemetryMeterProvider callback to execute.
+            // Runs the deferred MeterProvider callback.
             _ = sp.GetRequiredService<MeterProvider>();
 
             Assert.Null(DistroFeatureSdkStats.Instance);
@@ -221,8 +214,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         [Fact]
         public void UseMicrosoftOpenTelemetry_WithoutDisabledAll_InitializesDistroFeatureProducer()
         {
-            // Positive control for the gate above: without the kill switch, building the
-            // MeterProvider must initialize the distro Feature producer.
+            // Positive control.
             Environment.SetEnvironmentVariable(KillSwitchEnvVar, null);
             Environment.SetEnvironmentVariable(DisabledAllEnvVar, null);
             DistroFeatureSdkStats.ResetForTesting();

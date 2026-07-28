@@ -48,12 +48,8 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
         internal const string MeterVersion = "1.0";
 
         /// <summary>
-        /// Default minimum time between Feature SDKStats emissions. Feature stats share the
-        /// exporter's 15-minute reader but must ship on the 24 hr cadence, so <see cref="Observe"/>
-        /// throttles to one emission per interval (matches the exporter's Attach gauge). The
-        /// effective interval can be overridden via
-        /// <see cref="EnvironmentVariableConstants.APPLICATIONINSIGHTS_STATS_LONG_EXPORT_INTERVAL"/>
-        /// (spec: longInterval); see <see cref="_emissionInterval"/>.
+        /// Default throttle interval for Feature SDKStats (24h); overridable via
+        /// <see cref="EnvironmentVariableConstants.APPLICATIONINSIGHTS_STATS_LONG_EXPORT_INTERVAL"/>.
         /// </summary>
         internal static readonly TimeSpan EmissionInterval = TimeSpan.FromHours(24);
 
@@ -64,8 +60,6 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 
         private readonly Meter _meter;
 
-        // Effective long-interval throttle, resolved from APPLICATIONINSIGHTS_STATS_LONG_EXPORT_INTERVAL
-        // (spec: longInterval) with EmissionInterval as the default.
         private readonly TimeSpan _emissionInterval;
 
         private DistroFeatureSnapshot _snapshot;
@@ -86,8 +80,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             _meter.CreateObservableGauge<long>(MetricName, this.Observe);
         }
 
-        // Resolve the long-interval throttle from the env var (seconds), falling back to the
-        // 24 hr default when unset, unparseable, or non-positive.
+        // Resolve the throttle interval (seconds) from the env var, else the 24h default.
         private static TimeSpan ResolveEmissionInterval()
         {
             string? value;

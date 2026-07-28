@@ -368,7 +368,7 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             return;
         }
 
-        // Internal kill switch (spec: disabledAll) turns off all internal SDKStats.
+        // disabledAll kill switch.
         string? disabledAll;
         try
         {

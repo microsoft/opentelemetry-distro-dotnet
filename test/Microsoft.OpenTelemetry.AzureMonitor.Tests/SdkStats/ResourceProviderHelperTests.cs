@@ -85,11 +85,9 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         }
 
         [Theory]
-        // Concrete IMDS osType wins and is lower-cased.
         [InlineData("Windows", "linux", "windows")]
         [InlineData("Linux", "windows", "linux")]
         [InlineData("linux", "linux", "linux")]
-        // null / empty / literal "Unknown" fall back to the running process OS.
         [InlineData(null, "linux", "linux")]
         [InlineData("", "windows", "windows")]
         [InlineData("Unknown", "osx", "osx")]

@@ -19,17 +19,12 @@ internal static class EnvironmentVariableConstants
     internal const string APPLICATIONINSIGHTS_STATSBEAT_DISABLED = "APPLICATIONINSIGHTS_STATSBEAT_DISABLED";
 
     /// <summary>
-    /// Internal kill switch (spec: <c>disabledAll</c>): when set to <c>"true"</c>
-    /// (case-insensitive), the distro turns off all internal SDKStats (Attach / Feature /
-    /// Network) completely — it neither bootstraps the SDKStats pin nor registers its own
-    /// Feature/Network producers.
+    /// When "true", disables all internal SDKStats.
     /// </summary>
     internal const string APPLICATIONINSIGHTS_SDKSTATS_DISABLED_ALL = "APPLICATIONINSIGHTS_SDKSTATS_DISABLED_ALL";
 
     /// <summary>
-    /// Overrides the export interval (in seconds) for long-interval internal SDKStats — the
-    /// distro's Feature signal (default 24 hours). Maps to the <c>longInterval</c>
-    /// configuration in the SDKStats spec. Primarily intended for testing.
+    /// Overrides the Feature SDKStats export interval, in seconds (default 24h).
     /// </summary>
     internal const string APPLICATIONINSIGHTS_STATS_LONG_EXPORT_INTERVAL = "APPLICATIONINSIGHTS_STATS_LONG_EXPORT_INTERVAL";
 

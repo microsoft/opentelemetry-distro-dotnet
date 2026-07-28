@@ -181,10 +181,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         [Fact]
         public void Observe_LongExportIntervalOverride_ShortensThrottleWindow()
         {
-            // APPLICATIONINSIGHTS_STATS_LONG_EXPORT_INTERVAL (spec: longInterval) must shorten
-            // the Feature throttle window. With a 1-second override, a collection whose previous
-            // emission was 2 seconds ago is eligible again — whereas the default 24 hr window
-            // would suppress it (see Observe_ThrottlesToSingleEmission_AcrossRapidCollections).
+            // A 1s override makes an emission 2s ago eligible again (the 24h default would suppress it).
             const string longIntervalEnvVar = "APPLICATIONINSIGHTS_STATS_LONG_EXPORT_INTERVAL";
             var previous = Environment.GetEnvironmentVariable(longIntervalEnvVar);
             Environment.SetEnvironmentVariable(longIntervalEnvVar, "1");
@@ -204,12 +201,9 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
                 DistroFeatureSdkStats.Initialize(snapshot);
 
-                // First collection emits and anchors the throttle window.
                 Assert.Single(CollectObservableMeasurements());
 
-                // Rewind the last emission by 2 seconds: elapsed (2s) exceeds the 1s override
-                // window but is far inside the 24 hr default, so re-emission proves the override
-                // is applied.
+                // Backdate the last emission past the 1s window.
                 var instance = DistroFeatureSdkStats.Instance!;
                 long twoSecondsAgo = DateTime.UtcNow.Ticks - TimeSpan.FromSeconds(2).Ticks;
                 typeof(DistroFeatureSdkStats)
