@@ -19,7 +19,6 @@ internal static class EnvironmentVariableConstants
     internal const string APPLICATIONINSIGHTS_STATSBEAT_DISABLED = "APPLICATIONINSIGHTS_STATSBEAT_DISABLED";
 
     /// <summary>
-    /// <summary>
     /// Internal kill switch (spec: <c>disabledAll</c>): when set to <c>"true"</c>
     /// (case-insensitive), the distro turns off all internal SDKStats (Attach / Feature /
     /// Network) completely — it neither bootstraps the SDKStats pin nor registers its own

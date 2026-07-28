@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 {
-    [Collection(nameof(DistroFeatureSdkStatsCollection))]
+    [Collection("EnvironmentVariableTests")]
     public class DistroFeatureSdkStatsTests
     {
         private const string ValidConnectionString =
@@ -253,11 +253,5 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             listener.RecordObservableInstruments();
             return results;
         }
-    }
-
-    [CollectionDefinition(nameof(DistroFeatureSdkStatsCollection), DisableParallelization = true)]
-    public class DistroFeatureSdkStatsCollection
-    {
-        // The DistroFeatureSdkStats singleton is process-wide; serialize tests that touch it.
     }
 }

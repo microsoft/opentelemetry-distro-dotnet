@@ -15,11 +15,11 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
     /// <see cref="MicrosoftOpenTelemetryBuilderExtensions.UseMicrosoftOpenTelemetry{TBuilder}"/>.
     /// The pin is a process-wide singleton that triggers the Azure Monitor exporter's
     /// SDK Stats MeterProvider (and the Attach observable gauge it owns) as a ctor-time
-    /// side effect of an inert <c>AzureMonitorMetricExporter</c>. Reuses the
-    /// non-parallel <see cref="DistroFeatureSdkStatsCollection"/> so other tests in the
-    /// SdkStats namespace don't race on the process-wide singleton state.
+    /// side effect of an inert <c>AzureMonitorMetricExporter</c>. Runs in the shared
+    /// non-parallel <c>EnvironmentVariableTests</c> collection so these tests don't race with
+    /// any other env-var-mutating test on process-wide singleton or environment state.
     /// </summary>
-    [Collection(nameof(DistroFeatureSdkStatsCollection))]
+    [Collection("EnvironmentVariableTests")]
     public class SdkStatsPinTests : IDisposable
     {
         private const string KillSwitchEnvVar = "APPLICATIONINSIGHTS_STATSBEAT_DISABLED";

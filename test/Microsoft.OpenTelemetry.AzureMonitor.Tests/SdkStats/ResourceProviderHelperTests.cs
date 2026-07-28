@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 {
-    [Collection(nameof(ResourceProviderHelperCollection))]
+    [Collection("EnvironmentVariableTests")]
     public class ResourceProviderHelperTests : IDisposable
     {
         // Snapshot existing env vars so we can restore them after the test.
@@ -98,11 +98,5 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         {
             Assert.Equal(expected, ResourceProviderHelper.ResolveOperatingSystem(vmOsType, processOs));
         }
-    }
-
-    [CollectionDefinition(nameof(ResourceProviderHelperCollection), DisableParallelization = true)]
-    public class ResourceProviderHelperCollection
-    {
-        // Resource provider detection caches results process-wide; serialize tests.
     }
 }
