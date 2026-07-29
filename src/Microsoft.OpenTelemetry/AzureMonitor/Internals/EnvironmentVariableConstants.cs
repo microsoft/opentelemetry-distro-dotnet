@@ -19,6 +19,16 @@ internal static class EnvironmentVariableConstants
     internal const string APPLICATIONINSIGHTS_STATSBEAT_DISABLED = "APPLICATIONINSIGHTS_STATSBEAT_DISABLED";
 
     /// <summary>
+    /// When "true", disables all internal SDKStats.
+    /// </summary>
+    internal const string APPLICATIONINSIGHTS_SDKSTATS_DISABLED_ALL = "APPLICATIONINSIGHTS_SDKSTATS_DISABLED_ALL";
+
+    /// <summary>
+    /// Overrides the Feature SDKStats export interval, in seconds (default 24h).
+    /// </summary>
+    internal const string APPLICATIONINSIGHTS_STATS_LONG_EXPORT_INTERVAL = "APPLICATIONINSIGHTS_STATS_LONG_EXPORT_INTERVAL";
+
+    /// <summary>
     /// Customer-facing SDK stats opt-out. Customer SDK Stats are on by default; when this is
     /// set to <c>"true"</c> (case-insensitive), the Azure Monitor exporter disables Customer
     /// SDK Stats and the distro clears the

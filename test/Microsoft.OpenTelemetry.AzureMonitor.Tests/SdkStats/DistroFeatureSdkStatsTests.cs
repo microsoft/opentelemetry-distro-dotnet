@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 {
-    [Collection(nameof(DistroFeatureSdkStatsCollection))]
+    [Collection("EnvironmentVariableTests")]
     public class DistroFeatureSdkStatsTests
     {
         private const string ValidConnectionString =
@@ -178,6 +178,47 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             Assert.Single(measurements);
         }
 
+        [Fact]
+        public void Observe_LongExportIntervalOverride_ShortensThrottleWindow()
+        {
+            // A 1s override makes an emission 2s ago eligible again (the 24h default would suppress it).
+            const string longIntervalEnvVar = "APPLICATIONINSIGHTS_STATS_LONG_EXPORT_INTERVAL";
+            var previous = Environment.GetEnvironmentVariable(longIntervalEnvVar);
+            Environment.SetEnvironmentVariable(longIntervalEnvVar, "1");
+            try
+            {
+                DistroFeatureSdkStats.ResetForTesting();
+
+                var options = new MicrosoftOpenTelemetryOptions();
+                options.AzureMonitor.ConnectionString = ValidConnectionString;
+                var snapshot = DistroFeatureSnapshot.Build(
+                    options,
+                    ValidConnectionString,
+                    ExportTarget.AzureMonitor,
+                    customerSdkStatsEnabled: false,
+                    a365OnlyMode: false,
+                    distroVersion: "9.9.9-longoverride")!;
+
+                DistroFeatureSdkStats.Initialize(snapshot);
+
+                Assert.Single(CollectObservableMeasurements());
+
+                // Backdate the last emission past the 1s window.
+                var instance = DistroFeatureSdkStats.Instance!;
+                long twoSecondsAgo = DateTime.UtcNow.Ticks - TimeSpan.FromSeconds(2).Ticks;
+                typeof(DistroFeatureSdkStats)
+                    .GetField("_lastEmissionTicks", BindingFlags.NonPublic | BindingFlags.Instance)!
+                    .SetValue(instance, twoSecondsAgo);
+
+                Assert.Single(CollectObservableMeasurements());
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(longIntervalEnvVar, previous);
+                DistroFeatureSdkStats.ResetForTesting();
+            }
+        }
+
         private static List<(long value, Dictionary<string, object?> tags)> CollectObservableMeasurements()
         {
             var results = new List<(long value, Dictionary<string, object?> tags)>();
@@ -206,11 +247,5 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             listener.RecordObservableInstruments();
             return results;
         }
-    }
-
-    [CollectionDefinition(nameof(DistroFeatureSdkStatsCollection), DisableParallelization = true)]
-    public class DistroFeatureSdkStatsCollection
-    {
-        // The DistroFeatureSdkStats singleton is process-wide; serialize tests that touch it.
     }
 }

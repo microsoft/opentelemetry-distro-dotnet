@@ -368,6 +368,24 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             return;
         }
 
+        // disabledAll kill switch.
+        string? disabledAll;
+        try
+        {
+            disabledAll = Environment.GetEnvironmentVariable(
+                EnvironmentVariableConstants.APPLICATIONINSIGHTS_SDKSTATS_DISABLED_ALL);
+        }
+        catch (Exception)
+        {
+            disabledAll = null;
+        }
+
+        if (string.Equals(disabledAll, "true", StringComparison.OrdinalIgnoreCase))
+        {
+            AzureMonitorAspNetCoreEventSource.Log.DistroFeatureSdkStatsDisabledByEnvVar();
+            return;
+        }
+
         // Defer snapshot construction until the MeterProvider builds: by then the exporter's
         // AzureMonitorOptions has been populated from IConfiguration and environment variables,
         // so the connection string (and the customer iKey we extract from it) is the same value
