@@ -18,6 +18,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 {
@@ -32,6 +33,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         private const string FoundryUrl403 = "https://aka.ms/foundry-grant-agent-365-permissions";
         private readonly ExportFormatter _formatter;
         private readonly ILogger<Agent365ExporterCore> _logger;
+        private readonly Agent365CircuitBreaker _circuitBreaker;
+        private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
+        private readonly Func<DateTimeOffset> _utcNow;
 
         // The ingest service performs a case-insensitive check for "chat", so we send the
         // gen_ai.operation.name through unchanged. Both the lowercase canonical value and the
@@ -45,9 +49,21 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         /// <param name="formatter">The formatter instance used to format export payloads.</param>
         /// <param name="logger">The logger instance used to log messages during the export process.</param>
         public Agent365ExporterCore(ExportFormatter formatter, ILogger<Agent365ExporterCore> logger)
+            : this(formatter, logger, null, null)
+        {
+        }
+
+        internal Agent365ExporterCore(
+            ExportFormatter formatter,
+            ILogger<Agent365ExporterCore> logger,
+            Func<TimeSpan, CancellationToken, Task>? delayAsync,
+            Func<DateTimeOffset>? utcNow)
         {
             _formatter = formatter ?? throw new ArgumentNullException(nameof(formatter));
             _logger = logger ?? NullLogger<Agent365ExporterCore>.Instance;
+            _delayAsync = delayAsync ?? Task.Delay;
+            _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
+            _circuitBreaker = new Agent365CircuitBreaker(_utcNow);
         }
 
         /// <summary>
@@ -152,12 +168,29 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         /// <param name="tokenResolver"></param>
         /// <param name="sendAsync"></param>
         /// <returns></returns>
-        public async Task<ExportResult> ExportBatchCoreAsync(
+        public Task<ExportResult> ExportBatchCoreAsync(
             IEnumerable<(string TenantId, string AgentId, List<Activity> Activities)> groups,
             Resource resource,
             Agent365ExporterOptions options,
             Func<string, string, Task<string?>> tokenResolver,
             Func<HttpRequestMessage, Task<HttpResponseMessage>> sendAsync)
+        {
+            return ExportBatchCoreAsync(
+                groups,
+                resource,
+                options,
+                tokenResolver,
+                sendAsync,
+                CancellationToken.None);
+        }
+
+        internal async Task<ExportResult> ExportBatchCoreAsync(
+            IEnumerable<(string TenantId, string AgentId, List<Activity> Activities)> groups,
+            Resource resource,
+            Agent365ExporterOptions options,
+            Func<string, string, Task<string?>> tokenResolver,
+            Func<HttpRequestMessage, Task<HttpResponseMessage>> sendAsync,
+            CancellationToken cancellationToken)
         {
             foreach (var g in groups)
             {
@@ -229,54 +262,160 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 {
                     var chunk = chunks[i];
                     var json = _formatter.FormatMany(chunk, resource);
-                    using var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                    using var request = new HttpRequestMessage(HttpMethod.Post, requestUri)
-                    {
-                        Content = content
-                    };
-                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
                     var bodyBytes = Encoding.UTF8.GetByteCount(json);
                     this._logger?.LogDebug(
                         "Agent365ExporterCore: Sending chunk {ChunkIndex} of {ChunkCount} ({SpanCount} spans, {BodyBytes} bytes) to {RequestUri}.",
                         i + 1, chunks.Count, chunk.Count, bodyBytes, requestUri);
 
-                    try
-                    {
-                        var networkStats = DistroNetworkSdkStats.Instance;
-                        var stopwatch = networkStats != null ? Stopwatch.StartNew() : null;
+                    var success = await SendChunkWithRetriesAsync(
+                        requestUri,
+                        requestHost,
+                        json,
+                        token,
+                        i + 1,
+                        chunks.Count,
+                        sendAsync,
+                        cancellationToken).ConfigureAwait(false);
 
-                        using var resp = await sendAsync(request).ConfigureAwait(false);
-
-                        if (networkStats != null)
-                        {
-                            networkStats.TrackResponse(requestHost, (int)resp.StatusCode, stopwatch!.Elapsed.TotalMilliseconds);
-                        }
-
-                        var correlationId = resp.Headers.Contains(CorrelationIdHeaderKey) ? resp.Headers.GetValues(CorrelationIdHeaderKey).FirstOrDefault() : null;
-                        this._logger?.LogDebug("Agent365ExporterCore: HTTP {StatusCode} exporting spans. '{HeaderKey}': '{CorrelationId}'.", (int)resp.StatusCode, CorrelationIdHeaderKey, correlationId);
-                        if (!resp.IsSuccessStatusCode)
-                        {
-                            LogNonSuccessResponse(resp, correlationId, token!, i + 1, chunks.Count);
-                            return ExportResult.Failure;
-                        }
-                    }
-                    catch (HttpRequestException ex)
-                    {
-                        DistroNetworkSdkStats.Instance?.TrackException(requestHost, ex.GetType().FullName);
-                        this._logger?.LogError(ex, "Agent365ExporterCore: Exception exporting spans.");
+                    if (!success)
                         return ExportResult.Failure;
-                    }
-                    catch (TaskCanceledException ex)
-                    {
-                        DistroNetworkSdkStats.Instance?.TrackException(requestHost, ex.GetType().FullName);
-                        this._logger?.LogError(ex, "Agent365ExporterCore: Exception exporting spans.");
-                        return ExportResult.Failure;
-                    }
                 }
             }
             return ExportResult.Success;
+        }
+
+        private static HttpRequestMessage CreateRequest(string requestUri, string json, string token)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, requestUri)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            return request;
+        }
+
+        private void TrackSuccessfulAttempt(string? requestHost, double durationMs)
+        {
+            var networkStats = DistroNetworkSdkStats.Instance;
+            if (networkStats != null)
+            {
+                networkStats.TrackResponse(requestHost, 200, durationMs);
+            }
+        }
+
+        private void TrackResponseAttempt(string? requestHost, HttpStatusCode statusCode, double durationMs, bool willRetry)
+        {
+            var networkStats = DistroNetworkSdkStats.Instance;
+            if (networkStats != null)
+            {
+                networkStats.TrackResponse(requestHost, (int)statusCode, durationMs);
+            }
+        }
+
+        private void TrackExceptionAttempt(string? requestHost, Exception ex)
+        {
+            DistroNetworkSdkStats.Instance?.TrackException(requestHost, ex.GetType().FullName);
+        }
+
+        private async Task<bool> SendChunkWithRetriesAsync(
+            string requestUri,
+            string? requestHost,
+            string json,
+            string token,
+            int chunkIndex,
+            int chunkCount,
+            Func<HttpRequestMessage, Task<HttpResponseMessage>> sendAsync,
+            CancellationToken cancellationToken)
+        {
+            if (!_circuitBreaker.TryAcquirePermit())
+            {
+                _logger.LogWarning(
+                    "Agent365ExporterCore: Circuit breaker is open; skipping export to {RequestUri}.",
+                    requestUri);
+                return false;
+            }
+
+            for (var attempt = 0; attempt < Agent365RetryPolicy.MaxAttempts; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using var request = CreateRequest(requestUri, json, token);
+                var stopwatch = Stopwatch.StartNew();
+
+                try
+                {
+                    using var response = await sendAsync(request).ConfigureAwait(false);
+                    stopwatch.Stop();
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        TrackSuccessfulAttempt(requestHost, stopwatch.Elapsed.TotalMilliseconds);
+                        _circuitBreaker.RecordSuccess();
+                        return true;
+                    }
+
+                    var correlationId = response.Headers.Contains(CorrelationIdHeaderKey)
+                        ? response.Headers.GetValues(CorrelationIdHeaderKey).FirstOrDefault()
+                        : null;
+                    var canRetry = Agent365RetryPolicy.IsRetryable(response.StatusCode)
+                        && attempt < Agent365RetryPolicy.MaxRetries;
+
+                    TrackResponseAttempt(
+                        requestHost,
+                        response.StatusCode,
+                        stopwatch.Elapsed.TotalMilliseconds,
+                        canRetry);
+
+                    if (!canRetry)
+                    {
+                        LogNonSuccessResponse(response, correlationId, token, chunkIndex, chunkCount);
+                        if (Agent365RetryPolicy.IsRetryable(response.StatusCode))
+                        {
+                            _circuitBreaker.RecordTransientFailure();
+                        }
+                        return false;
+                    }
+
+                    var delay = Agent365RetryPolicy.GetDelay(response.Headers, attempt, _utcNow());
+                    _logger.LogWarning(
+                        "Agent365ExporterCore: HTTP {StatusCode} on attempt {Attempt} of {MaxAttempts}; retrying after {DelayMilliseconds} ms.",
+                        (int)response.StatusCode,
+                        attempt + 1,
+                        Agent365RetryPolicy.MaxAttempts,
+                        delay.TotalMilliseconds);
+                    await _delayAsync(delay, cancellationToken).ConfigureAwait(false);
+                }
+                catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+                {
+                    stopwatch.Stop();
+                    TrackExceptionAttempt(requestHost, ex);
+                    if (attempt == Agent365RetryPolicy.MaxRetries)
+                    {
+                        _circuitBreaker.RecordTransientFailure();
+                        return false;
+                    }
+
+                    await _delayAsync(
+                        TimeSpan.FromMilliseconds(500 * (1 << attempt)),
+                        cancellationToken).ConfigureAwait(false);
+                }
+                catch (HttpRequestException ex)
+                {
+                    stopwatch.Stop();
+                    TrackExceptionAttempt(requestHost, ex);
+                    if (attempt == Agent365RetryPolicy.MaxRetries)
+                    {
+                        _circuitBreaker.RecordTransientFailure();
+                        return false;
+                    }
+
+                    await _delayAsync(
+                        TimeSpan.FromMilliseconds(500 * (1 << attempt)),
+                        cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            return false;
         }
 
         private static AddResult TryAddActivityToMap(Activity activity, Dictionary<(string tenant, string agent), List<Activity>> map)
