@@ -346,6 +346,88 @@ public sealed class Agent365ExporterRetryTests
         DistroNetworkSdkStats.ResetForTesting();
     }
 
+    [TestMethod]
+    public async Task CircuitOpensAfterFiveExhaustedCycles()
+    {
+        var attempts = 0;
+        var core = CreateCore();
+
+        for (var cycle = 0; cycle < 5; cycle++)
+        {
+            var result = await ExportOneAsync(core, _ =>
+            {
+                attempts++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+            });
+            result.Should().Be(ExportResult.Failure);
+        }
+
+        var openResult = await ExportOneAsync(core, _ =>
+        {
+            attempts++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        });
+
+        openResult.Should().Be(ExportResult.Failure);
+        attempts.Should().Be(5 * Agent365RetryPolicy.MaxAttempts);
+    }
+
+    [TestMethod]
+    public async Task SuccessfulHalfOpenProbeClosesCircuit()
+    {
+        var attempts = 0;
+        var core = CreateCore();
+
+        await OpenCircuitAsync(core, _ =>
+        {
+            attempts++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+        });
+
+        _now = _now.AddSeconds(31);
+        var probe = await ExportOneAsync(core, _ =>
+        {
+            attempts++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        });
+        var next = await ExportOneAsync(core, _ =>
+        {
+            attempts++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        });
+
+        probe.Should().Be(ExportResult.Success);
+        next.Should().Be(ExportResult.Success);
+    }
+
+    [TestMethod]
+    public async Task NonRetryableFailuresDoNotOpenCircuit()
+    {
+        var attempts = 0;
+        var core = CreateCore();
+
+        for (var i = 0; i < 7; i++)
+        {
+            (await ExportOneAsync(core, _ =>
+            {
+                attempts++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden));
+            })).Should().Be(ExportResult.Failure);
+        }
+
+        attempts.Should().Be(7);
+    }
+
+    private async Task OpenCircuitAsync(
+        Agent365ExporterCore core,
+        Func<HttpRequestMessage, Task<HttpResponseMessage>> sendAsync)
+    {
+        for (var cycle = 0; cycle < Agent365CircuitBreaker.FailureThreshold; cycle++)
+        {
+            (await ExportOneAsync(core, sendAsync)).Should().Be(ExportResult.Failure);
+        }
+    }
+
     private static string? GetHost(ReadOnlySpan<KeyValuePair<string, object?>> tags)
     {
         for (int i = 0; i < tags.Length; i++)

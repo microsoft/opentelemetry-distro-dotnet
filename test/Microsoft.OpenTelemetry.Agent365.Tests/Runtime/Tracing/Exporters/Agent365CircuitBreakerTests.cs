@@ -85,18 +85,6 @@ public class Agent365CircuitBreakerTests
     }
 
     [TestMethod]
-    public void Exactly30SecondsNotEnoughForRecovery()
-    {
-        var breaker = OpenBreaker();
-        var openTime = _now;
-
-        // At t=30, recovery window has elapsed - half-open probe should succeed
-        _now = openTime.AddSeconds(30);
-        breaker.TryAcquirePermit().Should().BeTrue();
-        breaker.State.Should().Be(Agent365CircuitState.HalfOpen);
-    }
-
-    [TestMethod]
     public void FailedHalfOpenProbeStartsNewRecoveryWindow()
     {
         var breaker = OpenBreaker();

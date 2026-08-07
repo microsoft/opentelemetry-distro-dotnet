@@ -272,7 +272,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                         requestUri,
                         requestHost,
                         json,
-                        token,
+                        token!,
                         i + 1,
                         chunks.Count,
                         sendAsync,
