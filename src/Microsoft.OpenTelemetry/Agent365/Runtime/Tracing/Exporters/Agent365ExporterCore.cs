@@ -336,86 +336,98 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 return false;
             }
 
-            for (var attempt = 0; attempt < Agent365RetryPolicy.MaxAttempts; attempt++)
+            // ReleasePermit is a no-op when RecordSuccess/RecordTransientFailure already consumed
+            // the permit (they transition state away from HalfOpen). It releases the probe on every
+            // exit that records neither: caller cancellation, non-retryable response, unexpected
+            // exception, or loop fallthrough.
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                using var request = CreateRequest(requestUri, json, token);
-                var stopwatch = Stopwatch.StartNew();
-
-                try
+                for (var attempt = 0; attempt < Agent365RetryPolicy.MaxAttempts; attempt++)
                 {
-                    using var response = await sendAsync(request).ConfigureAwait(false);
-                    stopwatch.Stop();
+                    cancellationToken.ThrowIfCancellationRequested();
+                    using var request = CreateRequest(requestUri, json, token);
+                    var stopwatch = Stopwatch.StartNew();
 
-                    if (response.IsSuccessStatusCode)
+                    try
                     {
-                        TrackSuccessfulAttempt(requestHost, stopwatch.Elapsed.TotalMilliseconds);
-                        _circuitBreaker.RecordSuccess();
-                        return true;
+                        using var response = await sendAsync(request).ConfigureAwait(false);
+                        stopwatch.Stop();
+
+                        if (response.IsSuccessStatusCode)
+                        {
+                            TrackSuccessfulAttempt(requestHost, stopwatch.Elapsed.TotalMilliseconds);
+                            _circuitBreaker.RecordSuccess();
+                            return true;
+                        }
+
+                        var correlationId = response.Headers.Contains(CorrelationIdHeaderKey)
+                            ? response.Headers.GetValues(CorrelationIdHeaderKey).FirstOrDefault()
+                            : null;
+                        var canRetry = Agent365RetryPolicy.IsRetryable(response.StatusCode)
+                            && attempt < Agent365RetryPolicy.MaxRetries;
+
+                        TrackResponseAttempt(
+                            requestHost,
+                            response.StatusCode,
+                            stopwatch.Elapsed.TotalMilliseconds,
+                            canRetry);
+
+                        if (!canRetry)
+                        {
+                            LogNonSuccessResponse(response, correlationId, token, chunkIndex, chunkCount);
+                            if (Agent365RetryPolicy.IsRetryable(response.StatusCode))
+                            {
+                                _circuitBreaker.RecordTransientFailure();
+                            }
+                            // Non-retryable non-transient (e.g. 403): permit released by finally.
+                            return false;
+                        }
+
+                        var delay = Agent365RetryPolicy.GetDelay(response.Headers, attempt, _utcNow());
+                        _logger.LogWarning(
+                            "Agent365ExporterCore: HTTP {StatusCode} on attempt {Attempt} of {MaxAttempts}; retrying after {DelayMilliseconds} ms.",
+                            (int)response.StatusCode,
+                            attempt + 1,
+                            Agent365RetryPolicy.MaxAttempts,
+                            delay.TotalMilliseconds);
+                        await _delayAsync(delay, cancellationToken).ConfigureAwait(false);
                     }
-
-                    var correlationId = response.Headers.Contains(CorrelationIdHeaderKey)
-                        ? response.Headers.GetValues(CorrelationIdHeaderKey).FirstOrDefault()
-                        : null;
-                    var canRetry = Agent365RetryPolicy.IsRetryable(response.StatusCode)
-                        && attempt < Agent365RetryPolicy.MaxRetries;
-
-                    TrackResponseAttempt(
-                        requestHost,
-                        response.StatusCode,
-                        stopwatch.Elapsed.TotalMilliseconds,
-                        canRetry);
-
-                    if (!canRetry)
+                    catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
                     {
-                        LogNonSuccessResponse(response, correlationId, token, chunkIndex, chunkCount);
-                        if (Agent365RetryPolicy.IsRetryable(response.StatusCode))
+                        stopwatch.Stop();
+                        TrackExceptionAttempt(requestHost, ex);
+                        if (attempt == Agent365RetryPolicy.MaxRetries)
                         {
                             _circuitBreaker.RecordTransientFailure();
+                            return false;
                         }
-                        return false;
-                    }
 
-                    var delay = Agent365RetryPolicy.GetDelay(response.Headers, attempt, _utcNow());
-                    _logger.LogWarning(
-                        "Agent365ExporterCore: HTTP {StatusCode} on attempt {Attempt} of {MaxAttempts}; retrying after {DelayMilliseconds} ms.",
-                        (int)response.StatusCode,
-                        attempt + 1,
-                        Agent365RetryPolicy.MaxAttempts,
-                        delay.TotalMilliseconds);
-                    await _delayAsync(delay, cancellationToken).ConfigureAwait(false);
-                }
-                catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
-                {
-                    stopwatch.Stop();
-                    TrackExceptionAttempt(requestHost, ex);
-                    if (attempt == Agent365RetryPolicy.MaxRetries)
+                        await _delayAsync(
+                            TimeSpan.FromMilliseconds(500 * (1 << attempt)),
+                            cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (HttpRequestException ex)
                     {
-                        _circuitBreaker.RecordTransientFailure();
-                        return false;
-                    }
+                        stopwatch.Stop();
+                        TrackExceptionAttempt(requestHost, ex);
+                        if (attempt == Agent365RetryPolicy.MaxRetries)
+                        {
+                            _circuitBreaker.RecordTransientFailure();
+                            return false;
+                        }
 
-                    await _delayAsync(
-                        TimeSpan.FromMilliseconds(500 * (1 << attempt)),
-                        cancellationToken).ConfigureAwait(false);
-                }
-                catch (HttpRequestException ex)
-                {
-                    stopwatch.Stop();
-                    TrackExceptionAttempt(requestHost, ex);
-                    if (attempt == Agent365RetryPolicy.MaxRetries)
-                    {
-                        _circuitBreaker.RecordTransientFailure();
-                        return false;
+                        await _delayAsync(
+                            TimeSpan.FromMilliseconds(500 * (1 << attempt)),
+                            cancellationToken).ConfigureAwait(false);
                     }
-
-                    await _delayAsync(
-                        TimeSpan.FromMilliseconds(500 * (1 << attempt)),
-                        cancellationToken).ConfigureAwait(false);
                 }
+
+                return false;
             }
-
-            return false;
+            finally
+            {
+                _circuitBreaker.ReleasePermit();
+            }
         }
 
         private static AddResult TryAddActivityToMap(Activity activity, Dictionary<(string tenant, string agent), List<Activity>> map)

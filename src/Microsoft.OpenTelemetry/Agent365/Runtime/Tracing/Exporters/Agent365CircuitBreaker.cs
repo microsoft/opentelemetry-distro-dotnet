@@ -73,6 +73,22 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             }
         }
 
+        /// <summary>
+        /// Releases an acquired half-open probe without recording success or failure and without
+        /// changing the circuit state, failure count, or recovery timestamp.
+        /// Does nothing when the circuit is Closed or Open.
+        /// </summary>
+        internal void ReleasePermit()
+        {
+            lock (_gate)
+            {
+                if (_state == Agent365CircuitState.HalfOpen)
+                {
+                    _probeInFlight = false;
+                }
+            }
+        }
+
         internal void RecordTransientFailure()
         {
             lock (_gate)

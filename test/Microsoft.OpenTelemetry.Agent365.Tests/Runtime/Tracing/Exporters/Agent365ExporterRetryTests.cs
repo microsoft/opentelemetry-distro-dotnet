@@ -214,4 +214,58 @@ public sealed class Agent365ExporterRetryTests
         requests[0].Should().NotBeSameAs(requests[1]);
         contents[0].Should().NotBeSameAs(contents[1]);
     }
+
+    [TestMethod]
+    public async Task CallerCancellationDuringHalfOpenExportDoesNotPermanentlyBlockNextProbe()
+    {
+        var core = CreateCore();
+        using var cts = new CancellationTokenSource();
+
+        var cbField = typeof(Agent365ExporterCore)
+            .GetField("_circuitBreaker", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var cb = (Agent365CircuitBreaker)cbField.GetValue(core)!;
+
+        for (var i = 0; i < Agent365CircuitBreaker.FailureThreshold; i++)
+            cb.RecordTransientFailure();
+
+        _now = _now.Add(Agent365CircuitBreaker.RecoveryTimeout).AddSeconds(1);
+        cb.State.Should().Be(Agent365CircuitState.HalfOpen);
+
+        Func<Task> cancelAction = async () => await ExportOneAsync(
+            core,
+            _ =>
+            {
+                cts.Cancel();
+                return Task.FromCanceled<HttpResponseMessage>(cts.Token);
+            },
+            cts.Token);
+
+        await cancelAction.Should().ThrowAsync<OperationCanceledException>();
+
+        cb.State.Should().Be(Agent365CircuitState.HalfOpen);
+        cb.TryAcquirePermit().Should().BeTrue();
+    }
+
+    [TestMethod]
+    public async Task NonRetryableResponseDuringHalfOpenDoesNotPermanentlyBlockNextProbe()
+    {
+        var core = CreateCore();
+
+        var cbField = typeof(Agent365ExporterCore)
+            .GetField("_circuitBreaker", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var cb = (Agent365CircuitBreaker)cbField.GetValue(core)!;
+
+        for (var i = 0; i < Agent365CircuitBreaker.FailureThreshold; i++)
+            cb.RecordTransientFailure();
+
+        _now = _now.Add(Agent365CircuitBreaker.RecoveryTimeout).AddSeconds(1);
+        cb.State.Should().Be(Agent365CircuitState.HalfOpen);
+
+        var result = await ExportOneAsync(core, _ =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden)));
+
+        result.Should().Be(ExportResult.Failure);
+        cb.State.Should().Be(Agent365CircuitState.HalfOpen);
+        cb.TryAcquirePermit().Should().BeTrue();
+    }
 }

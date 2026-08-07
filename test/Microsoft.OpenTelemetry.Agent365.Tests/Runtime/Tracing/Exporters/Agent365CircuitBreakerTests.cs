@@ -136,6 +136,50 @@ public class Agent365CircuitBreakerTests
         breaker.State.Should().Be(Agent365CircuitState.HalfOpen);
     }
 
+    [TestMethod]
+    public void ReleasedHalfOpenPermitAllowsAnotherProbe()
+    {
+        var breaker = OpenBreaker();
+        _now = _now.AddSeconds(31);
+
+        // First probe acquired
+        breaker.TryAcquirePermit().Should().BeTrue();
+        breaker.State.Should().Be(Agent365CircuitState.HalfOpen);
+
+        // Second probe blocked while first is in flight
+        breaker.TryAcquirePermit().Should().BeFalse();
+
+        // Release without recording success or failure
+        breaker.ReleasePermit();
+        breaker.State.Should().Be(Agent365CircuitState.HalfOpen);
+
+        // Another probe now allowed
+        breaker.TryAcquirePermit().Should().BeTrue();
+    }
+
+    [TestMethod]
+    public void ReleasePermitDoesNothingWhenClosed()
+    {
+        var breaker = new Agent365CircuitBreaker(() => _now);
+        breaker.TryAcquirePermit().Should().BeTrue();
+
+        // No exception, state unchanged
+        breaker.ReleasePermit();
+        breaker.State.Should().Be(Agent365CircuitState.Closed);
+        breaker.TryAcquirePermit().Should().BeTrue();
+    }
+
+    [TestMethod]
+    public void ReleasePermitDoesNothingWhenOpen()
+    {
+        var breaker = OpenBreaker();
+        breaker.State.Should().Be(Agent365CircuitState.Open);
+
+        // No exception, state unchanged
+        breaker.ReleasePermit();
+        breaker.State.Should().Be(Agent365CircuitState.Open);
+    }
+
     private Agent365CircuitBreaker OpenBreaker()
     {
         var breaker = new Agent365CircuitBreaker(() => _now);
