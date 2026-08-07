@@ -41,11 +41,25 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             }
         }
 
-        internal bool TryAcquirePermit()
+        internal bool TryAcquirePermit() => TryAcquirePermit(out _);
+
+        /// <summary>
+        /// Attempts to acquire a permit to send. Reports via <paramref name="acquiredHalfOpenProbe"/>
+        /// whether this call took ownership of the single half-open probe, so the caller can release
+        /// exactly that probe (and never another invocation's) when it finishes.
+        /// </summary>
+        /// <param name="acquiredHalfOpenProbe">
+        /// <c>true</c> only when the circuit was HalfOpen and this call claimed the sole probe;
+        /// <c>false</c> for a Closed-state permit (which owns no probe) or when no permit was granted.
+        /// </param>
+        /// <returns><c>true</c> when sending is permitted; otherwise <c>false</c>.</returns>
+        internal bool TryAcquirePermit(out bool acquiredHalfOpenProbe)
         {
             lock (_gate)
             {
                 TransitionToHalfOpenIfReady();
+
+                acquiredHalfOpenProbe = false;
 
                 if (_state == Agent365CircuitState.Closed)
                 {
@@ -55,6 +69,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 if (_state == Agent365CircuitState.HalfOpen && !_probeInFlight)
                 {
                     _probeInFlight = true;
+                    acquiredHalfOpenProbe = true;
                     return true;
                 }
 

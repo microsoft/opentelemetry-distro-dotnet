@@ -168,6 +168,68 @@ public class Agent365CircuitBreakerTests
         breaker.State.Should().Be(Agent365CircuitState.Open);
     }
 
+    [TestMethod]
+    public void ClosedPermitDoesNotOwnHalfOpenProbe()
+    {
+        var breaker = new Agent365CircuitBreaker(() => _now);
+
+        breaker.TryAcquirePermit(out var acquiredHalfOpenProbe).Should().BeTrue();
+        acquiredHalfOpenProbe.Should().BeFalse();
+    }
+
+    [TestMethod]
+    public void HalfOpenProbeReportsOwnershipAndBlocksSecondOwner()
+    {
+        var breaker = OpenBreaker();
+        _now = _now.AddSeconds(31);
+
+        breaker.TryAcquirePermit(out var acquiredHalfOpenProbe).Should().BeTrue();
+        acquiredHalfOpenProbe.Should().BeTrue();
+
+        // A second concurrent attempt is refused and owns no probe.
+        breaker.TryAcquirePermit(out var secondOwner).Should().BeFalse();
+        secondOwner.Should().BeFalse();
+    }
+
+    [TestMethod]
+    public void ClosedPermitReleaseCannotFreeAnotherInvocationsHalfOpenProbe()
+    {
+        var breaker = new Agent365CircuitBreaker(() => _now);
+
+        // Invocation B acquires a Closed-state permit; a Closed permit owns no probe.
+        breaker.TryAcquirePermit(out var bOwnsProbe).Should().BeTrue();
+        bOwnsProbe.Should().BeFalse();
+
+        // While B is still running, the circuit opens and later recovers to half-open.
+        for (var i = 0; i < Agent365CircuitBreaker.FailureThreshold; i++)
+        {
+            breaker.RecordTransientFailure();
+        }
+
+        _now = _now.AddSeconds(31);
+
+        // Invocation H claims the single half-open probe.
+        breaker.TryAcquirePermit(out var hOwnsProbe).Should().BeTrue();
+        hOwnsProbe.Should().BeTrue();
+        breaker.State.Should().Be(Agent365CircuitState.HalfOpen);
+
+        // B finishes. Its ownership-gated finally must NOT release, because B never owned a probe.
+        if (bOwnsProbe)
+        {
+            breaker.ReleasePermit();
+        }
+
+        // H's probe is still in flight: no other invocation may acquire one.
+        breaker.TryAcquirePermit(out var thirdOwnsProbe).Should().BeFalse();
+        thirdOwnsProbe.Should().BeFalse();
+        breaker.State.Should().Be(Agent365CircuitState.HalfOpen);
+
+        // Sanity: once H releases its own probe, a fresh probe becomes available again.
+        breaker.ReleasePermit();
+        breaker.TryAcquirePermit(out var afterRelease).Should().BeTrue();
+        afterRelease.Should().BeTrue();
+    }
+
     private Agent365CircuitBreaker OpenBreaker()
     {
         var breaker = new Agent365CircuitBreaker(() => _now);

@@ -42,6 +42,14 @@ public class Agent365RetryPolicyTests
     }
 
     [TestMethod]
+    public void GetFallbackDelayProducesExponentialBackoff()
+    {
+        Agent365RetryPolicy.GetFallbackDelay(0).Should().Be(TimeSpan.FromMilliseconds(500));
+        Agent365RetryPolicy.GetFallbackDelay(1).Should().Be(TimeSpan.FromSeconds(1));
+        Agent365RetryPolicy.GetFallbackDelay(2).Should().Be(TimeSpan.FromSeconds(2));
+    }
+
+    [TestMethod]
     public void HonorsAndCapsRetryAfterDelta()
     {
         using var response = new HttpResponseMessage();

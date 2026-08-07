@@ -87,7 +87,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             _requestDuration = _meter.CreateHistogram<double>(
                 "Request_Duration",
                 unit: "ms",
-                description: "Duration of requests to the destination ingestion endpoint.");
+                description: "Duration of each HTTP response attempt to the destination ingestion endpoint.");
             _retryCount = _meter.CreateCounter<long>(
                 "Retry_Count",
                 description: "Count of requests for which the destination ingestion endpoint returned a retryable response.");

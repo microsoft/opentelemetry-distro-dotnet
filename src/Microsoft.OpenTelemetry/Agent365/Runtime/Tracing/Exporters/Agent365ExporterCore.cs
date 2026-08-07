@@ -295,31 +295,55 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             return request;
         }
 
-        private static void TrackSuccessfulAttempt(string? requestHost, double durationMs)
-        {
-            var stats = DistroNetworkSdkStats.Instance;
-            stats?.TrackDuration(requestHost, durationMs);
-            stats?.TrackSuccess(requestHost);
-        }
+        // HTTP status codes with special handling in RecordResponseStats, mirroring the
+        // DistroNetworkSdkStats.TrackResponse contract. 200 is the sole Request_Success_Count code;
+        // 206 (partial success accepted by the pipeline) and the 307/308 redirects are not terminal
+        // outcomes and record duration only.
+        private const int StatusOk = 200;
+        private const int StatusPartialContent = 206;
+        private const int StatusTemporaryRedirect = 307;
+        private const int StatusPermanentRedirect = 308;
 
-        private static void TrackResponseAttempt(string? requestHost, HttpStatusCode statusCode, double durationMs, bool willRetry)
+        /// <summary>
+        /// Records SDKStats for a single HTTP response attempt, aligned with the
+        /// <see cref="DistroNetworkSdkStats.TrackResponse"/> contract. Duration is recorded for every
+        /// attempt. Only HTTP 200 records <c>Request_Success_Count</c>; 206/307/308 record neither
+        /// success nor failure/retry/throttle. Otherwise a retryable attempt that will be retried
+        /// records <c>Retry_Count</c>, a throttling status records <c>Throttle_Count</c>, and any
+        /// remaining non-success (including a retryable status on the final, exhausted attempt)
+        /// records <c>Request_Failure_Count</c>.
+        /// </summary>
+        private static void RecordResponseStats(string? requestHost, HttpStatusCode statusCode, double durationMs, bool willRetry)
         {
             var stats = DistroNetworkSdkStats.Instance;
             if (stats == null)
                 return;
 
             stats.TrackDuration(requestHost, durationMs);
+
+            var code = (int)statusCode;
+            if (code == StatusOk)
+            {
+                stats.TrackSuccess(requestHost);
+                return;
+            }
+
+            if (code == StatusPartialContent || code == StatusTemporaryRedirect || code == StatusPermanentRedirect)
+            {
+                return;
+            }
+
             if (willRetry)
             {
-                stats.TrackRetry(requestHost, (int)statusCode);
+                stats.TrackRetry(requestHost, code);
             }
-            else if (DistroNetworkSdkStatsHelper.IsThrottle((int)statusCode))
+            else if (DistroNetworkSdkStatsHelper.IsThrottle(code))
             {
-                stats.TrackThrottle(requestHost, (int)statusCode);
+                stats.TrackThrottle(requestHost, code);
             }
             else
             {
-                stats.TrackFinalFailure(requestHost, (int)statusCode);
+                stats.TrackFinalFailure(requestHost, code);
             }
         }
 
@@ -338,7 +362,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             Func<HttpRequestMessage, Task<HttpResponseMessage>> sendAsync,
             CancellationToken cancellationToken)
         {
-            if (!_circuitBreaker.TryAcquirePermit())
+            if (!_circuitBreaker.TryAcquirePermit(out var acquiredHalfOpenProbe))
             {
                 _logger.LogWarning(
                     "Agent365ExporterCore: Circuit breaker is open; skipping export to {RequestUri}.",
@@ -346,10 +370,14 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 return false;
             }
 
-            // ReleasePermit is a no-op when RecordSuccess/RecordTransientFailure already consumed
-            // the permit (they transition state away from HalfOpen). It releases the probe on every
-            // exit that records neither: caller cancellation, non-retryable response, unexpected
-            // exception, or loop fallthrough.
+            // The permit is released in finally only when this invocation actually acquired the
+            // single half-open probe (acquiredHalfOpenProbe). A Closed-state permit owns no probe,
+            // so it must never call ReleasePermit — otherwise a slow Closed invocation completing
+            // after the circuit re-opened and handed the probe to a different invocation would
+            // release that other invocation's probe. RecordSuccess/RecordTransientFailure already
+            // consume the probe (transitioning away from HalfOpen), leaving the finally a no-op on
+            // those paths; the finally covers the exits that record neither: caller cancellation,
+            // non-retryable response, unexpected exception, or loop fallthrough.
             try
             {
                 for (var attempt = 0; attempt < Agent365RetryPolicy.MaxAttempts; attempt++)
@@ -365,7 +393,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
                         if (response.IsSuccessStatusCode)
                         {
-                            TrackSuccessfulAttempt(requestHost, stopwatch.Elapsed.TotalMilliseconds);
+                            RecordResponseStats(requestHost, response.StatusCode, stopwatch.Elapsed.TotalMilliseconds, willRetry: false);
                             _circuitBreaker.RecordSuccess();
                             return true;
                         }
@@ -376,11 +404,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                         var canRetry = Agent365RetryPolicy.IsRetryable(response.StatusCode)
                             && attempt < Agent365RetryPolicy.MaxRetries;
 
-                        TrackResponseAttempt(
+                        RecordResponseStats(
                             requestHost,
                             response.StatusCode,
                             stopwatch.Elapsed.TotalMilliseconds,
-                            canRetry);
+                            willRetry: canRetry);
 
                         if (!canRetry)
                         {
@@ -395,40 +423,29 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
                         var delay = Agent365RetryPolicy.GetDelay(response.Headers, attempt, _utcNow());
                         _logger.LogWarning(
-                            "Agent365ExporterCore: HTTP {StatusCode} on attempt {Attempt} of {MaxAttempts}; retrying after {DelayMilliseconds} ms.",
+                            "Agent365ExporterCore: HTTP {StatusCode} on attempt {Attempt} of {MaxAttempts}; retrying after {DelayMilliseconds} ms. Correlation ID: {CorrelationId}.",
                             (int)response.StatusCode,
                             attempt + 1,
                             Agent365RetryPolicy.MaxAttempts,
-                            delay.TotalMilliseconds);
+                            delay.TotalMilliseconds,
+                            correlationId ?? "N/A");
                         await _delayAsync(delay, cancellationToken).ConfigureAwait(false);
                     }
                     catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
                     {
                         stopwatch.Stop();
-                        TrackExceptionAttempt(requestHost, ex);
-                        if (attempt == Agent365RetryPolicy.MaxRetries)
+                        if (await HandleTransportExceptionAsync(ex, "timeout", requestHost, attempt, cancellationToken).ConfigureAwait(false))
                         {
-                            _circuitBreaker.RecordTransientFailure();
                             return false;
                         }
-
-                        await _delayAsync(
-                            TimeSpan.FromMilliseconds(500 * (1 << attempt)),
-                            cancellationToken).ConfigureAwait(false);
                     }
                     catch (HttpRequestException ex)
                     {
                         stopwatch.Stop();
-                        TrackExceptionAttempt(requestHost, ex);
-                        if (attempt == Agent365RetryPolicy.MaxRetries)
+                        if (await HandleTransportExceptionAsync(ex, "error", requestHost, attempt, cancellationToken).ConfigureAwait(false))
                         {
-                            _circuitBreaker.RecordTransientFailure();
                             return false;
                         }
-
-                        await _delayAsync(
-                            TimeSpan.FromMilliseconds(500 * (1 << attempt)),
-                            cancellationToken).ConfigureAwait(false);
                     }
                 }
 
@@ -436,8 +453,53 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             }
             finally
             {
-                _circuitBreaker.ReleasePermit();
+                if (acquiredHalfOpenProbe)
+                {
+                    _circuitBreaker.ReleasePermit();
+                }
             }
+        }
+
+        /// <summary>
+        /// Handles a transport-level failure (timeout-style <see cref="TaskCanceledException"/> or
+        /// <see cref="HttpRequestException"/>) for a single attempt. Records the exception for
+        /// SDKStats, then either logs an <c>Error</c> and reopens the circuit on the final attempt
+        /// (returning <c>true</c> so the caller stops), or logs a <c>Warning</c> with the attempt
+        /// number and backoff and waits before the next retry (returning <c>false</c>). Never logs
+        /// the bearer token or request payload.
+        /// </summary>
+        /// <returns><c>true</c> when the attempt budget is exhausted and the caller should stop.</returns>
+        private async Task<bool> HandleTransportExceptionAsync(
+            Exception exception,
+            string kind,
+            string? requestHost,
+            int attempt,
+            CancellationToken cancellationToken)
+        {
+            TrackExceptionAttempt(requestHost, exception);
+
+            if (attempt == Agent365RetryPolicy.MaxRetries)
+            {
+                _logger.LogError(
+                    exception,
+                    "Agent365ExporterCore: Network {Kind} on final attempt {Attempt} of {MaxAttempts}; giving up.",
+                    kind,
+                    attempt + 1,
+                    Agent365RetryPolicy.MaxAttempts);
+                _circuitBreaker.RecordTransientFailure();
+                return true;
+            }
+
+            var delay = Agent365RetryPolicy.GetFallbackDelay(attempt);
+            _logger.LogWarning(
+                exception,
+                "Agent365ExporterCore: Network {Kind} on attempt {Attempt} of {MaxAttempts}; retrying after {DelayMilliseconds} ms.",
+                kind,
+                attempt + 1,
+                Agent365RetryPolicy.MaxAttempts,
+                delay.TotalMilliseconds);
+            await _delayAsync(delay, cancellationToken).ConfigureAwait(false);
+            return false;
         }
 
         private static AddResult TryAddActivityToMap(Activity activity, Dictionary<(string tenant, string agent), List<Activity>> map)

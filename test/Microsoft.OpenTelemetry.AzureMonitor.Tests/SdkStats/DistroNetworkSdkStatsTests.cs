@@ -126,6 +126,29 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             Assert.Equal("mot2.0.0", success.tags["version"]);
         }
 
+        [Fact]
+        public void RequestDuration_Description_MentionsPerResponseAttempt()
+        {
+            string? description = null;
+            using var listener = new MeterListener
+            {
+                InstrumentPublished = (instrument, l) =>
+                {
+                    if (instrument.Meter.Name == DistroNetworkSdkStats.MeterName
+                        && instrument.Name == "Request_Duration")
+                    {
+                        description = instrument.Description;
+                    }
+                },
+            };
+            listener.Start();
+
+            DistroNetworkSdkStats.Initialize("N/A", "1.0.0");
+
+            Assert.NotNull(description);
+            Assert.Contains("response attempt", description);
+        }
+
         private static List<(string instrument, long value, Dictionary<string, object?> tags)> Collect(System.Action record)
         {
             var results = new List<(string instrument, long value, Dictionary<string, object?> tags)>();

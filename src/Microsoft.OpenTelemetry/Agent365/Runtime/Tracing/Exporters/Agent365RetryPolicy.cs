@@ -45,7 +45,16 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                     : requestedDelay.Value;
             }
 
-            return TimeSpan.FromMilliseconds(500 * (1 << retryIndex));
+            return GetFallbackDelay(retryIndex);
         }
+
+        /// <summary>
+        /// Exponential backoff fallback used when the response carries no honorable
+        /// <c>Retry-After</c> header and for transport-level exceptions (timeout / connection
+        /// failures). Produces 500 ms, 1 s, and 2 s for retry indexes 0, 1, and 2.
+        /// </summary>
+        /// <param name="retryIndex">Zero-based index of the retry about to be scheduled.</param>
+        internal static TimeSpan GetFallbackDelay(int retryIndex) =>
+            TimeSpan.FromMilliseconds(500 * (1 << retryIndex));
     }
 }
