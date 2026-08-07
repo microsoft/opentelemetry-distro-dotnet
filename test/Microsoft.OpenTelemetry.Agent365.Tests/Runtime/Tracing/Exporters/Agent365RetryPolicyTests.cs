@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -68,5 +71,29 @@ public class Agent365RetryPolicyTests
 
         Agent365RetryPolicy.GetDelay(response.Headers, 0, now)
             .Should().Be(TimeSpan.FromMilliseconds(500));
+    }
+
+    [TestMethod]
+    public void ZeroRetryAfterDeltaIsValidForImmediateRetry()
+    {
+        using var response = new HttpResponseMessage();
+        var now = DateTimeOffset.UtcNow;
+        response.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.Zero);
+
+        Agent365RetryPolicy.GetDelay(response.Headers, 0, now)
+            .Should().Be(TimeSpan.Zero);
+    }
+
+    [DataTestMethod]
+    [DataRow(HttpStatusCode.MultipleChoices)]    // 300
+    [DataRow(HttpStatusCode.MovedPermanently)]   // 301
+    [DataRow(HttpStatusCode.Found)]               // 302
+    [DataRow(HttpStatusCode.BadRequest)]          // 400
+    [DataRow(HttpStatusCode.Unauthorized)]        // 401
+    [DataRow(HttpStatusCode.Forbidden)]           // 403
+    [DataRow(HttpStatusCode.NotFound)]            // 404
+    public void NonRetryableStatusCodesReturnFalse(HttpStatusCode statusCode)
+    {
+        Agent365RetryPolicy.IsRetryable(statusCode).Should().BeFalse();
     }
 }

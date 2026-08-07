@@ -38,7 +38,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 }
             }
 
-            if (requestedDelay > TimeSpan.Zero)
+            if (requestedDelay.HasValue && requestedDelay.Value >= TimeSpan.Zero)
             {
                 return requestedDelay.Value > MaxRetryAfter
                     ? MaxRetryAfter
