@@ -425,3 +425,4 @@ api/
 # Language server cache
 *.lscache
 .github/copilot-instructions.md
+.worktrees/
