@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 using FluentAssertions;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
 
@@ -60,6 +63,54 @@ public class Agent365CircuitBreakerTests
 
         breaker.State.Should().Be(Agent365CircuitState.Open);
         breaker.TryAcquirePermit().Should().BeFalse();
+    }
+
+    [TestMethod]
+    public void FailuresWhileClosedDoNotShiftRecoveryWindow()
+    {
+        // Open the breaker at t=0
+        var breaker = OpenBreaker();
+        var openTime = _now;
+
+        // Multiple failures while checking state (which might fail) should not shift recovery window
+        _now = _now.AddSeconds(10);
+        breaker.RecordTransientFailure();
+        breaker.RecordTransientFailure();
+        breaker.RecordTransientFailure();
+
+        // At t=30, still not ready (exactly at boundary, needs > 30 seconds)
+        _now = openTime.AddSeconds(30);
+        breaker.TryAcquirePermit().Should().BeFalse();
+        breaker.State.Should().Be(Agent365CircuitState.Open);
+
+        // At t=31, recovery window has elapsed (measured from original open time)
+        _now = openTime.AddSeconds(31);
+        breaker.TryAcquirePermit().Should().BeTrue();
+        breaker.State.Should().Be(Agent365CircuitState.HalfOpen);
+    }
+
+    [TestMethod]
+    public void Exactly30SecondsNotEnoughForRecovery()
+    {
+        var breaker = OpenBreaker();
+        var openTime = _now;
+
+        // Exactly 30 seconds later - should not transition
+        _now = openTime.AddSeconds(30);
+        breaker.TryAcquirePermit().Should().BeFalse();
+        breaker.State.Should().Be(Agent365CircuitState.Open);
+    }
+
+    [TestMethod]
+    public void Exactly31SecondsAllowsHalfOpenTransition()
+    {
+        var breaker = OpenBreaker();
+        var openTime = _now;
+
+        // Exactly 31 seconds later - should allow probe
+        _now = openTime.AddSeconds(31);
+        breaker.TryAcquirePermit().Should().BeTrue();
+        breaker.State.Should().Be(Agent365CircuitState.HalfOpen);
     }
 
     private Agent365CircuitBreaker OpenBreaker()

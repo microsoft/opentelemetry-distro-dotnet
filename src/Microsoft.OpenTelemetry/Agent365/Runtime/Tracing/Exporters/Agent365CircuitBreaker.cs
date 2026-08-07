@@ -77,15 +77,28 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         {
             lock (_gate)
             {
-                _consecutiveFailures++;
-                _lastFailureTime = _utcNow();
                 _probeInFlight = false;
 
-                if (_state == Agent365CircuitState.HalfOpen
-                    || _consecutiveFailures >= FailureThreshold)
+                if (_state == Agent365CircuitState.HalfOpen)
                 {
+                    // Reopening circuit from half-open probe failure
+                    _consecutiveFailures++;
+                    _lastFailureTime = _utcNow();
                     _state = Agent365CircuitState.Open;
                 }
+                else if (_state == Agent365CircuitState.Closed)
+                {
+                    // Track failures while closed
+                    _consecutiveFailures++;
+
+                    // Only transition and record time when threshold reached
+                    if (_consecutiveFailures >= FailureThreshold)
+                    {
+                        _lastFailureTime = _utcNow();
+                        _state = Agent365CircuitState.Open;
+                    }
+                }
+                // If already Open, do nothing - don't update _lastFailureTime
             }
         }
 
@@ -93,7 +106,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         {
             if (_state == Agent365CircuitState.Open
                 && _lastFailureTime.HasValue
-                && _utcNow() - _lastFailureTime.Value >= RecoveryTimeout)
+                && _utcNow() - _lastFailureTime.Value > RecoveryTimeout)
             {
                 _state = Agent365CircuitState.HalfOpen;
                 _probeInFlight = false;
