@@ -295,27 +295,37 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             return request;
         }
 
-        private void TrackSuccessfulAttempt(string? requestHost, double durationMs)
+        private static void TrackSuccessfulAttempt(string? requestHost, double durationMs)
         {
-            var networkStats = DistroNetworkSdkStats.Instance;
-            if (networkStats != null)
+            var stats = DistroNetworkSdkStats.Instance;
+            stats?.TrackDuration(requestHost, durationMs);
+            stats?.TrackSuccess(requestHost);
+        }
+
+        private static void TrackResponseAttempt(string? requestHost, HttpStatusCode statusCode, double durationMs, bool willRetry)
+        {
+            var stats = DistroNetworkSdkStats.Instance;
+            if (stats == null)
+                return;
+
+            stats.TrackDuration(requestHost, durationMs);
+            if (willRetry)
             {
-                networkStats.TrackResponse(requestHost, 200, durationMs);
+                stats.TrackRetry(requestHost, (int)statusCode);
+            }
+            else if (DistroNetworkSdkStatsHelper.IsThrottle((int)statusCode))
+            {
+                stats.TrackThrottle(requestHost, (int)statusCode);
+            }
+            else
+            {
+                stats.TrackFinalFailure(requestHost, (int)statusCode);
             }
         }
 
-        private void TrackResponseAttempt(string? requestHost, HttpStatusCode statusCode, double durationMs, bool willRetry)
+        private static void TrackExceptionAttempt(string? requestHost, Exception exception)
         {
-            var networkStats = DistroNetworkSdkStats.Instance;
-            if (networkStats != null)
-            {
-                networkStats.TrackResponse(requestHost, (int)statusCode, durationMs);
-            }
-        }
-
-        private void TrackExceptionAttempt(string? requestHost, Exception ex)
-        {
-            DistroNetworkSdkStats.Instance?.TrackException(requestHost, ex.GetType().FullName);
+            DistroNetworkSdkStats.Instance?.TrackException(requestHost, exception.GetType().FullName);
         }
 
         private async Task<bool> SendChunkWithRetriesAsync(

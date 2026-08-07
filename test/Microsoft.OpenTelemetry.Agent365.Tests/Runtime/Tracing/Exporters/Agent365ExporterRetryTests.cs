@@ -6,9 +6,13 @@ using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.OpenTelemetry.AzureMonitor.SdkStats;
 using OpenTelemetry;
 using OpenTelemetry.Resources;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
+using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Threading;
@@ -267,5 +271,88 @@ public sealed class Agent365ExporterRetryTests
         result.Should().Be(ExportResult.Failure);
         cb.State.Should().Be(Agent365CircuitState.HalfOpen);
         cb.TryAcquirePermit().Should().BeTrue();
+    }
+
+    [TestMethod]
+    public async Task TwoRetryableResponsesThenSuccessProducesTwoRetriesAndOneSuccess()
+    {
+        DistroNetworkSdkStats.ResetForTesting();
+        DistroNetworkSdkStats.Initialize("N/A", "1.0.0");
+
+        var measurements = new List<(string instrument, long value, string? host)>();
+        using var listener = new MeterListener
+        {
+            InstrumentPublished = (instrument, l) =>
+            {
+                if (instrument.Meter.Name == DistroNetworkSdkStats.MeterName)
+                    l.EnableMeasurementEvents(instrument);
+            },
+        };
+        listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
+            measurements.Add((instrument.Name, value, GetHost(tags))));
+        listener.SetMeasurementEventCallback<double>((instrument, value, tags, _) =>
+            measurements.Add((instrument.Name, (long)value, GetHost(tags))));
+        listener.Start();
+
+        var attempts = 0;
+        var result = await ExportOneAsync(CreateCore(), _ =>
+        {
+            attempts++;
+            return Task.FromResult(new HttpResponseMessage(
+                attempts <= 2 ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK));
+        });
+
+        result.Should().Be(ExportResult.Success);
+        attempts.Should().Be(3);
+        // Filter by host "api" (from "api.example.com") to isolate this test's measurements.
+        var ours = measurements.Where(m => m.host == "api").ToList();
+        ours.Count(m => m.instrument == "Retry_Count").Should().Be(2);
+        ours.Count(m => m.instrument == "Request_Success_Count").Should().Be(1);
+        ours.Should().NotContain(m => m.instrument == "Request_Failure_Count");
+
+        DistroNetworkSdkStats.ResetForTesting();
+    }
+
+    [TestMethod]
+    public async Task FourRetryableResponsesProducesThreeRetriesAndOneFinalFailure()
+    {
+        DistroNetworkSdkStats.ResetForTesting();
+        DistroNetworkSdkStats.Initialize("N/A", "1.0.0");
+
+        var measurements = new List<(string instrument, long value, string? host)>();
+        using var listener = new MeterListener
+        {
+            InstrumentPublished = (instrument, l) =>
+            {
+                if (instrument.Meter.Name == DistroNetworkSdkStats.MeterName)
+                    l.EnableMeasurementEvents(instrument);
+            },
+        };
+        listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
+            measurements.Add((instrument.Name, value, GetHost(tags))));
+        listener.SetMeasurementEventCallback<double>((instrument, value, tags, _) =>
+            measurements.Add((instrument.Name, (long)value, GetHost(tags))));
+        listener.Start();
+
+        var result = await ExportOneAsync(CreateCore(), _ =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)));
+
+        result.Should().Be(ExportResult.Failure);
+        var ours = measurements.Where(m => m.host == "api").ToList();
+        ours.Count(m => m.instrument == "Retry_Count").Should().Be(3);
+        ours.Count(m => m.instrument == "Request_Failure_Count").Should().Be(1);
+        ours.Should().NotContain(m => m.instrument == "Request_Success_Count");
+
+        DistroNetworkSdkStats.ResetForTesting();
+    }
+
+    private static string? GetHost(ReadOnlySpan<KeyValuePair<string, object?>> tags)
+    {
+        for (int i = 0; i < tags.Length; i++)
+        {
+            if (tags[i].Key == "host")
+                return tags[i].Value as string;
+        }
+        return null;
     }
 }

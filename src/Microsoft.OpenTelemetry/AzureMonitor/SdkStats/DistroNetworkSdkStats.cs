@@ -83,7 +83,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
                 description: "Count of requests accepted by the destination ingestion endpoint.");
             _requestFailureCount = _meter.CreateCounter<long>(
                 "Request_Failure_Count",
-                description: "Count of requests that returned a non-retryable, non-throttling failure from the destination ingestion endpoint.");
+                description: "Count of requests that ended in failure and will not be retried.");
             _requestDuration = _meter.CreateHistogram<double>(
                 "Request_Duration",
                 unit: "ms",
@@ -212,6 +212,12 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             {
                 // See TrackSuccess.
             }
+        }
+
+        /// <summary>Record a final failure (non-retryable response) that will not be retried. Backs <c>Request_Failure_Count</c>.</summary>
+        internal void TrackFinalFailure(string? requestHost, int statusCode)
+        {
+            TrackFailure(requestHost, statusCode);
         }
 
         /// <summary>Record a non-retryable, non-throttling failure. Backs <c>Request_Failure_Count</c>.</summary>

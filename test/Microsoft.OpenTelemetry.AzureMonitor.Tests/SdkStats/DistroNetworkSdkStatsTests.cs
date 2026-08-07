@@ -99,6 +99,18 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         }
 
         [Fact]
+        public void TrackFinalFailure_RecordsFailureNotRetry()
+        {
+            using var listener = CreateListener(out var measurements);
+            var stats = DistroNetworkSdkStats.Initialize("ikey", "1.0.0");
+
+            stats.TrackFinalFailure("host.example.com", 503);
+
+            Assert.Contains(measurements, m => m.instrument == "Request_Failure_Count");
+            Assert.DoesNotContain(measurements, m => m.instrument == "Retry_Count");
+        }
+
+        [Fact]
         public void Initialize_IsIdempotent_AndUpdatesContext()
         {
             var first = DistroNetworkSdkStats.Initialize("N/A", "1.0.0");
@@ -137,6 +149,27 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             record();
             return results;
+        }
+
+        private static MeterListener CreateListener(out List<(string instrument, long value, Dictionary<string, object?> tags)> measurements)
+        {
+            var results = new List<(string instrument, long value, Dictionary<string, object?> tags)>();
+            measurements = results;
+
+            var listener = new MeterListener
+            {
+                InstrumentPublished = (instrument, l) =>
+                {
+                    if (instrument.Meter.Name == DistroNetworkSdkStats.MeterName)
+                        l.EnableMeasurementEvents(instrument);
+                },
+            };
+            listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
+                results.Add((instrument.Name, value, ToDict(tags))));
+            listener.SetMeasurementEventCallback<double>((instrument, value, tags, _) =>
+                results.Add((instrument.Name, (long)value, ToDict(tags))));
+            listener.Start();
+            return listener;
         }
 
         private static Dictionary<string, object?> ToDict(System.ReadOnlySpan<KeyValuePair<string, object?>> tags)
