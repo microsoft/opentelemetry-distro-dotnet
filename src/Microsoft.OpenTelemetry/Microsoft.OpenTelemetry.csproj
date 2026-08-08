@@ -50,6 +50,9 @@
     <!-- Agent365 extensions (PrivateAssets=all: compile-time only, not propagated to consumers) -->
     <PackageReference Include="Microsoft.Agents.Builder" PrivateAssets="all" />
 
+    <!-- Durable delivery: store-and-forward persistent storage -->
+    <PackageReference Include="OpenTelemetry.PersistentStorage.FileSystem" />
+
     <!-- Microsoft.Agents.Builder (PrivateAssets=all) compiles against 10.x Microsoft.Extensions.*
          but suppresses transitive flow. On net8.0, the shared framework only has 8.x assemblies.
          These explicit dependencies ensure the 10.x assemblies are available at runtime. -->
