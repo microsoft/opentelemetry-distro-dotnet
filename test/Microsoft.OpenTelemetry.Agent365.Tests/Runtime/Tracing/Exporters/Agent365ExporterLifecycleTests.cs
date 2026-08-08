@@ -120,6 +120,62 @@ public sealed class Agent365ExporterLifecycleTests
         coordinator.DisposeCalls.Should().Be(1);
     }
 
+    // ------------------------------------------------------------------ sync shutdown hook
+
+    [TestMethod]
+    public void SyncExporterShutdownStopsReplayCoordinator()
+    {
+        var coordinator = new FakeReplayCoordinator();
+        using var exporter = CreateSyncExporter(coordinator);
+
+        exporter.Shutdown().Should().BeTrue("the sync shutdown hook must stop the replay loop and report success");
+
+        coordinator.StopCalls.Should().Be(1);
+    }
+
+    [TestMethod]
+    public void SyncExporterShutdownWithoutCoordinatorReturnsTrue()
+    {
+        using var exporter = new Agent365Exporter(
+            CreateCore(),
+            NullLogger<Agent365Exporter>.Instance,
+            CreateOptions());
+
+        exporter.Shutdown().Should().BeTrue("shutdown is a safe no-op when no replay loop is wired");
+    }
+
+    [TestMethod]
+    public void SyncExporterShutdownThenDisposeStopsAndDisposesOnce()
+    {
+        var coordinator = new FakeReplayCoordinator();
+        var exporter = CreateSyncExporter(coordinator);
+
+        exporter.Shutdown();
+        exporter.Dispose();
+
+        coordinator.StopCalls.Should().Be(1, "shutdown stops the loop");
+        coordinator.DisposeCalls.Should().Be(1, "dispose releases the loop exactly once");
+    }
+
+    [TestMethod]
+    public void SyncExporterShutdownIsBoundedByTimeoutWhenCoordinatorBlocks()
+    {
+        // The coordinator's StopAsync only completes when its cancellation token fires, so a shutdown
+        // that ignored the timeout would hang forever (and fail via the test-runner timeout). Completing
+        // proves OnShutdown bounds the stop by the supplied timeout.
+        var coordinator = new BlockingReplayCoordinator();
+        using var exporter = CreateSyncExporter(coordinator);
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var result = exporter.Shutdown(200);
+        stopwatch.Stop();
+
+        coordinator.StopCalls.Should().Be(1);
+        result.Should().BeTrue("StopAsync observes the timeout token and completes cooperatively");
+        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(30),
+            "OnShutdown must bound the wait by the supplied timeout rather than blocking indefinitely");
+    }
+
     [TestMethod]
     public void AsyncExporterDisposeDisposesReplayCoordinator()
     {
@@ -286,6 +342,80 @@ public sealed class Agent365ExporterLifecycleTests
         coordinator.Should().BeNull();
     }
 
+    // ------------------------------------------------------------------ public construction safety
+
+    [TestMethod]
+    public void PublicCoreConstructorDefaultsToDisabledStorage()
+    {
+        // A core built via the public constructor is never wired to a replay coordinator (only the
+        // builder path injects a real store + coordinator), so it must default to a no-op store rather
+        // than a real on-disk store that would accumulate write-only, undrained durable records.
+        var core = new Agent365ExporterCore(
+            new ExportFormatter(NullLogger<ExportFormatter>.Instance),
+            NullLogger<Agent365ExporterCore>.Instance);
+
+        core.Storage.Should().BeOfType<DisabledAgent365Storage>(
+            "public construction must not create write-only undrained offline storage");
+    }
+
+    [TestMethod]
+    public void PublicExporterOverPublicCoreDisposesCleanlyWithoutDurableStorage()
+    {
+        var core = new Agent365ExporterCore(
+            new ExportFormatter(NullLogger<ExportFormatter>.Instance),
+            NullLogger<Agent365ExporterCore>.Instance);
+
+        using var exporter = new Agent365Exporter(
+            core,
+            NullLogger<Agent365Exporter>.Instance,
+            CreateOptions());
+
+        core.Storage.Should().BeOfType<DisabledAgent365Storage>();
+
+        Action dispose = exporter.Dispose;
+        dispose.Should().NotThrow();
+    }
+
+    [TestMethod]
+    public void BuildDurableProcessorDisposesEagerStorageWhenSyncExporterConstructionThrows()
+    {
+        var storage = new TrackingStorage();
+
+        // No token resolver -> the exporter constructor throws before it takes ownership of the store,
+        // so the eagerly created store must be disposed by BuildDurableProcessor's failure path.
+        Action build = () => ObservabilityTracerProviderBuilderExtensions.BuildDurableProcessor(
+            Agent365ExporterType.Agent365Exporter,
+            storage,
+            new ExportFormatter(NullLogger<ExportFormatter>.Instance),
+            NullLogger<Agent365ExporterCore>.Instance,
+            new Agent365ExporterOptions(),
+            NullLogger<Agent365Exporter>.Instance,
+            httpClient: null);
+
+        build.Should().Throw<ArgumentNullException>();
+        storage.DisposeCalls.Should().Be(1,
+            "the eagerly created store must be disposed when sync exporter construction fails");
+    }
+
+    [TestMethod]
+    public void BuildDurableProcessorDisposesEagerStorageWhenAsyncExporterConstructionThrows()
+    {
+        var storage = new TrackingStorage();
+
+        Action build = () => ObservabilityTracerProviderBuilderExtensions.BuildDurableProcessor(
+            Agent365ExporterType.Agent365ExporterAsync,
+            storage,
+            new ExportFormatter(NullLogger<ExportFormatter>.Instance),
+            NullLogger<Agent365ExporterCore>.Instance,
+            new Agent365ExporterOptions(),
+            NullLogger<Agent365Exporter>.Instance,
+            httpClient: null);
+
+        build.Should().Throw<ArgumentNullException>();
+        storage.DisposeCalls.Should().Be(1,
+            "the eagerly created store must be disposed when async exporter construction fails");
+    }
+
     // ------------------------------------------------------------------ fakes
 
     private sealed class FakeReplayCoordinator : IAgent365ReplayCoordinator
@@ -302,6 +432,34 @@ public sealed class Agent365ExporterLifecycleTests
         {
             StopCalls++;
             return Task.CompletedTask;
+        }
+
+        public void Dispose() => DisposeCalls++;
+    }
+
+    /// <summary>
+    /// A replay coordinator whose <see cref="StopAsync"/> only completes once its cancellation token
+    /// fires, mirroring the real coordinator's cooperative, token-bounded stop. Used to prove the sync
+    /// exporter's shutdown hook bounds the stop by the supplied timeout rather than blocking forever.
+    /// </summary>
+    private sealed class BlockingReplayCoordinator : IAgent365ReplayCoordinator
+    {
+        public int StartCalls { get; private set; }
+
+        public int StopCalls { get; private set; }
+
+        public int DisposeCalls { get; private set; }
+
+        public void Start() => StartCalls++;
+
+        public async Task StopAsync(CancellationToken cancellationToken)
+        {
+            StopCalls++;
+            var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using (cancellationToken.Register(() => completion.TrySetResult(true)))
+            {
+                await completion.Task.ConfigureAwait(false);
+            }
         }
 
         public void Dispose() => DisposeCalls++;

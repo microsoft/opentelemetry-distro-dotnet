@@ -4,6 +4,7 @@
 using System;
 using System.Diagnostics;
 using System.Net.Http;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using global::OpenTelemetry;
 using global::OpenTelemetry.Resources;
@@ -128,6 +129,44 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             {
                 _logger.LogError(exOuter, "Agent365Exporter: Unhandled export exception.");
                 return ExportResult.Failure;
+            }
+        }
+
+        /// <summary>
+        /// Stops the durable-delivery replay loop as part of OpenTelemetry's cooperative shutdown,
+        /// bounded by <paramref name="timeoutMilliseconds"/>. This is the graceful counterpart to
+        /// <see cref="Dispose(bool)"/>: shutdown halts the background drain (so no replay pass outlives
+        /// the provider's shutdown deadline) while dispose releases the coordinator, the shared store,
+        /// and any owned HttpClient. The base class guarantees this runs at most once. It never throws —
+        /// a failure to stop within the deadline is logged and reported as an unsuccessful shutdown.
+        /// </summary>
+        /// <param name="timeoutMilliseconds">
+        /// The number of milliseconds allowed for the stop to complete, or <see cref="Timeout.Infinite"/>
+        /// (-1) to wait indefinitely.
+        /// </param>
+        /// <returns><c>true</c> when the replay loop stopped within the deadline; otherwise <c>false</c>.</returns>
+        protected override bool OnShutdown(int timeoutMilliseconds)
+        {
+            if (_replayCoordinator == null)
+            {
+                return true;
+            }
+
+            try
+            {
+                using var cts = timeoutMilliseconds == Timeout.Infinite
+                    ? new CancellationTokenSource()
+                    : new CancellationTokenSource(timeoutMilliseconds);
+
+                // StopAsync observes the token cooperatively and returns (without throwing) once the loop
+                // drains or the deadline fires, so this wait is bounded by timeoutMilliseconds.
+                _replayCoordinator.StopAsync(cts.Token).GetAwaiter().GetResult();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Agent365Exporter: Failed to stop the replay coordinator during shutdown.");
+                return false;
             }
         }
 

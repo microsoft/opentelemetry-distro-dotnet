@@ -48,8 +48,15 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         /// </summary>
         /// <param name="formatter">The formatter instance used to format export payloads.</param>
         /// <param name="logger">The logger instance used to log messages during the export process.</param>
+        /// <remarks>
+        /// A core built through this public constructor is never wired to a replay coordinator (only the
+        /// builder path injects a real store and starts the background drain). It therefore defaults to a
+        /// no-op <see cref="DisabledAgent365Storage"/> so a failed export is dropped gracefully rather than
+        /// persisted to an on-disk store that nothing would ever drain — which would accumulate write-only,
+        /// undrained durable records and leak the store's maintenance timer.
+        /// </remarks>
         public Agent365ExporterCore(ExportFormatter formatter, ILogger<Agent365ExporterCore> logger)
-            : this(formatter, logger, null, null, null)
+            : this(formatter, logger, null, new DisabledAgent365Storage(), null)
         {
         }
 
