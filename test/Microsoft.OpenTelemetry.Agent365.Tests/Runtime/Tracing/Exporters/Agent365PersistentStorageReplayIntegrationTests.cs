@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Net;
+using System.Runtime.InteropServices;
 
 namespace Microsoft.Agents.A365.Observability.Tests.Tracing.Exporters;
 
@@ -20,7 +21,9 @@ namespace Microsoft.Agents.A365.Observability.Tests.Tracing.Exporters;
 ///   <item><c>TryGetNext</c> is non-destructive and re-serves the same unleased blob; a leased blob is excluded.</item>
 ///   <item>A full drain deletes every delivered record from disk.</item>
 ///   <item>Retained records are leased so the pass advances past them within a single pass.</item>
-///   <item>An un-leasable first blob does not spin the pass (the root-cause liveness defect).</item>
+///   <item>An un-leasable first blob does not spin the pass (the root-cause liveness defect). Its on-disk
+///   reproduction relies on Windows open-file rename semantics and is Windows-gated; the cross-platform
+///   proof lives in <c>Agent365ReplayCoordinatorTests.LeaseFailureDoesNotSpinWhenStorageReservesSameBlob</c>.</item>
 /// </list>
 /// </summary>
 [TestClass]
@@ -164,6 +167,23 @@ public sealed class Agent365PersistentStorageReplayIntegrationTests
     [TestMethod]
     public async Task UnleasableFirstBlobDoesNotSpinTheRealPass()
     {
+        // This reproduces an un-leasable first blob by holding the .blob file open so the provider's
+        // lease (a File.Move rename) fails. That mechanism is Windows-specific: Windows denies renaming
+        // an open file, whereas POSIX (Linux/macOS) permits renaming an open file, so the lease would
+        // succeed there and the on-disk scenario could not be reproduced. This test therefore gates only
+        // its OS-specific reproduction mechanism to Windows; the platform-independent proof that a failed
+        // lease stops (rather than spins) the pass lives in
+        // Agent365ReplayCoordinatorTests.LeaseFailureDoesNotSpinWhenStorageReservesSameBlob, which drives
+        // the same coordinator logic against a re-serving storage double on every OS the CI matrix runs.
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            Assert.Inconclusive(
+                "The un-leasable-blob reproduction relies on Windows open-file rename semantics. The " +
+                "cross-platform behavior is covered by " +
+                "Agent365ReplayCoordinatorTests.LeaseFailureDoesNotSpinWhenStorageReservesSameBlob.");
+            return;
+        }
+
         var root = NewRoot();
         try
         {

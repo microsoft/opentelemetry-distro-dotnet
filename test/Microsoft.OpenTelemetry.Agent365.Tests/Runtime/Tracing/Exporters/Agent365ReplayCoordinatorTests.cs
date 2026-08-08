@@ -17,9 +17,11 @@ namespace Microsoft.Agents.A365.Observability.Tests.Tracing.Exporters;
 /// authentication entry point <see cref="Agent365ExporterCore.ReplayRecordAsync"/>:
 /// each pass asks the shared <see cref="Agent365TransmissionGate"/> for a permit, reads at most ten
 /// leased records, resolves a *fresh* token per record (including the agentic user id), sends once,
-/// and drives storage — success deletes, retryable retains and stops the pass, permanent/corrupt
-/// deletes the poison blob, a missing token retains the record for a later pass, and a delete failure
-/// after a successful send logs the duplicate risk. Owned half-open probes are always released.
+/// and drives storage — success deletes, retryable retains and stops the pass, a permanent send
+/// failure or an unreadable/poison (undeserializable) blob deletes it, an unknown replay fault or
+/// global misconfiguration retains the current record and stops the pass (durable telemetry is never
+/// deleted for an unknown fault), a missing token retains the record for a later pass, and a delete
+/// failure after a successful send logs the duplicate risk. Owned half-open probes are always released.
 /// </summary>
 [TestClass]
 public sealed class Agent365ReplayCoordinatorTests
@@ -614,31 +616,95 @@ public sealed class Agent365ReplayCoordinatorTests
         await coordinator.StopAsync(CancellationToken.None);
     }
 
-    // ------------------------------------------------------------------ per-record exception isolation
+    // ------------------------------------------------------------------ per-record / global fault isolation
 
     [TestMethod]
-    public async Task ReplayThrowingRecordIsQuarantinedAndPassContinues()
+    public async Task ReplayThrowingRecordIsRetainedAndStopsThePass()
     {
-        var poison = FakeStoredRecord.From(CreateRecord(agentId: "poison"));
-        var good = FakeStoredRecord.From(CreateRecord(agentId: "good"));
-        var storage = new FakeStorage(poison, good);
+        // A non-cancellation exception thrown out of replay is an unknown fault: it is far more likely a
+        // global misconfiguration or a transient dependency outage than bad data in this one record, and
+        // the record already deserialized cleanly. Deleting it (and continuing) could discard up to
+        // maxRecordsPerPass durable records on a single global fault. The pass must instead retain the
+        // current record and stop, touching no further records this pass.
+        var throwing = FakeStoredRecord.From(CreateRecord(agentId: "first"));
+        var next = FakeStoredRecord.From(CreateRecord(agentId: "second"));
+        var storage = new FakeStorage(throwing, next);
+        var gate = new Agent365TransmissionGate(() => _now);
         var sends = 0;
         var coordinator = CreateCoordinator(
             storage,
-            sendAsync: (request, _) =>
+            gate: gate,
+            sendAsync: (_, _) =>
             {
                 sends++;
-                if (request.RequestUri!.ToString().Contains("poison"))
-                    throw new InvalidOperationException("replay boom");
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+                throw new InvalidOperationException("replay boom");
             });
 
         Func<Task> act = () => coordinator.ReplayOnceAsync(CancellationToken.None);
 
         await act.Should().NotThrowAsync("one record's replay exception must not tear down the whole pass");
-        sends.Should().Be(2, "the pass continues to the next record after a throwing one");
-        poison.DeleteCalls.Should().Be(1, "a record whose replay throws is quarantined as poison and deleted");
-        good.DeleteCalls.Should().Be(1, "the following record is still delivered and deleted");
+        sends.Should().Be(1, "the pass stops after the first throwing record; no further records are sent");
+        throwing.DeleteCalls.Should().Be(0, "an unknown replay fault retains the record; durable telemetry is not deleted");
+        next.DeleteCalls.Should().Be(0, "the pass stopped, so the following record is left untouched");
+        storage.PendingCount.Should().Be(1, "the second record is never served because the pass stopped");
+        gate.ConsecutiveErrors.Should().Be(0, "an unknown replay fault is not a transport availability signal");
+    }
+
+    [TestMethod]
+    public async Task DomainResolverFailureRetainsRecordAndStopsWithoutDeleting()
+    {
+        // A throwing DomainResolver is a global misconfiguration that would affect every record. It must
+        // never be misclassified as poison and delete durable telemetry.
+        var stored = FakeStoredRecord.From(CreateRecord());
+        var storage = new FakeStorage(stored);
+        var gate = new Agent365TransmissionGate(() => _now);
+        var coordinator = CreateCoordinator(
+            storage,
+            gate: gate,
+            domainResolver: _ => throw new InvalidOperationException("resolver misconfigured"));
+
+        Func<Task> act = () => coordinator.ReplayOnceAsync(CancellationToken.None);
+
+        await act.Should().NotThrowAsync("a global resolver misconfiguration must not tear down the pass");
+        stored.DeleteCalls.Should().Be(0, "a global domain-resolver failure must not delete durable telemetry");
+        gate.ConsecutiveErrors.Should().Be(0, "a misconfiguration is not a transport availability signal");
+    }
+
+    [TestMethod]
+    public async Task GlobalPlaintextEndpointRetainsRecordAndStopsWithoutDeleting()
+    {
+        // A globally-resolved plaintext (http://) endpoint makes request construction throw for every
+        // record. It is a global misconfiguration, not per-record poison, so telemetry must be retained.
+        var stored = FakeStoredRecord.From(CreateRecord());
+        var storage = new FakeStorage(stored);
+        var coordinator = CreateCoordinator(
+            storage,
+            domainResolver: _ => "http://api.example.com");
+
+        Func<Task> act = () => coordinator.ReplayOnceAsync(CancellationToken.None);
+
+        await act.Should().NotThrowAsync("a global plaintext-endpoint misconfiguration must not tear down the pass");
+        stored.DeleteCalls.Should().Be(0, "a global plaintext-endpoint misconfiguration must not delete durable telemetry");
+    }
+
+    [TestMethod]
+    public async Task OwnedProbeIsReleasedWhenReplayThrows()
+    {
+        // The unknown-fault path retains the record and returns early. Like the other non-terminal exits,
+        // it must return the single half-open probe it owns rather than leaking it.
+        var stored = FakeStoredRecord.From(CreateRecord());
+        var storage = new FakeStorage(stored);
+        var gate = ProbeGate();
+        var coordinator = CreateCoordinator(
+            storage,
+            gate: gate,
+            sendAsync: (_, _) => throw new InvalidOperationException("replay boom"));
+
+        await coordinator.ReplayOnceAsync(CancellationToken.None);
+
+        stored.DeleteCalls.Should().Be(0, "an unknown replay fault retains the record");
+        gate.TryAcquire(out var ownsProbe).Should().BeTrue();
+        ownsProbe.Should().BeTrue("the owned probe was released on the retain-and-stop path, not leaked");
     }
 
     [TestMethod]

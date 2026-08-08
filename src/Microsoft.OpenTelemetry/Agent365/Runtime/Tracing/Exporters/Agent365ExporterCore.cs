@@ -398,8 +398,16 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         /// into an <see cref="Agent365SendOutcome"/> for the replay coordinator to act on. A token that
         /// cannot be resolved (null/empty result, or a resolver exception) yields
         /// <see cref="Agent365SendDisposition.TokenUnavailable"/> so the coordinator retains the
-        /// already-persisted record for a later pass instead of discarding telemetry. Never logs the bearer
-        /// token or payload.
+        /// already-persisted record for a later pass instead of discarding telemetry.
+        /// <para>
+        /// The record's essential fields (tenant, agent, payload) are already validated when the blob is
+        /// deserialized, so request construction here cannot fail on this record's own data; the only
+        /// exceptions it can raise are global/unknown faults (a throwing
+        /// <see cref="Agent365ExporterOptions.DomainResolver"/>, a misconfigured plaintext endpoint, or an
+        /// unexpected transport fault not classified as retryable). Those are intentionally allowed to
+        /// propagate so the coordinator retains the record and stops the pass — preferring data safety over
+        /// deleting durable telemetry as if it were per-record poison. Never logs the bearer token or payload.
+        /// </para>
         /// </summary>
         internal async Task<Agent365SendOutcome> ReplayRecordAsync(
             Agent365DurableRecord record,

@@ -19,6 +19,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
     ///   <item>A retryable failure retains the record, backs the gate off, and stops the pass.</item>
     ///   <item>A permanent failure or an unreadable/poison blob is deleted (it can never succeed).</item>
     ///   <item>A record whose token cannot be resolved is retained for a later pass.</item>
+    ///   <item>An unknown replay exception or global misconfiguration retains the current record and stops the
+    ///   pass; durable telemetry is never deleted for an unknown fault (only readable/poison and permanent
+    ///   failures delete).</item>
     /// </list>
     /// Exactly one background loop runs between <see cref="Start"/> and <see cref="StopAsync"/>. The class
     /// targets <c>netstandard2.0</c>, so the loop uses a cancellation-aware delay rather than
@@ -229,15 +232,21 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                     }
                     catch (Exception ex)
                     {
-                        // Replaying this one record threw a non-cancellation exception. A single bad record
-                        // must not tear down the pass (nor, via RunAsync, the whole loop): quarantine it as
-                        // poison so it cannot wedge the queue, then continue with the remaining records.
+                        // Replaying this record threw a non-cancellation exception. The record already
+                        // deserialized cleanly (unreadable/poison blobs are deleted at the TryRead boundary
+                        // above), so this is an unknown fault far more likely to be a global misconfiguration
+                        // (e.g. a throwing DomainResolver or a plaintext endpoint) or a transient dependency
+                        // outage than bad data in this one record. Deleting-and-continuing here could discard
+                        // up to _maxRecordsPerPass durable records on a single global fault. Retain the
+                        // current record — durable telemetry is never deleted for an unknown fault — and stop
+                        // the pass; the next cadence retries it once the fault clears. A single bad record
+                        // still cannot tear down the loop because RunAsync also survives exceptions.
                         _logger.LogError(
                             ex,
-                            "Agent365ReplayCoordinator: Replaying a record threw a non-cancellation exception; " +
-                            "quarantining it as poison and continuing the pass.");
-                        DeleteRecord(stored, delivered: false);
-                        continue;
+                            "Agent365ReplayCoordinator: Replaying a record threw an unknown non-cancellation " +
+                            "exception; retaining the record and stopping the pass to avoid deleting durable " +
+                            "telemetry on a global fault.");
+                        return;
                     }
 
                     switch (outcome.Disposition)
@@ -275,7 +284,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             {
                 // Release the single half-open probe only when this pass owns it and recorded no terminal
                 // gate outcome (RecordSuccess/RecordRetryableFailure already reset the probe). This covers
-                // permanent-failure, token-unavailable, poison, cancellation and empty-storage exits.
+                // permanent-failure, token-unavailable, poison, unknown-fault retain-and-stop, cancellation
+                // and empty-storage exits.
                 if (ownsProbe && !recordedTerminalGateOutcome)
                 {
                     _gate.ReleaseProbe();
