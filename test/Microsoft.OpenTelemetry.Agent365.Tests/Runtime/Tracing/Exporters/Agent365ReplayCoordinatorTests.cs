@@ -366,9 +366,18 @@ public sealed class Agent365ReplayCoordinatorTests
         await coordinator.ReplayOnceAsync(CancellationToken.None);
 
         stored.DeleteCalls.Should().Be(1, "a delete is attempted after a successful send");
-        logger.Entries.Should().Contain(
+
+        var warning = logger.Entries.Should().ContainSingle(
             e => e.Level == LogLevel.Warning && e.Message.ToLowerInvariant().Contains("duplicate"),
-            "a successful send whose record cannot be deleted risks a duplicate on the next pass");
+            "a successful send whose record cannot be deleted risks a duplicate on the next pass").Subject;
+
+        var message = warning.Message.ToLowerInvariant();
+        message.Should().Contain(
+            "re-sent",
+            "the warning must state the stored record may be replayed (re-sent) again on a later pass");
+        message.Should().NotContain(
+            "dedup",
+            "the pipeline offers no deduplication, so the warning must not claim the duplicate will be prevented");
     }
 
     // ------------------------------------------------------------------ per-pass cap
