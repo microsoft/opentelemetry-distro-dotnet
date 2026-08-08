@@ -25,7 +25,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         internal Agent365TransmissionGate(Func<DateTimeOffset>? utcNow = null, Random? random = null)
         {
             _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
-            _random = random ?? Random.Shared;
+
+            // Random.Shared is unavailable on netstandard2.0. A per-gate Random instance is safe
+            // because every access is serialized under _lock.
+            _random = random ?? new Random();
         }
 
         internal int ConsecutiveErrors

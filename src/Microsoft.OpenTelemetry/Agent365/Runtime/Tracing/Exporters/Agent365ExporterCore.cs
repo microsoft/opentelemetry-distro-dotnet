@@ -33,8 +33,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         private const string FoundryUrl403 = "https://aka.ms/foundry-grant-agent-365-permissions";
         private readonly ExportFormatter _formatter;
         private readonly ILogger<Agent365ExporterCore> _logger;
-        private readonly Agent365CircuitBreaker _circuitBreaker;
-        private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
+        private readonly Agent365TransmissionGate _gate;
+        private readonly Lazy<IAgent365PersistentStorage> _storage;
         private readonly Func<DateTimeOffset> _utcNow;
 
         // The ingest service performs a case-insensitive check for "chat", so we send the
@@ -49,21 +49,28 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         /// <param name="formatter">The formatter instance used to format export payloads.</param>
         /// <param name="logger">The logger instance used to log messages during the export process.</param>
         public Agent365ExporterCore(ExportFormatter formatter, ILogger<Agent365ExporterCore> logger)
-            : this(formatter, logger, null, null)
+            : this(formatter, logger, null, null, null)
         {
         }
 
         internal Agent365ExporterCore(
             ExportFormatter formatter,
             ILogger<Agent365ExporterCore> logger,
-            Func<TimeSpan, CancellationToken, Task>? delayAsync,
-            Func<DateTimeOffset>? utcNow)
+            Func<DateTimeOffset>? utcNow,
+            IAgent365PersistentStorage? storage,
+            Agent365TransmissionGate? gate)
         {
             _formatter = formatter ?? throw new ArgumentNullException(nameof(formatter));
             _logger = logger ?? NullLogger<Agent365ExporterCore>.Instance;
-            _delayAsync = delayAsync ?? Task.Delay;
             _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
-            _circuitBreaker = new Agent365CircuitBreaker(_utcNow);
+            _gate = gate ?? new Agent365TransmissionGate(_utcNow);
+
+            // Resolved lazily so that a core which never persists (e.g. everything delivers on the
+            // first attempt, or an injected fake is supplied) never creates the on-disk
+            // FileBlobProvider and its maintenance timer. An injected storage is returned as-is.
+            _storage = new Lazy<IAgent365PersistentStorage>(
+                () => storage ?? Agent365PersistentStorage.Create(Agent365StorageDirectoryResolver.Resolve(null)),
+                LazyThreadSafetyMode.ExecutionAndPublication);
         }
 
         /// <summary>
@@ -224,18 +231,21 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 // malformed, in which case the recorder falls back to "unknown".
                 string? requestHost = Uri.TryCreate(requestUri, UriKind.Absolute, out var parsedUri) ? parsedUri.Host : null;
 
+                // Agentic user ID is a 1:1 property of the identity group (agent -> agentic user);
+                // resolved once from the first activity and used both for token resolution and for
+                // the durable record persisted on hand-off.
+                var agenticUserId = activities.Count > 0
+                    ? activities[0].GetAttributeOrBaggage(OpenTelemetryConstants.AgentAUIDKey)
+                    : null;
+
                 string? token = null;
+                var tokenResolverThrew = false;
                 try
                 {
-                    // Prefer ContextualTokenResolver when set; extract agentic user ID from the
-                    // first activity in the group (1:1 relationship between agent and agentic user).
+                    // Prefer ContextualTokenResolver when set.
                     if (options.ContextualTokenResolver != null)
                     {
-                        var agenticUserId = activities.Count > 0
-                            ? activities[0].GetAttributeOrBaggage(OpenTelemetryConstants.AgentAUIDKey)
-                            : null;
                         var identity = new AgentIdentity(agentId, agenticUserId);
-
                         var context = new TokenResolverContext(identity, tenantId);
                         token = await options.ContextualTokenResolver(context).ConfigureAwait(false);
                     }
@@ -248,7 +258,18 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 }
                 catch (Exception ex)
                 {
+                    tokenResolverThrew = true;
                     this._logger?.LogError(ex, "Agent365ExporterCore: TokenResolver threw for agent {AgentId} tenant {TenantId}.", agentId, tenantId);
+                }
+
+                // A token-resolver *exception* is treated as a transient outage: persist every chunk
+                // for durable retry so telemetry is not lost. A null/empty token with no exception is
+                // a permanent misconfiguration: fail fast without persisting.
+                if (tokenResolverThrew)
+                {
+                    if (!PersistAllChunks(chunks, resource, tenantId, agentId, agenticUserId, options.UseS2SEndpoint))
+                        return ExportResult.Failure;
+                    continue;
                 }
 
                 if (string.IsNullOrEmpty(token))
@@ -257,7 +278,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                     return ExportResult.Failure;
                 }
 
-                // Send each chunk; all-or-nothing: fail on first chunk failure so the batch processor retries.
+                // Send each chunk once. On a retryable/transport failure or a closed gate the chunk is
+                // handed to durable storage; a storage failure aborts the batch so the processor retries.
                 for (int i = 0; i < chunks.Count; i++)
                 {
                     var chunk = chunks[i];
@@ -268,21 +290,101 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                         "Agent365ExporterCore: Sending chunk {ChunkIndex} of {ChunkCount} ({SpanCount} spans, {BodyBytes} bytes) to {RequestUri}.",
                         i + 1, chunks.Count, chunk.Count, bodyBytes, requestUri);
 
-                    var success = await SendChunkWithRetriesAsync(
-                        requestUri,
-                        requestHost,
+                    var record = new Agent365DurableRecord(
+                        tenantId,
+                        agentId,
+                        agenticUserId,
+                        options.UseS2SEndpoint,
                         json,
-                        token!,
-                        i + 1,
-                        chunks.Count,
-                        sendAsync,
-                        cancellationToken).ConfigureAwait(false);
+                        _utcNow());
 
-                    if (!success)
-                        return ExportResult.Failure;
+                    if (!_gate.TryAcquire(out var ownsProbe))
+                    {
+                        // Gate is in backoff: skip the network entirely and persist for later delivery.
+                        this._logger?.LogWarning(
+                            "Agent365ExporterCore: Transmission gate closed; persisting chunk {ChunkIndex} of {ChunkCount} for durable retry.",
+                            i + 1, chunks.Count);
+                        if (!_storage.Value.TryStore(record))
+                            return ExportResult.Failure;
+                        continue;
+                    }
+
+                    // The probe is released in finally only when this invocation acquired the single
+                    // half-open probe (ownsProbe). Delivered/RetryableFailure already reset the probe
+                    // via RecordSuccess/RecordRetryableFailure, leaving the finally a no-op; it covers
+                    // the exits that record neither: permanent failure, caller cancellation, or an
+                    // unexpected exception bubbling out.
+                    try
+                    {
+                        var outcome = await SendChunkOnceAsync(
+                            requestUri,
+                            requestHost,
+                            json,
+                            token!,
+                            i + 1,
+                            chunks.Count,
+                            sendAsync,
+                            cancellationToken).ConfigureAwait(false);
+
+                        switch (outcome.Disposition)
+                        {
+                            case Agent365SendDisposition.Delivered:
+                                _gate.RecordSuccess();
+                                break;
+
+                            case Agent365SendDisposition.RetryableFailure:
+                                _gate.RecordRetryableFailure(outcome.RetryAfter);
+                                if (!_storage.Value.TryStore(record))
+                                    return ExportResult.Failure;
+                                break;
+
+                            case Agent365SendDisposition.PermanentFailure:
+                                return ExportResult.Failure;
+
+                            case Agent365SendDisposition.Canceled:
+                                throw new OperationCanceledException(cancellationToken);
+                        }
+                    }
+                    finally
+                    {
+                        if (ownsProbe)
+                            _gate.ReleaseProbe();
+                    }
                 }
             }
             return ExportResult.Success;
+        }
+
+        /// <summary>
+        /// Persists every chunk of an identity group to durable storage without attempting a network
+        /// send. Used when a token-resolver exception makes an immediate send impossible but the
+        /// telemetry must not be lost. Returns <c>false</c> on the first storage failure so the caller
+        /// can surface an exporter failure and let the batch processor retry.
+        /// </summary>
+        private bool PersistAllChunks(
+            List<List<Activity>> chunks,
+            Resource resource,
+            string tenantId,
+            string agentId,
+            string? agenticUserId,
+            bool useS2SEndpoint)
+        {
+            for (int i = 0; i < chunks.Count; i++)
+            {
+                var json = _formatter.FormatMany(chunks[i], resource);
+                var record = new Agent365DurableRecord(
+                    tenantId,
+                    agentId,
+                    agenticUserId,
+                    useS2SEndpoint,
+                    json,
+                    _utcNow());
+
+                if (!_storage.Value.TryStore(record))
+                    return false;
+            }
+
+            return true;
         }
 
         private static HttpRequestMessage CreateRequest(string requestUri, string json, string token)
@@ -352,7 +454,16 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             DistroNetworkSdkStats.Instance?.TrackException(requestHost, exception.GetType().FullName);
         }
 
-        private async Task<bool> SendChunkWithRetriesAsync(
+        /// <summary>
+        /// Sends a single chunk exactly once and classifies the outcome for the durable delivery
+        /// pipeline. A 2xx response is <see cref="Agent365SendDisposition.Delivered"/>. A retryable
+        /// status (401/408/429/5xx) or a transport-level failure (connection error or timeout) is a
+        /// <see cref="Agent365SendDisposition.RetryableFailure"/> carrying the server's Retry-After
+        /// when present. A permanent non-success (e.g. 403) is a
+        /// <see cref="Agent365SendDisposition.PermanentFailure"/>; caller cancellation is reported as
+        /// <see cref="Agent365SendDisposition.Canceled"/>. Never logs the bearer token or payload.
+        /// </summary>
+        private async Task<Agent365SendOutcome> SendChunkOnceAsync(
             string requestUri,
             string? requestHost,
             string json,
@@ -362,144 +473,122 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             Func<HttpRequestMessage, Task<HttpResponseMessage>> sendAsync,
             CancellationToken cancellationToken)
         {
-            if (!_circuitBreaker.TryAcquirePermit(out var acquiredHalfOpenProbe))
+            if (cancellationToken.IsCancellationRequested)
             {
-                _logger.LogWarning(
-                    "Agent365ExporterCore: Circuit breaker is open; skipping export to {RequestUri}.",
-                    requestUri);
-                return false;
+                return new Agent365SendOutcome(Agent365SendDisposition.Canceled, null);
             }
 
-            // The permit is released in finally only when this invocation actually acquired the
-            // single half-open probe (acquiredHalfOpenProbe). A Closed-state permit owns no probe,
-            // so it must never call ReleasePermit — otherwise a slow Closed invocation completing
-            // after the circuit re-opened and handed the probe to a different invocation would
-            // release that other invocation's probe. RecordSuccess/RecordTransientFailure already
-            // consume the probe (transitioning away from HalfOpen), leaving the finally a no-op on
-            // those paths; the finally covers the exits that record neither: caller cancellation,
-            // non-retryable response, unexpected exception, or loop fallthrough.
+            using var request = CreateRequest(requestUri, json, token);
+            var stopwatch = Stopwatch.StartNew();
+
             try
             {
-                for (var attempt = 0; attempt < Agent365RetryPolicy.MaxAttempts; attempt++)
+                using var response = await sendAsync(request).ConfigureAwait(false);
+                stopwatch.Stop();
+
+                if (response.IsSuccessStatusCode)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    using var request = CreateRequest(requestUri, json, token);
-                    var stopwatch = Stopwatch.StartNew();
-
-                    try
-                    {
-                        using var response = await sendAsync(request).ConfigureAwait(false);
-                        stopwatch.Stop();
-
-                        if (response.IsSuccessStatusCode)
-                        {
-                            RecordResponseStats(requestHost, response.StatusCode, stopwatch.Elapsed.TotalMilliseconds, willRetry: false);
-                            _circuitBreaker.RecordSuccess();
-                            return true;
-                        }
-
-                        var correlationId = response.Headers.Contains(CorrelationIdHeaderKey)
-                            ? response.Headers.GetValues(CorrelationIdHeaderKey).FirstOrDefault()
-                            : null;
-                        var canRetry = Agent365RetryPolicy.IsRetryable(response.StatusCode)
-                            && attempt < Agent365RetryPolicy.MaxRetries;
-
-                        RecordResponseStats(
-                            requestHost,
-                            response.StatusCode,
-                            stopwatch.Elapsed.TotalMilliseconds,
-                            willRetry: canRetry);
-
-                        if (!canRetry)
-                        {
-                            LogNonSuccessResponse(response, correlationId, token, chunkIndex, chunkCount);
-                            if (Agent365RetryPolicy.IsRetryable(response.StatusCode))
-                            {
-                                _circuitBreaker.RecordTransientFailure();
-                            }
-                            // Non-retryable non-transient (e.g. 403): permit released by finally.
-                            return false;
-                        }
-
-                        var delay = Agent365RetryPolicy.GetDelay(response.Headers, attempt, _utcNow());
-                        _logger.LogWarning(
-                            "Agent365ExporterCore: HTTP {StatusCode} on attempt {Attempt} of {MaxAttempts}; retrying after {DelayMilliseconds} ms. Correlation ID: {CorrelationId}.",
-                            (int)response.StatusCode,
-                            attempt + 1,
-                            Agent365RetryPolicy.MaxAttempts,
-                            delay.TotalMilliseconds,
-                            correlationId ?? "N/A");
-                        await _delayAsync(delay, cancellationToken).ConfigureAwait(false);
-                    }
-                    catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
-                    {
-                        stopwatch.Stop();
-                        if (await HandleTransportExceptionAsync(ex, "timeout", requestHost, attempt, cancellationToken).ConfigureAwait(false))
-                        {
-                            return false;
-                        }
-                    }
-                    catch (HttpRequestException ex)
-                    {
-                        stopwatch.Stop();
-                        if (await HandleTransportExceptionAsync(ex, "error", requestHost, attempt, cancellationToken).ConfigureAwait(false))
-                        {
-                            return false;
-                        }
-                    }
+                    RecordResponseStats(requestHost, response.StatusCode, stopwatch.Elapsed.TotalMilliseconds, willRetry: false);
+                    return new Agent365SendOutcome(Agent365SendDisposition.Delivered, null);
                 }
 
-                return false;
+                var correlationId = response.Headers.Contains(CorrelationIdHeaderKey)
+                    ? response.Headers.GetValues(CorrelationIdHeaderKey).FirstOrDefault()
+                    : null;
+                var retryable = Agent365TransmissionGate.IsRetryable(response.StatusCode);
+
+                RecordResponseStats(
+                    requestHost,
+                    response.StatusCode,
+                    stopwatch.Elapsed.TotalMilliseconds,
+                    willRetry: retryable);
+
+                if (retryable)
+                {
+                    _logger.LogWarning(
+                        "Agent365ExporterCore: HTTP {StatusCode} for chunk {ChunkIndex} of {ChunkCount}; persisting for durable retry. Correlation ID: {CorrelationId}.",
+                        (int)response.StatusCode,
+                        chunkIndex,
+                        chunkCount,
+                        correlationId ?? "N/A");
+                    return new Agent365SendOutcome(
+                        Agent365SendDisposition.RetryableFailure,
+                        GetRetryAfter(response.Headers, _utcNow()));
+                }
+
+                // Permanent non-success (e.g. 403): preserve the actionable diagnostic and stop.
+                LogNonSuccessResponse(response, correlationId, token, chunkIndex, chunkCount);
+                return new Agent365SendOutcome(Agent365SendDisposition.PermanentFailure, null);
             }
-            finally
+            catch (TaskCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                if (acquiredHalfOpenProbe)
-                {
-                    _circuitBreaker.ReleasePermit();
-                }
+                stopwatch.Stop();
+                return new Agent365SendOutcome(Agent365SendDisposition.Canceled, null);
+            }
+            catch (TaskCanceledException ex)
+            {
+                // A TaskCanceledException without caller cancellation is an HTTP client timeout.
+                stopwatch.Stop();
+                return HandleTransportFailure(ex, "timeout", requestHost, chunkIndex, chunkCount);
+            }
+            catch (HttpRequestException ex)
+            {
+                stopwatch.Stop();
+                return HandleTransportFailure(ex, "error", requestHost, chunkIndex, chunkCount);
             }
         }
 
         /// <summary>
-        /// Handles a transport-level failure (timeout-style <see cref="TaskCanceledException"/> or
-        /// <see cref="HttpRequestException"/>) for a single attempt. Records the exception for
-        /// SDKStats, then either logs an <c>Error</c> and reopens the circuit on the final attempt
-        /// (returning <c>true</c> so the caller stops), or logs a <c>Warning</c> with the attempt
-        /// number and backoff and waits before the next retry (returning <c>false</c>). Never logs
-        /// the bearer token or request payload.
+        /// Classifies a transport-level failure (connection error or client timeout) as a retryable
+        /// outcome with no server-provided Retry-After (the gate applies jittered backoff). Records
+        /// the exception for SDKStats and logs a warning without the bearer token or payload.
         /// </summary>
-        /// <returns><c>true</c> when the attempt budget is exhausted and the caller should stop.</returns>
-        private async Task<bool> HandleTransportExceptionAsync(
+        private Agent365SendOutcome HandleTransportFailure(
             Exception exception,
             string kind,
             string? requestHost,
-            int attempt,
-            CancellationToken cancellationToken)
+            int chunkIndex,
+            int chunkCount)
         {
             TrackExceptionAttempt(requestHost, exception);
-
-            if (attempt == Agent365RetryPolicy.MaxRetries)
-            {
-                _logger.LogError(
-                    exception,
-                    "Agent365ExporterCore: Network {Kind} on final attempt {Attempt} of {MaxAttempts}; giving up.",
-                    kind,
-                    attempt + 1,
-                    Agent365RetryPolicy.MaxAttempts);
-                _circuitBreaker.RecordTransientFailure();
-                return true;
-            }
-
-            var delay = Agent365RetryPolicy.GetFallbackDelay(attempt);
             _logger.LogWarning(
                 exception,
-                "Agent365ExporterCore: Network {Kind} on attempt {Attempt} of {MaxAttempts}; retrying after {DelayMilliseconds} ms.",
+                "Agent365ExporterCore: Network {Kind} for chunk {ChunkIndex} of {ChunkCount}; persisting for durable retry.",
                 kind,
-                attempt + 1,
-                Agent365RetryPolicy.MaxAttempts,
-                delay.TotalMilliseconds);
-            await _delayAsync(delay, cancellationToken).ConfigureAwait(false);
-            return false;
+                chunkIndex,
+                chunkCount);
+            return new Agent365SendOutcome(Agent365SendDisposition.RetryableFailure, null);
+        }
+
+        /// <summary>
+        /// Extracts the Retry-After hint from a non-success response. Prefers the delta-seconds form,
+        /// falling back to the HTTP-date form relative to <paramref name="utcNow"/>. Returns
+        /// <c>null</c> when absent or non-positive; the transmission gate then applies jittered
+        /// exponential backoff.
+        /// </summary>
+        private static TimeSpan? GetRetryAfter(HttpResponseHeaders headers, DateTimeOffset utcNow)
+        {
+            var retryAfter = headers.RetryAfter;
+            if (retryAfter == null)
+            {
+                return null;
+            }
+
+            if (retryAfter.Delta is TimeSpan delta && delta > TimeSpan.Zero)
+            {
+                return delta;
+            }
+
+            if (retryAfter.Date is DateTimeOffset date)
+            {
+                var untilDate = date - utcNow;
+                if (untilDate > TimeSpan.Zero)
+                {
+                    return untilDate;
+                }
+            }
+
+            return null;
         }
 
         private static AddResult TryAddActivityToMap(Activity activity, Dictionary<(string tenant, string agent), List<Activity>> map)
@@ -606,5 +695,40 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 return string.Empty;
             }
         }
+    }
+
+    /// <summary>
+    /// Classification of a single send attempt used to drive the durable delivery pipeline.
+    /// </summary>
+    internal enum Agent365SendDisposition
+    {
+        /// <summary>The server accepted the chunk (2xx).</summary>
+        Delivered,
+
+        /// <summary>A retryable status (401/408/429/5xx) or transport failure; persist for later.</summary>
+        RetryableFailure,
+
+        /// <summary>A permanent non-success (e.g. 403) that must not be retried.</summary>
+        PermanentFailure,
+
+        /// <summary>The caller's cancellation token was signalled; abort without persisting.</summary>
+        Canceled
+    }
+
+    /// <summary>
+    /// Result of a single send attempt: its <see cref="Disposition"/> and, for a retryable failure,
+    /// the server-provided Retry-After hint (<c>null</c> when absent, so the gate applies backoff).
+    /// </summary>
+    internal readonly record struct Agent365SendOutcome
+    {
+        internal Agent365SendOutcome(Agent365SendDisposition disposition, TimeSpan? retryAfter)
+        {
+            Disposition = disposition;
+            RetryAfter = retryAfter;
+        }
+
+        internal Agent365SendDisposition Disposition { get; }
+
+        internal TimeSpan? RetryAfter { get; }
     }
 }
