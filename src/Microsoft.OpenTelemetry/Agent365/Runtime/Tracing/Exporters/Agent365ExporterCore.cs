@@ -199,6 +199,12 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             Func<HttpRequestMessage, Task<HttpResponseMessage>> sendAsync,
             CancellationToken cancellationToken)
         {
+            // A permanent failure (403 etc.) or a null/empty token for one identity group must not
+            // discard telemetry for the other, unrelated groups. Such a failure is aggregated here and
+            // the remaining groups are still processed; the batch is reported failed only after every
+            // group has been given a chance to deliver or persist.
+            var anyPermanentFailure = false;
+
             foreach (var g in groups)
             {
                 var (tenantId, agentId, activities) = g;
@@ -275,13 +281,22 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 if (string.IsNullOrEmpty(token))
                 {
                     this._logger?.LogWarning("Agent365ExporterCore: No token obtained. Skipping export for this identity.");
-                    return ExportResult.Failure;
+                    // Permanent misconfiguration for this identity only: do not persist, do not abort the
+                    // whole batch. Aggregate the failure and continue with the other identity groups.
+                    anyPermanentFailure = true;
+                    continue;
                 }
 
                 // Send each chunk once. On a retryable/transport failure or a closed gate the chunk is
-                // handed to durable storage; a storage failure aborts the batch so the processor retries.
+                // handed to durable storage; a storage failure aborts the batch because the OpenTelemetry
+                // batch processor does not re-export a failed batch, so returning Failure only signals the
+                // drop and cannot itself trigger a retry.
                 for (int i = 0; i < chunks.Count; i++)
                 {
+                    // Honor cancellation before touching the gate or storage for every chunk. A token that
+                    // is already cancelled throws here, before any send or persist, so nothing is written.
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     var chunk = chunks[i];
                     var json = _formatter.FormatMany(chunk, resource);
 
@@ -314,6 +329,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                     // via RecordSuccess/RecordRetryableFailure, leaving the finally a no-op; it covers
                     // the exits that record neither: permanent failure, caller cancellation, or an
                     // unexpected exception bubbling out.
+                    var permanentFailureForGroup = false;
                     try
                     {
                         var outcome = await SendChunkOnceAsync(
@@ -339,7 +355,12 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                                 break;
 
                             case Agent365SendDisposition.PermanentFailure:
-                                return ExportResult.Failure;
+                                // Aggregate and stop this identity's chunk sequence: later chunks for the
+                                // same identity share the permanent condition and must not be sent. Other
+                                // identity groups are unaffected and still processed.
+                                anyPermanentFailure = true;
+                                permanentFailureForGroup = true;
+                                break;
 
                             case Agent365SendDisposition.Canceled:
                                 throw new OperationCanceledException(cancellationToken);
@@ -350,16 +371,23 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                         if (ownsProbe)
                             _gate.ReleaseProbe();
                     }
+
+                    if (permanentFailureForGroup)
+                        break;
                 }
             }
-            return ExportResult.Success;
+
+            // Every group has now delivered, persisted, or been skipped. Fail only if at least one
+            // group hit a permanent condition (permanent status or null/empty token); otherwise the
+            // batch was fully handled.
+            return anyPermanentFailure ? ExportResult.Failure : ExportResult.Success;
         }
 
         /// <summary>
         /// Persists every chunk of an identity group to durable storage without attempting a network
         /// send. Used when a token-resolver exception makes an immediate send impossible but the
         /// telemetry must not be lost. Returns <c>false</c> on the first storage failure so the caller
-        /// can surface an exporter failure and let the batch processor retry.
+        /// can surface an exporter failure (the batch processor does not re-export a failed batch).
         /// </summary>
         private bool PersistAllChunks(
             List<List<Activity>> chunks,

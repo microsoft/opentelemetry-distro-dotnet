@@ -27,7 +27,7 @@ namespace Microsoft.Agents.A365.Observability.Tests.Tracing.Exporters;
 /// <see cref="Agent365TransmissionGate"/> and <see cref="IAgent365PersistentStorage"/>.
 /// Retryable outcomes (401/408/429/5xx/transport) persist and report the batch handled;
 /// permanent outcomes (403/4xx) and null tokens fail without persisting; storage failures
-/// surface as an exporter failure so the batch processor can retry.
+/// surface as an exporter failure (the batch processor does not re-export a failed batch).
 /// </summary>
 [TestClass]
 public sealed class Agent365DurableExportTests
@@ -55,7 +55,7 @@ public sealed class Agent365DurableExportTests
         return gate;
     }
 
-    private static Activity CreateActivity(string? agenticUserId = null)
+    private static Activity CreateActivity(string? agenticUserId = null, string tenantId = "tenant-1", string agentId = "agent-1")
     {
         using var listener = new ActivityListener
         {
@@ -72,12 +72,36 @@ public sealed class Agent365DurableExportTests
             throw new InvalidOperationException("Failed to start activity.");
 
         activity.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "invoke_agent");
-        activity.SetTag(OpenTelemetryConstants.TenantIdKey, "tenant-1");
-        activity.SetTag(OpenTelemetryConstants.GenAiAgentIdKey, "agent-1");
+        activity.SetTag(OpenTelemetryConstants.TenantIdKey, tenantId);
+        activity.SetTag(OpenTelemetryConstants.GenAiAgentIdKey, agentId);
         if (!string.IsNullOrEmpty(agenticUserId))
             activity.SetTag(OpenTelemetryConstants.AgentAUIDKey, agenticUserId);
         activity.Stop();
         return activity;
+    }
+
+    private async Task<ExportResult> ExportActivitiesAsync(
+        Agent365ExporterCore core,
+        IEnumerable<Activity> activities,
+        Func<HttpRequestMessage, Task<HttpResponseMessage>> sendAsync,
+        long maxPayloadBytes = 900_000,
+        Func<string, string, Task<string?>>? tokenResolver = null,
+        CancellationToken cancellationToken = default)
+    {
+        var groups = core.PartitionByIdentity(activities);
+        var options = new Agent365ExporterOptions
+        {
+            DomainResolver = _ => "api.example.com",
+            TokenResolver = (_, _) => Task.FromResult<string?>("test-token"),
+            MaxPayloadBytes = maxPayloadBytes
+        };
+        return await core.ExportBatchCoreAsync(
+            groups: groups,
+            resource: ResourceBuilder.CreateEmpty().Build(),
+            options: options,
+            tokenResolver: tokenResolver ?? ((_, _) => Task.FromResult<string?>("test-token")),
+            sendAsync: sendAsync,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<ExportResult> ExportOneAsync(
@@ -427,6 +451,149 @@ public sealed class Agent365DurableExportTests
         storage.Records.Should().BeEmpty();
     }
 
+    // ---- Multi-chunk delivery / isolation ------------------------------------------------
+
+    [TestMethod]
+    public async Task RetryableFirstChunkPersistsCurrentAndRemainingChunks()
+    {
+        // Three same-identity spans forced into three separate chunks (MaxPayloadBytes = 1, each
+        // span's estimate far exceeds it, so ChunkBySize yields one span per chunk).
+        var storage = new FakeStorage();
+        var sends = 0;
+
+        var result = await ExportActivitiesAsync(
+            CreateCore(storage: storage),
+            new[] { CreateActivity(), CreateActivity(), CreateActivity() },
+            _ =>
+            {
+                sends++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+            },
+            maxPayloadBytes: 1);
+
+        // The first chunk is sent once and returns a retryable status: it is persisted and the gate
+        // enters backoff. The two remaining chunks are then persisted without any further network call.
+        result.Should().Be(ExportResult.Success);
+        sends.Should().Be(1);
+        storage.Records.Should().HaveCount(3);
+    }
+
+    [TestMethod]
+    public async Task PermanentFirstChunkStopsRemainingChunksForThatIdentity()
+    {
+        // Three same-identity chunks; the first send is a permanent 403. Later chunks for the same
+        // identity share the permanent condition and must not be sent or persisted.
+        var storage = new FakeStorage();
+        var sends = 0;
+
+        var result = await ExportActivitiesAsync(
+            CreateCore(storage: storage),
+            new[] { CreateActivity(), CreateActivity(), CreateActivity() },
+            _ =>
+            {
+                sends++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden));
+            },
+            maxPayloadBytes: 1);
+
+        result.Should().Be(ExportResult.Failure);
+        sends.Should().Be(1);
+        storage.Records.Should().BeEmpty();
+    }
+
+    [TestMethod]
+    public async Task PermanentFailureInOneGroupDoesNotDiscardOtherGroups()
+    {
+        // Two unrelated identity groups. agent-perm returns a permanent 403; agent-ok returns a
+        // retryable 503. The permanent failure must not discard the unrelated group: agent-ok is still
+        // processed and persisted, and the batch fails only because agent-perm hit a permanent status.
+        var storage = new FakeStorage();
+        var permSends = 0;
+        var okSends = 0;
+
+        var result = await ExportActivitiesAsync(
+            CreateCore(storage: storage),
+            new[]
+            {
+                CreateActivity(agentId: "agent-perm"),
+                CreateActivity(agentId: "agent-ok"),
+            },
+            request =>
+            {
+                var uri = request.RequestUri!.ToString();
+                if (uri.Contains("agent-perm"))
+                {
+                    permSends++;
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden));
+                }
+
+                okSends++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+            });
+
+        result.Should().Be(ExportResult.Failure);
+        permSends.Should().Be(1);
+        okSends.Should().Be(1);
+        storage.Records.Should().ContainSingle();
+        storage.Records[0].AgentId.Should().Be("agent-ok");
+    }
+
+    [TestMethod]
+    public async Task NullTokenForOneGroupDoesNotDiscardOtherGroups()
+    {
+        // agent-null resolves a null token (permanent misconfiguration, not persisted); agent-ok
+        // resolves a valid token and returns a retryable 503 that is persisted. The null-token group
+        // must not abort the batch before the unrelated group is processed.
+        var storage = new FakeStorage();
+
+        var result = await ExportActivitiesAsync(
+            CreateCore(storage: storage),
+            new[]
+            {
+                CreateActivity(agentId: "agent-null"),
+                CreateActivity(agentId: "agent-ok"),
+            },
+            request =>
+            {
+                var uri = request.RequestUri!.ToString();
+                return Task.FromResult(new HttpResponseMessage(
+                    uri.Contains("agent-ok") ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK));
+            },
+            tokenResolver: (agentId, _) =>
+                Task.FromResult<string?>(agentId == "agent-null" ? null : "test-token"));
+
+        result.Should().Be(ExportResult.Failure);
+        storage.Records.Should().ContainSingle();
+        storage.Records[0].AgentId.Should().Be("agent-ok");
+    }
+
+    [TestMethod]
+    public async Task CancellationBetweenChunksThrowsAfterFirstChunkPersisted()
+    {
+        // Two same-identity chunks. The caller cancels after the first send; the per-chunk cancellation
+        // check must throw before the second chunk touches the gate or storage.
+        var storage = new FakeStorage();
+        using var cts = new CancellationTokenSource();
+        var sends = 0;
+
+        Func<Task> act = () => ExportActivitiesAsync(
+            CreateCore(storage: storage),
+            new[] { CreateActivity(), CreateActivity() },
+            _ =>
+            {
+                sends++;
+                cts.Cancel();
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+            },
+            maxPayloadBytes: 1,
+            cancellationToken: cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        // Only the first chunk was sent and persisted; the second chunk short-circuits on cancellation.
+        sends.Should().Be(1);
+        storage.Records.Should().ContainSingle();
+    }
+
     // ---- Gate backoff propagation (Retry-After / jitter) ---------------------------------
 
     [TestMethod]
@@ -488,13 +655,9 @@ public sealed class Agent365DurableExportTests
     [TestMethod]
     public async Task SuccessRecordsRequestSuccessCount()
     {
-        DistroNetworkSdkStats.ResetForTesting();
-        DistroNetworkSdkStats.Initialize("N/A", "1.0.0");
+        using var listener = StartStatsCapture(out var measurements);
         try
         {
-            var measurements = new List<(string instrument, long value, string? host)>();
-            using var listener = CreateStatsListener(measurements);
-
             var result = await ExportOneAsync(CreateCore(), _ =>
                 Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)));
 
@@ -514,13 +677,9 @@ public sealed class Agent365DurableExportTests
     [TestMethod]
     public async Task RetryableStatusRecordsRetryCount()
     {
-        DistroNetworkSdkStats.ResetForTesting();
-        DistroNetworkSdkStats.Initialize("N/A", "1.0.0");
+        using var listener = StartStatsCapture(out var measurements);
         try
         {
-            var measurements = new List<(string instrument, long value, string? host)>();
-            using var listener = CreateStatsListener(measurements);
-
             var result = await ExportOneAsync(CreateCore(), _ =>
                 Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)));
 
@@ -540,22 +699,52 @@ public sealed class Agent365DurableExportTests
     }
 
     [TestMethod]
-    public async Task ThrottleStatusRecordsThrottleCount()
+    public async Task TooManyRequests429RecordsRetryCount()
     {
-        DistroNetworkSdkStats.ResetForTesting();
-        DistroNetworkSdkStats.Initialize("N/A", "1.0.0");
+        using var listener = StartStatsCapture(out var measurements);
         try
         {
-            var measurements = new List<(string instrument, long value, string? host)>();
-            using var listener = CreateStatsListener(measurements);
-
             var result = await ExportOneAsync(CreateCore(), _ =>
                 Task.FromResult(new HttpResponseMessage((HttpStatusCode)429)));
 
+            // 429 is in the gate's retryable set: the endpoint response is counted as a retry (the
+            // chunk is re-sent later from durable storage), NOT as a throttle. Throttle_Count is
+            // reserved for the Breeze throttle codes 402/439 (see ThrottleStatusRecordsThrottleCount).
             result.Should().Be(ExportResult.Success);
             var ours = measurements.Where(m => m.host == "api").ToList();
             ours.Count(m => m.instrument == "Retry_Count").Should().Be(1);
+            ours.Should().NotContain(m => m.instrument == "Throttle_Count");
             ours.Should().NotContain(m => m.instrument == "Request_Failure_Count");
+        }
+        finally
+        {
+            DistroNetworkSdkStats.ResetForTesting();
+        }
+    }
+
+    [DataTestMethod]
+    [DataRow(402)]
+    [DataRow(439)]
+    public async Task ThrottleStatusRecordsThrottleCount(int statusCode)
+    {
+        using var listener = StartStatsCapture(out var measurements);
+        try
+        {
+            var storage = new FakeStorage();
+            var result = await ExportOneAsync(CreateCore(storage: storage), _ =>
+                Task.FromResult(new HttpResponseMessage((HttpStatusCode)statusCode)));
+
+            // 402/439 are the Breeze throttle codes. They are not in the gate's retryable set, so the
+            // chunk is a permanent (non-persisted) failure, and RecordResponseStats classifies the
+            // status as a throttle: Throttle_Count is recorded (not Retry_Count or Request_Failure_Count).
+            result.Should().Be(ExportResult.Failure);
+            storage.Records.Should().BeEmpty();
+            var ours = measurements.Where(m => m.host == "api").ToList();
+            ours.Count(m => m.instrument == "Throttle_Count").Should().Be(1);
+            ours.Should().Contain(m => m.instrument == "Request_Duration");
+            ours.Should().NotContain(m => m.instrument == "Retry_Count");
+            ours.Should().NotContain(m => m.instrument == "Request_Failure_Count");
+            ours.Should().NotContain(m => m.instrument == "Request_Success_Count");
         }
         finally
         {
@@ -566,13 +755,9 @@ public sealed class Agent365DurableExportTests
     [TestMethod]
     public async Task PermanentStatusRecordsRequestFailure()
     {
-        DistroNetworkSdkStats.ResetForTesting();
-        DistroNetworkSdkStats.Initialize("N/A", "1.0.0");
+        using var listener = StartStatsCapture(out var measurements);
         try
         {
-            var measurements = new List<(string instrument, long value, string? host)>();
-            using var listener = CreateStatsListener(measurements);
-
             var result = await ExportOneAsync(CreateCore(), _ =>
                 Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden)));
 
@@ -591,13 +776,9 @@ public sealed class Agent365DurableExportTests
     [TestMethod]
     public async Task PartialContentDeliversAndRecordsDurationOnly()
     {
-        DistroNetworkSdkStats.ResetForTesting();
-        DistroNetworkSdkStats.Initialize("N/A", "1.0.0");
+        using var listener = StartStatsCapture(out var measurements);
         try
         {
-            var measurements = new List<(string instrument, long value, string? host)>();
-            using var listener = CreateStatsListener(measurements);
-
             var result = await ExportOneAsync(CreateCore(), _ =>
                 Task.FromResult(new HttpResponseMessage(HttpStatusCode.PartialContent)));
 
@@ -621,13 +802,9 @@ public sealed class Agent365DurableExportTests
     [DataRow(308)]
     public async Task RedirectIsPermanentRecordsDurationOnlyAndDoesNotPersist(int statusCode)
     {
-        DistroNetworkSdkStats.ResetForTesting();
-        DistroNetworkSdkStats.Initialize("N/A", "1.0.0");
+        using var listener = StartStatsCapture(out var measurements);
         try
         {
-            var measurements = new List<(string instrument, long value, string? host)>();
-            using var listener = CreateStatsListener(measurements);
-
             var storage = new FakeStorage();
             var result = await ExportOneAsync(CreateCore(storage: storage), _ =>
                 Task.FromResult(new HttpResponseMessage((HttpStatusCode)statusCode)));
@@ -652,13 +829,9 @@ public sealed class Agent365DurableExportTests
     [TestMethod]
     public async Task TransportExceptionRecordsExceptionCount()
     {
-        DistroNetworkSdkStats.ResetForTesting();
-        DistroNetworkSdkStats.Initialize("N/A", "1.0.0");
+        using var listener = StartStatsCapture(out var measurements);
         try
         {
-            var measurements = new List<(string instrument, long value, string? host)>();
-            using var listener = CreateStatsListener(measurements);
-
             var result = await ExportOneAsync(CreateCore(), _ =>
                 Task.FromException<HttpResponseMessage>(new HttpRequestException("network")));
 
@@ -701,6 +874,21 @@ public sealed class Agent365DurableExportTests
 
     // ---- Helpers -------------------------------------------------------------------------
 
+    /// <summary>
+    /// Starts an SDKStats measurement capture: resets and re-creates the process-global meter, then
+    /// registers a <see cref="MeterListener"/> scoped to it. Centralizes the setup shared by the
+    /// metric-semantics tests below.
+    /// </summary>
+    private static MeterListener StartStatsCapture(out System.Collections.Concurrent.ConcurrentQueue<(string instrument, long value, string? host)> measurements)
+    {
+        DistroNetworkSdkStats.ResetForTesting();
+        DistroNetworkSdkStats.Initialize("N/A", "1.0.0");
+        var captured = new System.Collections.Concurrent.ConcurrentQueue<(string instrument, long value, string? host)>();
+        var listener = CreateStatsListener(captured);
+        measurements = captured;
+        return listener;
+    }
+
     private static string? GetHost(ReadOnlySpan<KeyValuePair<string, object?>> tags)
     {
         for (int i = 0; i < tags.Length; i++)
@@ -711,7 +899,7 @@ public sealed class Agent365DurableExportTests
         return null;
     }
 
-    private static MeterListener CreateStatsListener(List<(string instrument, long value, string? host)> measurements)
+    private static MeterListener CreateStatsListener(System.Collections.Concurrent.ConcurrentQueue<(string instrument, long value, string? host)> measurements)
     {
         var listener = new MeterListener
         {
@@ -722,9 +910,9 @@ public sealed class Agent365DurableExportTests
             },
         };
         listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
-            measurements.Add((instrument.Name, value, GetHost(tags))));
+            measurements.Enqueue((instrument.Name, value, GetHost(tags))));
         listener.SetMeasurementEventCallback<double>((instrument, value, tags, _) =>
-            measurements.Add((instrument.Name, (long)value, GetHost(tags))));
+            measurements.Enqueue((instrument.Name, (long)value, GetHost(tags))));
         listener.Start();
         return listener;
     }
