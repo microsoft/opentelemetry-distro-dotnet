@@ -384,6 +384,94 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         }
 
         /// <summary>
+        /// Replays a single durable record with freshly resolved authentication. Rebuilds the request
+        /// endpoint from the record's tenant/agent/S2S fields, resolves a <em>fresh</em> token (preferring
+        /// <see cref="Agent365ExporterOptions.ContextualTokenResolver"/> with the record's agent id and
+        /// agentic user id), and sends the persisted payload exactly once. The single attempt is classified
+        /// into an <see cref="Agent365SendOutcome"/> for the replay coordinator to act on. A token that
+        /// cannot be resolved (null/empty result, or a resolver exception) yields
+        /// <see cref="Agent365SendDisposition.TokenUnavailable"/> so the coordinator retains the
+        /// already-persisted record for a later pass instead of discarding telemetry. Never logs the bearer
+        /// token or payload.
+        /// </summary>
+        internal async Task<Agent365SendOutcome> ReplayRecordAsync(
+            Agent365DurableRecord record,
+            Agent365ExporterOptions options,
+            Func<string, string, Task<string?>> tokenResolver,
+            Func<HttpRequestMessage, Task<HttpResponseMessage>> sendAsync,
+            CancellationToken cancellationToken)
+        {
+            if (record == null) throw new ArgumentNullException(nameof(record));
+            if (options == null) throw new ArgumentNullException(nameof(options));
+            if (tokenResolver == null) throw new ArgumentNullException(nameof(tokenResolver));
+            if (sendAsync == null) throw new ArgumentNullException(nameof(sendAsync));
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return new Agent365SendOutcome(Agent365SendDisposition.Canceled, null);
+            }
+
+            // Build the endpoint fresh from the record; an env override wins, exactly as the live path.
+            var endpointOverride = Environment.GetEnvironmentVariable("A365_OBSERVABILITY_DOMAIN_OVERRIDE");
+            var endpoint = !string.IsNullOrEmpty(endpointOverride)
+                ? endpointOverride
+                : options.DomainResolver.Invoke(record.TenantId);
+
+            var endpointPath = BuildEndpointPath(record.TenantId, record.AgentId, record.UseS2SEndpoint);
+            var requestUri = BuildRequestUri(endpoint, endpointPath);
+            string? requestHost = Uri.TryCreate(requestUri, UriKind.Absolute, out var parsedUri) ? parsedUri.Host : null;
+
+            string? token;
+            try
+            {
+                // Prefer ContextualTokenResolver, resolving with the record's agent + agentic user id so
+                // the AI-teammate (agentic user) and S2S (null user) scenarios both get the right context.
+                if (options.ContextualTokenResolver != null)
+                {
+                    var identity = new AgentIdentity(record.AgentId, record.AgenticUserId);
+                    var context = new TokenResolverContext(identity, record.TenantId);
+                    token = await options.ContextualTokenResolver(context).ConfigureAwait(false);
+                }
+                else
+                {
+                    token = await tokenResolver(record.AgentId, record.TenantId).ConfigureAwait(false);
+                }
+            }
+            catch (Exception ex)
+            {
+                // A resolver outage during replay is transient: retain the already-persisted record and
+                // try again on a later pass rather than deleting telemetry.
+                _logger.LogWarning(
+                    ex,
+                    "Agent365ExporterCore: TokenResolver threw during replay for agent {AgentId} tenant {TenantId}; retaining record.",
+                    record.AgentId,
+                    record.TenantId);
+                return new Agent365SendOutcome(Agent365SendDisposition.TokenUnavailable, null);
+            }
+
+            if (string.IsNullOrEmpty(token))
+            {
+                // No token, but the record is already durable: retain it (unlike the live path, which fails
+                // fast without persisting) so a later pass can deliver once a token becomes available.
+                _logger.LogWarning(
+                    "Agent365ExporterCore: No token obtained during replay for agent {AgentId} tenant {TenantId}; retaining record.",
+                    record.AgentId,
+                    record.TenantId);
+                return new Agent365SendOutcome(Agent365SendDisposition.TokenUnavailable, null);
+            }
+
+            return await SendChunkOnceAsync(
+                requestUri,
+                requestHost,
+                record.Payload,
+                token!,
+                chunkIndex: 1,
+                chunkCount: 1,
+                sendAsync,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
         /// Persists every chunk of an identity group to durable storage without attempting a network
         /// send. Used when a token-resolver exception makes an immediate send impossible but the
         /// telemetry must not be lost. Returns <c>false</c> on the first storage failure so the caller
@@ -740,7 +828,15 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         PermanentFailure,
 
         /// <summary>The caller's cancellation token was signalled; abort without persisting.</summary>
-        Canceled
+        Canceled,
+
+        /// <summary>
+        /// No auth token could be resolved (null/empty result or a resolver exception). Produced only by
+        /// the replay path: the record is already durable, so it is retained for a later pass rather than
+        /// discarded. Never produced by the live send path (which fails a null token fast without
+        /// persisting).
+        /// </summary>
+        TokenUnavailable
     }
 
     /// <summary>

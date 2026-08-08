@@ -935,13 +935,26 @@ public sealed class Agent365DurableExportTests
 /// <summary>
 /// In-memory <see cref="IAgent365PersistentStorage"/> test double. <see cref="StoreResult"/>
 /// controls whether <see cref="TryStore"/> succeeds; successful stores are captured in
-/// <see cref="Records"/>. Never touches disk. Shared with <c>Agent365ExporterTests</c>.
+/// <see cref="Records"/>. For the replay path, records seeded via the constructor are handed out by
+/// <see cref="TryGetNext"/> in order (one per call) so a pass drains at most its per-pass cap.
+/// Never touches disk. Shared with <c>Agent365ExporterTests</c> and <c>Agent365ReplayCoordinatorTests</c>.
 /// </summary>
 internal sealed class FakeStorage : IAgent365PersistentStorage
 {
+    private readonly Queue<IAgent365StoredRecord> _pending = new();
+
+    public FakeStorage(params FakeStoredRecord[] pending)
+    {
+        foreach (var record in pending)
+            _pending.Enqueue(record);
+    }
+
     public List<Agent365DurableRecord> Records { get; } = new();
 
     public bool StoreResult { get; set; } = true;
+
+    /// <summary>Number of seeded replay records not yet handed out by <see cref="TryGetNext"/>.</summary>
+    public int PendingCount => _pending.Count;
 
     public bool TryStore(Agent365DurableRecord record)
     {
@@ -952,11 +965,75 @@ internal sealed class FakeStorage : IAgent365PersistentStorage
 
     public bool TryGetNext([NotNullWhen(true)] out IAgent365StoredRecord? record)
     {
+        if (_pending.Count > 0)
+        {
+            record = _pending.Dequeue();
+            return true;
+        }
+
         record = null;
         return false;
     }
 
     public void Dispose()
     {
+    }
+}
+
+/// <summary>
+/// In-memory <see cref="IAgent365StoredRecord"/> test double for the replay path. Each of
+/// <see cref="TryLease"/>, <see cref="TryRead"/> and <see cref="TryDelete"/> returns its configurable
+/// result and records how often it was called; <see cref="DeleteCalls"/> lets a test distinguish a
+/// deleted record from a retained one. Never touches disk.
+/// </summary>
+internal sealed class FakeStoredRecord : IAgent365StoredRecord
+{
+    private readonly Agent365DurableRecord? _record;
+
+    private FakeStoredRecord(Agent365DurableRecord? record)
+    {
+        _record = record;
+    }
+
+    /// <summary>Creates a readable stored record wrapping <paramref name="record"/>.</summary>
+    public static FakeStoredRecord From(Agent365DurableRecord record) => new(record);
+
+    /// <summary>Creates a poison stored record whose <see cref="TryRead"/> always fails.</summary>
+    public static FakeStoredRecord Corrupt() => new(null) { ReadResult = false };
+
+    public bool LeaseResult { get; set; } = true;
+    public bool ReadResult { get; set; } = true;
+    public bool DeleteResult { get; set; } = true;
+
+    public int LeaseCalls { get; private set; }
+    public int ReadCalls { get; private set; }
+    public int DeleteCalls { get; private set; }
+    public TimeSpan LeasedDuration { get; private set; }
+
+    public bool TryLease(TimeSpan duration)
+    {
+        LeaseCalls++;
+        if (LeaseResult)
+            LeasedDuration = duration;
+        return LeaseResult;
+    }
+
+    public bool TryRead([NotNullWhen(true)] out Agent365DurableRecord? record)
+    {
+        ReadCalls++;
+        if (ReadResult && _record != null)
+        {
+            record = _record;
+            return true;
+        }
+
+        record = null;
+        return false;
+    }
+
+    public bool TryDelete()
+    {
+        DeleteCalls++;
+        return DeleteResult;
     }
 }
