@@ -120,6 +120,29 @@ public class Agent365Options
     }
 
     /// <summary>
+    /// When true, disables the on-disk store-and-forward pipeline: undeliverable exports are dropped
+    /// instead of being persisted for later replay, and no background replay loop is started.
+    /// When false (default), failed/deferred exports are persisted and drained on a background cadence.
+    /// Default is false.
+    /// </summary>
+    public bool DisableOfflineStorage
+    {
+        get => ExporterOptions.DisableOfflineStorage;
+        set => ExporterOptions.DisableOfflineStorage = value;
+    }
+
+    /// <summary>
+    /// Root directory for the on-disk store-and-forward pipeline. When null (default), a
+    /// per-user/per-process location is resolved automatically. Ignored when
+    /// <see cref="DisableOfflineStorage"/> is true.
+    /// </summary>
+    public string? StorageDirectory
+    {
+        get => ExporterOptions.StorageDirectory;
+        set => ExporterOptions.StorageDirectory = value;
+    }
+
+    /// <summary>
     /// When true, skips exporter registration. Instrumentation is still added.
     /// Used internally by <see cref="MicrosoftOpenTelemetryBuilderExtensions.UseMicrosoftOpenTelemetry"/>.
     /// </summary>

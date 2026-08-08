@@ -77,13 +77,20 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
             // Create ExportFormatter and Agent365ExporterCore
             var exportFormatter = new ExportFormatter(formatterLogger);
-            var exporterCore = new Agent365ExporterCore(exportFormatter, coreLogger);
+
+            // Create the shared durable store honoring the options — a no-op store when offline storage
+            // is disabled or its initialization fails — and inject it into the core so the live persist
+            // path and the background replay drain operate on one queue and one transmission gate. Wiring
+            // the exporters with wireDurableDelivery: true has each build and start its replay coordinator
+            // from that shared store (or skip it when the store is disabled).
+            var storage = Agent365DurableDelivery.CreateStorage(exporterOptions, coreLogger);
+            var exporterCore = new Agent365ExporterCore(exportFormatter, coreLogger, utcNow: null, storage: storage, gate: null);
 
             switch (exporterType)
             {
                 case Agent365ExporterType.Agent365ExporterAsync:
                     var asyncBatchProcessor = new BatchActivityExportProcessorAsync(
-                        new Agent365ExporterAsync(core: exporterCore, logger: logger, options: exporterOptions, resource: null, httpClient: httpClient),
+                        new Agent365ExporterAsync(core: exporterCore, logger: logger, options: exporterOptions, resource: null, httpClient: httpClient, replayCoordinator: null, wireDurableDelivery: true),
                         maxQueueSize: exporterOptions.MaxQueueSize,
                         scheduledDelayMilliseconds: exporterOptions.ScheduledDelayMilliseconds,
                         maxExportBatchSize: exporterOptions.MaxExportBatchSize);
@@ -92,7 +99,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
                 case Agent365ExporterType.Agent365Exporter:
                     var batchProcessor = new BatchActivityExportProcessor(
-                        new Agent365Exporter(core: exporterCore, logger: logger, options: exporterOptions, resource: null, httpClient: httpClient),
+                        new Agent365Exporter(core: exporterCore, logger: logger, options: exporterOptions, resource: null, httpClient: httpClient, replayCoordinator: null, wireDurableDelivery: true),
                         maxQueueSize: exporterOptions.MaxQueueSize,
                         scheduledDelayMilliseconds: exporterOptions.ScheduledDelayMilliseconds,
                         exporterTimeoutMilliseconds: exporterOptions.ExporterTimeoutMilliseconds,

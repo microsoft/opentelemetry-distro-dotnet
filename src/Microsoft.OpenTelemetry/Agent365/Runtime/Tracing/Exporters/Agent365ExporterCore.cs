@@ -74,6 +74,19 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         }
 
         /// <summary>
+        /// The durable store this core persists undeliverable exports to. Shared with the replay
+        /// coordinator so both the live persist path and the replay drain operate on the same records.
+        /// Resolving this forces the (otherwise lazy) storage to materialize.
+        /// </summary>
+        internal IAgent365PersistentStorage Storage => _storage.Value;
+
+        /// <summary>
+        /// The transmission gate this core coordinates send availability through. Shared with the replay
+        /// coordinator so live sends and replay passes observe a single backoff/half-open state.
+        /// </summary>
+        internal Agent365TransmissionGate Gate => _gate;
+
+        /// <summary>
         /// Partitions a batch of activities by tenant and agent identity.
         /// Only genAI activities (those with a known gen_ai.operation.name) are included.
         /// </summary>

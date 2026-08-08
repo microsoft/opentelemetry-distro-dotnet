@@ -11,6 +11,22 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 {
     /// <summary>
+    /// Lifecycle surface of the durable replay loop, factored into an interface so an exporter can own
+    /// the loop's lifetime without depending on the concrete <see cref="Agent365ReplayCoordinator"/> and
+    /// so tests can substitute a fake. <see cref="Start"/> launches the single background loop,
+    /// <see cref="StopAsync"/> stops it asynchronously, and <see cref="System.IDisposable.Dispose"/>
+    /// stops it synchronously.
+    /// </summary>
+    internal interface IAgent365ReplayCoordinator : IDisposable
+    {
+        /// <summary>Starts the single background replay loop. Idempotent.</summary>
+        void Start();
+
+        /// <summary>Signals the background loop to stop and awaits its completion.</summary>
+        Task StopAsync(CancellationToken cancellationToken);
+    }
+
+    /// <summary>
     /// Drains durably-persisted Agent365 exports back onto the wire. On a fixed cadence it asks the
     /// shared <see cref="Agent365TransmissionGate"/> for a permit and, when granted, reads at most a
     /// bounded number of leased records and replays each with freshly resolved authentication:
@@ -29,7 +45,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
     /// released when this pass owns it and recorded no terminal gate outcome, so a probe is never leaked
     /// nor double-released.
     /// </summary>
-    internal sealed class Agent365ReplayCoordinator
+    internal sealed class Agent365ReplayCoordinator : IAgent365ReplayCoordinator
     {
         internal static readonly TimeSpan DefaultReplayInterval = TimeSpan.FromMinutes(2);
 
@@ -45,6 +61,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
         private readonly object _lifecycleLock = new();
         private bool _started;
+        private bool _shutdownRequested;
+        private bool _disposed;
         private Task? _runTask;
 
         /// <summary>
@@ -98,17 +116,19 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
         /// <summary>
         /// Starts the single background replay loop. Idempotent: repeated calls are no-ops so only one
-        /// loop ever runs.
+        /// loop ever runs. A no-op once shutdown has been requested or the coordinator disposed, so a
+        /// stopped coordinator never revives.
         /// </summary>
-        internal void Start()
+        public void Start()
         {
             lock (_lifecycleLock)
             {
                 // Publish _runTask under the same lock StopAsync reads it under. This removes the race
                 // where a concurrent StopAsync observes a null _runTask (Start had CAS-ed _started but not
-                // yet assigned _runTask) and returns without awaiting the loop. If StopAsync already ran,
-                // _shutdown is cancelled and no loop is launched, so a stopped coordinator never revives.
-                if (_started || _shutdown.IsCancellationRequested)
+                // yet assigned _runTask) and returns without awaiting the loop. If shutdown was already
+                // requested (StopAsync/Dispose ran), no loop is launched, so a stopped coordinator never
+                // revives.
+                if (_started || _shutdownRequested)
                 {
                     return;
                 }
@@ -120,21 +140,18 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
         /// <summary>
         /// Signals the background loop to stop and awaits its completion. Safe to call when the loop was
-        /// never started. Never blocks past <paramref name="cancellationToken"/>.
+        /// never started, and safe to call more than once. Never blocks past <paramref name="cancellationToken"/>.
         /// </summary>
-        internal async Task StopAsync(CancellationToken cancellationToken)
+        public async Task StopAsync(CancellationToken cancellationToken)
         {
             Task? run;
             lock (_lifecycleLock)
             {
-                if (!_shutdown.IsCancellationRequested)
-                {
-                    _shutdown.Cancel();
-                }
+                RequestShutdownNoLock();
 
                 // Read the run task under the same lock Start publishes it under, so a Start that has
-                // already begun is guaranteed visible here. If Start has not yet run, _shutdown is now
-                // cancelled and that later Start will observe it and decline to launch a loop.
+                // already begun is guaranteed visible here. If Start has not yet run, shutdown is now
+                // requested and that later Start will observe it and decline to launch a loop.
                 run = _runTask;
             }
 
@@ -150,6 +167,48 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             {
                 await Task.WhenAny(run, cancelTcs.Task).ConfigureAwait(false);
             }
+        }
+
+        /// <summary>
+        /// Stops the background loop synchronously and releases the shutdown token source. Idempotent, so
+        /// a double dispose (or a dispose after <see cref="StopAsync"/>) is safe. Awaiting the loop here
+        /// cannot throw because <see cref="RunAsync"/> swallows its own cancellation/exceptions.
+        /// </summary>
+        public void Dispose()
+        {
+            Task? run;
+            lock (_lifecycleLock)
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _disposed = true;
+                RequestShutdownNoLock();
+                run = _runTask;
+            }
+
+            // Await the loop so no background pass outlives Dispose. The cancellation-aware delay unblocks
+            // immediately on the shutdown signal, so this returns promptly.
+            run?.GetAwaiter().GetResult();
+            _shutdown.Dispose();
+        }
+
+        /// <summary>
+        /// Requests cooperative shutdown exactly once. Must be called under <see cref="_lifecycleLock"/>.
+        /// Uses a dedicated flag rather than <c>_shutdown.IsCancellationRequested</c> so it never touches a
+        /// <see cref="CancellationTokenSource"/> that <see cref="Dispose"/> may have already released.
+        /// </summary>
+        private void RequestShutdownNoLock()
+        {
+            if (_shutdownRequested)
+            {
+                return;
+            }
+
+            _shutdownRequested = true;
+            _shutdown.Cancel();
         }
 
         private async Task RunAsync()
