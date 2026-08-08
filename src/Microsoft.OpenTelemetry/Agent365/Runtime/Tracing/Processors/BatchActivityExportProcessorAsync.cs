@@ -49,6 +49,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
 
         private int state;
         private int activeExport;
+        private int activeProducers;
         private int exporterShutdownStarted;
         private int exporterDisposeClaim;
         private int disposeRequested;
@@ -58,9 +59,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
         /// Initializes a new instance of the <see cref="BatchActivityExportProcessorAsync"/> class.
         /// </summary>
         /// <param name="exporter">The async exporter instance.</param>
-        /// <param name="maxQueueSize">Maximum queue size.</param>
-        /// <param name="scheduledDelayMilliseconds">Delay between exports in ms.</param>
-        /// <param name="maxExportBatchSize">Max batch size per export.</param>
+        /// <param name="maxQueueSize">Maximum queue size. Must be greater than or equal to 1.</param>
+        /// <param name="scheduledDelayMilliseconds">Delay between exports in ms. Must be greater than or equal to 1.</param>
+        /// <param name="maxExportBatchSize">Max batch size per export. Must be in the range [1, <paramref name="maxQueueSize"/>].</param>
+        /// <exception cref="ArgumentNullException"><paramref name="exporter"/> is <c>null</c>.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">An argument is outside its allowed range.</exception>
         public BatchActivityExportProcessorAsync(
             BaseExporterAsync<Activity> exporter,
             int maxQueueSize = DefaultMaxQueueSize,
@@ -68,23 +71,55 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
             int maxExportBatchSize = DefaultMaxExportBatchSize)
         {
             this.exporter = exporter ?? throw new ArgumentNullException(nameof(exporter));
+
+            // Validate arguments to match OpenTelemetry's synchronous BatchExportProcessor<T>: a queue of
+            // at least one slot, a batch in [1, maxQueueSize], and a strictly positive scheduled delay.
+            // Requiring scheduledDelayMilliseconds >= 1 also guarantees the idle worker always sleeps on
+            // a bounded, positive interval, so it can never busy-spin re-checking an empty queue.
+            if (maxQueueSize < 1)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(maxQueueSize), maxQueueSize, "maxQueueSize must be greater than or equal to 1.");
+            }
+
+            if (maxExportBatchSize < 1 || maxExportBatchSize > maxQueueSize)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(maxExportBatchSize), maxExportBatchSize, "maxExportBatchSize must be greater than or equal to 1 and less than or equal to maxQueueSize.");
+            }
+
+            if (scheduledDelayMilliseconds < 1)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(scheduledDelayMilliseconds), scheduledDelayMilliseconds, "scheduledDelayMilliseconds must be greater than or equal to 1.");
+            }
+
             this.maxQueueSize = maxQueueSize;
             this.scheduledDelayMilliseconds = scheduledDelayMilliseconds;
             this.maxExportBatchSize = maxExportBatchSize;
 
-            // A positive scheduled delay bounds how long the idle worker sleeps before it re-checks state,
-            // acting as a safety net; every enqueue and shutdown also releases the signal to wake it early.
-            this.workerIdleWaitMilliseconds = scheduledDelayMilliseconds > 0
-                ? scheduledDelayMilliseconds
-                : Timeout.Infinite;
+            // The scheduled delay bounds how long the idle worker sleeps before it re-checks state; it is
+            // only a safety net because every enqueue, shutdown, and producer-exit also releases the
+            // signal to wake it early. Validation above guarantees it is strictly positive.
+            this.workerIdleWaitMilliseconds = scheduledDelayMilliseconds;
 
             this.queue = new ConcurrentQueue<Activity>();
-            this.signal = new SemaphoreSlim(0);
+
+            // A binary (max-count 1) signal: releases saturate at one pending wake, so a burst of enqueues
+            // cannot accumulate a large count that would make the worker spin through WaitAsync returning
+            // synchronously once the queue drains. One wake is enough — the worker drains the whole queue.
+            this.signal = new SemaphoreSlim(0, 1);
             this.friendlyTypeName = $"{this.GetType().Name}{{{exporter.GetType().Name}}}";
 
             // Start the worker last so every field it reads is fully initialized before it runs.
             this.workerTask = Task.Run(this.ProcessLoopAsync);
         }
+
+        /// <summary>
+        /// Gets the number of activities currently buffered in the queue. Test-only diagnostic used to
+        /// assert that no accepted activity is stranded after the worker exits.
+        /// </summary>
+        internal int QueueCount => this.queue.Count;
 
         /// <summary>
         /// Called when an <see cref="Activity"/> is ended.
@@ -106,24 +141,54 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
         }
 
         /// <summary>
-        /// Enqueues activity data for export. Once shutdown has begun the processor no longer accepts
-        /// activities; if the queue is full the data is dropped.
+        /// Enqueues activity data for export using a producer/worker handshake. Once shutdown has begun
+        /// the processor no longer accepts activities and the data is dropped silently (never throwing —
+        /// <see cref="BaseProcessor{T}.OnEnd"/> is contractually not allowed to throw); if the queue is
+        /// full while running the data is also dropped.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The <see cref="activeProducers"/> counter closes the race between a producer that has already
+        /// observed <see cref="StateRunning"/> and a worker deciding the queue is drained. A producer
+        /// increments the counter <em>before</em> it reads the state; the worker only exits once it has
+        /// observed <see cref="StateDraining"/> and then <see cref="activeProducers"/> at zero. Because
+        /// the increment carries a full fence, any producer the worker does not count reads the already
+        /// published <see cref="StateDraining"/> and drops — so an accepted activity is never stranded in
+        /// the queue after the worker has exited.
+        /// </para>
+        /// </remarks>
         /// <param name="data">The activity to export.</param>
         private void OnExport(Activity data)
         {
-            if (Volatile.Read(ref this.state) != StateRunning)
+            // Publish the producer's presence before reading the state so the worker's drain-exit
+            // handshake can never miss an in-flight enqueue (see the remarks above).
+            Interlocked.Increment(ref this.activeProducers);
+            try
             {
-                throw new ObjectDisposedException(nameof(BatchActivityExportProcessorAsync));
-            }
+                if (Volatile.Read(ref this.state) != StateRunning)
+                {
+                    // Shutdown has begun: drop silently rather than throw or strand the activity.
+                    return;
+                }
 
-            if (this.queue.Count < this.maxQueueSize)
+                if (this.queue.Count < this.maxQueueSize)
+                {
+                    this.queue.Enqueue(data);
+                    this.TryReleaseSignal();
+                }
+
+                // else: queue full, drop (could count dropped).
+            }
+            finally
             {
-                this.queue.Enqueue(data);
-                this.TryReleaseSignal();
+                // Wake the worker once the last in-flight producer leaves during shutdown, so its
+                // drain-exit handshake re-evaluates promptly instead of waiting out the idle interval.
+                if (Interlocked.Decrement(ref this.activeProducers) == 0
+                    && Volatile.Read(ref this.state) != StateRunning)
+                {
+                    this.TryReleaseSignal();
+                }
             }
-
-            // else: drop, could count dropped
         }
 
         /// <summary>
@@ -181,31 +246,138 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
         }
 
         /// <summary>
+        /// Called by the base <c>Shutdown</c> (invoked by a standard <c>TracerProvider</c> shutdown). It
+        /// bridges to the asynchronous drain in <see cref="ShutdownAsync"/> so the queued activities and
+        /// any in-flight export are drained and the exporter is shut down, bounded by
+        /// <paramref name="timeoutMilliseconds"/>. On timeout it returns <c>false</c> without cancelling
+        /// the drain — the worker remains owned and keeps draining in the background, and a later
+        /// <see cref="Dispose(bool)"/> stays safe.
+        /// </summary>
+        /// <param name="timeoutMilliseconds">The bound on the caller's wait, or <see cref="Timeout.Infinite"/>.</param>
+        /// <returns><c>true</c> when the drain and exporter shutdown completed within the timeout; otherwise <c>false</c>.</returns>
+        protected override bool OnShutdown(int timeoutMilliseconds)
+            => RunBounded(token => this.ShutdownAsync(token), timeoutMilliseconds);
+
+        /// <summary>
+        /// Called by the base <c>ForceFlush</c> (invoked by a standard <c>TracerProvider</c> force flush).
+        /// It bridges to <see cref="ForceFlushAsync"/> so the queued activities and any in-flight export
+        /// are drained and the exporter is flushed, bounded by <paramref name="timeoutMilliseconds"/>. On
+        /// timeout it returns <c>false</c> without cancelling the worker.
+        /// </summary>
+        /// <param name="timeoutMilliseconds">The bound on the caller's wait, or <see cref="Timeout.Infinite"/>.</param>
+        /// <returns><c>true</c> when the flush completed within the timeout; otherwise <c>false</c>.</returns>
+        protected override bool OnForceFlush(int timeoutMilliseconds)
+            => RunBounded(token => this.ForceFlushAsync(token), timeoutMilliseconds);
+
+        /// <summary>
+        /// Runs an asynchronous operation from a synchronous <see cref="BaseProcessor{T}"/> hook without
+        /// risking a sync-over-async deadlock, bounded by <paramref name="timeoutMilliseconds"/>. The
+        /// operation is started on the thread pool (its awaits already use <c>ConfigureAwait(false)</c>,
+        /// so no caller context is captured) and awaited with a bounded <see cref="Task.Wait(int)"/>. On
+        /// timeout the token is cancelled to stop the operation's own wait — never the background drain —
+        /// and <c>false</c> is returned; any fault is swallowed and reported as <c>false</c> so the hook
+        /// never throws.
+        /// </summary>
+        /// <param name="operation">The bounded operation, receiving a token that fires only on timeout.</param>
+        /// <param name="timeoutMilliseconds">The wait bound, or <see cref="Timeout.Infinite"/> to wait indefinitely.</param>
+        /// <returns><c>true</c> when the operation completed within the timeout; otherwise <c>false</c>.</returns>
+        private static bool RunBounded(Func<CancellationToken, Task> operation, int timeoutMilliseconds)
+        {
+            var timeoutSource = new CancellationTokenSource();
+
+            // Offload to the thread pool so the synchronous caller's context is never captured and cannot
+            // deadlock (the async chain uses ConfigureAwait(false) throughout).
+            var task = Task.Run(() => operation(timeoutSource.Token));
+
+            bool completed;
+            try
+            {
+                completed = task.Wait(timeoutMilliseconds);
+            }
+            catch (Exception)
+            {
+                // The operation faulted within the timeout; hooks must not throw.
+                completed = false;
+            }
+
+            if (!completed)
+            {
+                // Timed out (or faulted): stop the operation's own wait — never the background drain.
+                timeoutSource.Cancel();
+            }
+
+            // Dispose the timeout source and observe any fault only once the background operation has
+            // finished using the token, so we neither race a disposed token nor leave an unobserved
+            // task exception when the caller stopped waiting early.
+            task.ContinueWith(
+                static (t, state) =>
+                {
+                    _ = t.Exception;
+                    ((CancellationTokenSource)state!).Dispose();
+                },
+                timeoutSource,
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+
+            return completed;
+        }
+
+        /// <summary>
         /// The main processing loop that batches and exports activities asynchronously. It drains until
-        /// shutdown has begun and the queue is empty, then shuts the exporter down exactly once.
+        /// shutdown has begun, the queue is empty, and no producer is mid-enqueue, then shuts the exporter
+        /// down exactly once.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the asynchronous processing loop.</returns>
         private async Task ProcessLoopAsync()
         {
             try
             {
-                while (Volatile.Read(ref this.state) == StateRunning || !this.queue.IsEmpty)
+                while (true)
                 {
-                    if (this.queue.IsEmpty)
+                    if (!this.queue.IsEmpty)
+                    {
+                        // Never cancel an in-flight export merely because shutdown started.
+                        await this.ExportNextBatchAsync().ConfigureAwait(false);
+                        continue;
+                    }
+
+                    if (Volatile.Read(ref this.state) == StateRunning)
                     {
                         // Idle: wait for work or a shutdown signal (bounded so state changes are re-checked).
                         await this.signal.WaitAsync(this.workerIdleWaitMilliseconds).ConfigureAwait(false);
                         continue;
                     }
 
-                    // Never cancel an in-flight export merely because shutdown started.
-                    await this.ExportNextBatchAsync().ConfigureAwait(false);
+                    // Draining and the queue looks empty. Only exit once no producer is mid-enqueue: a
+                    // producer increments activeProducers before it reads the state, so observing zero here
+                    // (after having observed StateDraining above) proves no accepted activity can still be
+                    // added — nothing is stranded. If a producer is in flight, wait for it (it releases the
+                    // signal on its way out) and re-check.
+                    if (Volatile.Read(ref this.activeProducers) != 0)
+                    {
+                        await this.signal.WaitAsync(this.workerIdleWaitMilliseconds).ConfigureAwait(false);
+                        continue;
+                    }
+
+                    if (!this.queue.IsEmpty)
+                    {
+                        continue;
+                    }
+
+                    break;
                 }
             }
             finally
             {
                 await this.ShutdownExporterOnceAsync().ConfigureAwait(false);
-                Volatile.Write(ref this.state, StateStopped);
+
+                // Full-fence publish of the Stopped transition. Interlocked.Exchange is a full barrier, so
+                // the Stopped store is globally visible before the disposeRequested read below, which
+                // cannot be reordered ahead of it. Together with the symmetric full fence in Dispose this
+                // forms a Dekker handshake: at least one side observes the other's write, so a requested
+                // disposal is never lost, and the exactly-once claim prevents a double dispose.
+                Interlocked.Exchange(ref this.state, StateStopped);
 
                 // If disposal was requested while the worker still owned the exporter, dispose it now that
                 // the worker is done using it. The claim guard keeps this to exactly one disposal.
@@ -271,8 +443,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
         {
             if (disposing && Interlocked.Exchange(ref this.disposed, 1) == 0)
             {
-                // Record intent before waking the worker so a worker finishing concurrently observes it.
-                Volatile.Write(ref this.disposeRequested, 1);
+                // Record intent with a full fence before reading the state, so this cannot be reordered
+                // after the state read. Interlocked.Exchange is a full barrier; paired with the worker's
+                // full-fence Stopped transition it forms a Dekker handshake — at least one side observes
+                // the other's write, so the exporter is disposed exactly once and never leaked.
+                Interlocked.Exchange(ref this.disposeRequested, 1);
                 this.BeginShutdown();
 
                 // If the worker already stopped it will not dispose the exporter, so do it here. Whichever

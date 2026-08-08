@@ -9,3 +9,5 @@ Microsoft.OpenTelemetry.Agent365Options.StorageDirectory.get -> string?
 Microsoft.OpenTelemetry.Agent365Options.StorageDirectory.set -> void
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterAsync.Dispose() -> void
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterAsync.ShutdownAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.OnForceFlush(int timeoutMilliseconds) -> bool
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.OnShutdown(int timeoutMilliseconds) -> bool
