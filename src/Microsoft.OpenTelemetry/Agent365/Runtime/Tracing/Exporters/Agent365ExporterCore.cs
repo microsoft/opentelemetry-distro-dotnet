@@ -205,6 +205,13 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             // group has been given a chance to deliver or persist.
             var anyPermanentFailure = false;
 
+            // The live send delegate already binds the export cancellation token (it is created as
+            // request => httpClient.SendAsync(request, cancellationToken)). SendChunkOnceAsync now takes
+            // a token-aware delegate to support the replay path; adapt the live one without changing its
+            // behavior by discarding the (identical) inner token.
+            Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> tokenAwareSendAsync =
+                (request, _) => sendAsync(request);
+
             foreach (var g in groups)
             {
                 var (tenantId, agentId, activities) = g;
@@ -339,7 +346,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                             token!,
                             i + 1,
                             chunks.Count,
-                            sendAsync,
+                            tokenAwareSendAsync,
                             cancellationToken).ConfigureAwait(false);
 
                         switch (outcome.Disposition)
@@ -398,7 +405,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             Agent365DurableRecord record,
             Agent365ExporterOptions options,
             Func<string, string, Task<string?>> tokenResolver,
-            Func<HttpRequestMessage, Task<HttpResponseMessage>> sendAsync,
+            Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> sendAsync,
             CancellationToken cancellationToken)
         {
             if (record == null) throw new ArgumentNullException(nameof(record));
@@ -586,7 +593,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             string token,
             int chunkIndex,
             int chunkCount,
-            Func<HttpRequestMessage, Task<HttpResponseMessage>> sendAsync,
+            Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> sendAsync,
             CancellationToken cancellationToken)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -599,7 +606,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
             try
             {
-                using var response = await sendAsync(request).ConfigureAwait(false);
+                // Thread the caller's token into the actual HTTP request so an in-flight send is
+                // cancelled when the caller (e.g. the replay coordinator on shutdown) cancels.
+                using var response = await sendAsync(request, cancellationToken).ConfigureAwait(false);
                 stopwatch.Stop();
 
                 if (response.IsSuccessStatusCode)

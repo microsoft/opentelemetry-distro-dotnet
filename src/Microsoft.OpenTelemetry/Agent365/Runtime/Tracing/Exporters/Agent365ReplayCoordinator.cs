@@ -40,7 +40,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
         private readonly CancellationTokenSource _shutdown = new();
 
-        private int _started;
+        private readonly object _lifecycleLock = new();
+        private bool _started;
         private Task? _runTask;
 
         /// <summary>
@@ -76,6 +77,13 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                     nameof(maxRecordsPerPass), maxRecordsPerPass, "At least one record must be handled per pass.");
             }
 
+            if (replayInterval.HasValue && replayInterval.Value <= TimeSpan.Zero)
+            {
+                // A non-positive interval would spin the background loop with no delay between passes.
+                throw new ArgumentOutOfRangeException(
+                    nameof(replayInterval), replayInterval, "The replay interval must be positive.");
+            }
+
             _replayInterval = replayInterval ?? DefaultReplayInterval;
             _maxRecordsPerPass = maxRecordsPerPass;
 
@@ -91,12 +99,20 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         /// </summary>
         internal void Start()
         {
-            if (Interlocked.CompareExchange(ref _started, 1, 0) != 0)
+            lock (_lifecycleLock)
             {
-                return;
-            }
+                // Publish _runTask under the same lock StopAsync reads it under. This removes the race
+                // where a concurrent StopAsync observes a null _runTask (Start had CAS-ed _started but not
+                // yet assigned _runTask) and returns without awaiting the loop. If StopAsync already ran,
+                // _shutdown is cancelled and no loop is launched, so a stopped coordinator never revives.
+                if (_started || _shutdown.IsCancellationRequested)
+                {
+                    return;
+                }
 
-            _runTask = Task.Run(RunAsync);
+                _started = true;
+                _runTask = Task.Run(RunAsync);
+            }
         }
 
         /// <summary>
@@ -105,12 +121,20 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         /// </summary>
         internal async Task StopAsync(CancellationToken cancellationToken)
         {
-            if (!_shutdown.IsCancellationRequested)
+            Task? run;
+            lock (_lifecycleLock)
             {
-                _shutdown.Cancel();
+                if (!_shutdown.IsCancellationRequested)
+                {
+                    _shutdown.Cancel();
+                }
+
+                // Read the run task under the same lock Start publishes it under, so a Start that has
+                // already begun is guaranteed visible here. If Start has not yet run, _shutdown is now
+                // cancelled and that later Start will observe it and decline to launch a loop.
+                run = _runTask;
             }
 
-            var run = _runTask;
             if (run == null)
             {
                 return;
@@ -134,13 +158,17 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                     await _delayAsync(_replayInterval, _shutdown.Token).ConfigureAwait(false);
                     await ReplayOnceAsync(_shutdown.Token).ConfigureAwait(false);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
                 {
+                    // Cooperative shutdown requested via StopAsync: exit the loop.
                     break;
                 }
                 catch (Exception ex)
                 {
                     // One intentional, long-lived background task: never let a single pass tear it down.
+                    // This also catches a non-shutdown OperationCanceledException (e.g. a stray token
+                    // cancellation not originating from StopAsync), which must be logged and survived
+                    // rather than silently killing the loop.
                     _logger.LogError(ex, "Agent365ReplayCoordinator: Unhandled exception during a replay pass.");
                 }
             }
@@ -173,8 +201,12 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
                     if (!stored!.TryLease(_leaseDuration))
                     {
-                        // Leased by another worker or an overlapping pass; leave it in place and move on.
-                        continue;
+                        // The real FileBlobProvider is non-destructive: a failed lease leaves the same
+                        // unleased blob at the head of the queue, so the next TryGetNext re-serves it. A
+                        // "continue" here would therefore re-fetch and re-lease the identical blob up to
+                        // _maxRecordsPerPass times (a tight spin). Stop the pass instead; the next cadence
+                        // retries it once the contending lease or maintenance window clears.
+                        break;
                     }
 
                     if (!stored.TryRead(out var record))
@@ -184,7 +216,29 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                         continue;
                     }
 
-                    var outcome = await _replayAsync(record!, cancellationToken).ConfigureAwait(false);
+                    Agent365SendOutcome outcome;
+                    try
+                    {
+                        outcome = await _replayAsync(record!, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        // Cooperative cancellation (e.g. shutdown mid-flight): retain the leased record and
+                        // let the cancellation propagate. It must never be misclassified as poison.
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        // Replaying this one record threw a non-cancellation exception. A single bad record
+                        // must not tear down the pass (nor, via RunAsync, the whole loop): quarantine it as
+                        // poison so it cannot wedge the queue, then continue with the remaining records.
+                        _logger.LogError(
+                            ex,
+                            "Agent365ReplayCoordinator: Replaying a record threw a non-cancellation exception; " +
+                            "quarantining it as poison and continuing the pass.");
+                        DeleteRecord(stored, delivered: false);
+                        continue;
+                    }
 
                     switch (outcome.Disposition)
                     {

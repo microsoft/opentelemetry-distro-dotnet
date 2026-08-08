@@ -6,6 +6,7 @@ using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Http.Headers;
 
@@ -44,7 +45,7 @@ public sealed class Agent365ReplayCoordinatorTests
     private Agent365ReplayCoordinator CreateCoordinator(
         IAgent365PersistentStorage storage,
         Func<string, string, Task<string?>>? tokenResolver = null,
-        Func<HttpRequestMessage, Task<HttpResponseMessage>>? sendAsync = null,
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? sendAsync = null,
         Agent365TransmissionGate? gate = null,
         ILogger? logger = null,
         int maxRecordsPerPass = 10,
@@ -55,7 +56,7 @@ public sealed class Agent365ReplayCoordinatorTests
     {
         gate ??= new Agent365TransmissionGate(() => _now);
         tokenResolver ??= (_, _) => Task.FromResult<string?>("fresh-token");
-        sendAsync ??= _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        sendAsync ??= (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
 
         var options = new Agent365ExporterOptions
         {
@@ -113,7 +114,7 @@ public sealed class Agent365ReplayCoordinatorTests
                 tokens++;
                 return Task.FromResult<string?>("fresh-token");
             },
-            sendAsync: request =>
+            sendAsync: (request, _) =>
             {
                 sentAuthorization = request.Headers.Authorization!.Parameter!;
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
@@ -134,7 +135,7 @@ public sealed class Agent365ReplayCoordinatorTests
         Uri? sentUri = null;
         var coordinator = CreateCoordinator(
             storage,
-            sendAsync: request =>
+            sendAsync: (request, _) =>
             {
                 sentUri = request.RequestUri;
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
@@ -156,7 +157,7 @@ public sealed class Agent365ReplayCoordinatorTests
         var body = string.Empty;
         var coordinator = CreateCoordinator(
             storage,
-            sendAsync: async request =>
+            sendAsync: async (request, _) =>
             {
                 body = await request.Content!.ReadAsStringAsync();
                 return new HttpResponseMessage(HttpStatusCode.OK);
@@ -179,7 +180,7 @@ public sealed class Agent365ReplayCoordinatorTests
         var sends = 0;
         var coordinator = CreateCoordinator(
             storage,
-            sendAsync: _ =>
+            sendAsync: (_, _) =>
             {
                 sends++;
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
@@ -202,7 +203,7 @@ public sealed class Agent365ReplayCoordinatorTests
         var coordinator = CreateCoordinator(
             storage,
             gate: gate,
-            sendAsync: _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)));
+            sendAsync: (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)));
 
         await coordinator.ReplayOnceAsync(CancellationToken.None);
 
@@ -220,7 +221,7 @@ public sealed class Agent365ReplayCoordinatorTests
         var coordinator = CreateCoordinator(
             storage,
             gate: gate,
-            sendAsync: _ =>
+            sendAsync: (_, _) =>
             {
                 var response = new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
                 response.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromSeconds(45));
@@ -241,7 +242,7 @@ public sealed class Agent365ReplayCoordinatorTests
         var storage = new FakeStorage(stored);
         var coordinator = CreateCoordinator(
             storage,
-            sendAsync: _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden)));
+            sendAsync: (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden)));
 
         await coordinator.ReplayOnceAsync(CancellationToken.None);
 
@@ -257,7 +258,7 @@ public sealed class Agent365ReplayCoordinatorTests
         var coordinator = CreateCoordinator(
             storage,
             gate: gate,
-            sendAsync: _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest)));
+            sendAsync: (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest)));
 
         await coordinator.ReplayOnceAsync(CancellationToken.None);
 
@@ -273,7 +274,7 @@ public sealed class Agent365ReplayCoordinatorTests
         var sends = 0;
         var coordinator = CreateCoordinator(
             storage,
-            sendAsync: _ =>
+            sendAsync: (_, _) =>
             {
                 sends++;
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
@@ -296,7 +297,7 @@ public sealed class Agent365ReplayCoordinatorTests
         var coordinator = CreateCoordinator(
             storage,
             tokenResolver: (_, _) => Task.FromResult<string?>(null),
-            sendAsync: _ =>
+            sendAsync: (_, _) =>
             {
                 sends++;
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
@@ -334,7 +335,7 @@ public sealed class Agent365ReplayCoordinatorTests
         var coordinator = CreateCoordinator(
             storage,
             tokenResolver: (_, _) => throw new InvalidOperationException("token boom"),
-            sendAsync: _ =>
+            sendAsync: (_, _) =>
             {
                 sends++;
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
@@ -358,7 +359,7 @@ public sealed class Agent365ReplayCoordinatorTests
         var coordinator = CreateCoordinator(
             storage,
             logger: logger,
-            sendAsync: _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)));
+            sendAsync: (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)));
 
         await coordinator.ReplayOnceAsync(CancellationToken.None);
 
@@ -380,7 +381,7 @@ public sealed class Agent365ReplayCoordinatorTests
         var sends = 0;
         var coordinator = CreateCoordinator(
             storage,
-            sendAsync: _ =>
+            sendAsync: (_, _) =>
             {
                 sends++;
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
@@ -405,7 +406,7 @@ public sealed class Agent365ReplayCoordinatorTests
         var sends = 0;
         var coordinator = CreateCoordinator(
             storage,
-            sendAsync: _ =>
+            sendAsync: (_, _) =>
             {
                 sends++;
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
@@ -489,7 +490,7 @@ public sealed class Agent365ReplayCoordinatorTests
         var coordinator = CreateCoordinator(
             storage,
             gate: BackoffGate(),
-            sendAsync: _ =>
+            sendAsync: (_, _) =>
             {
                 sends++;
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
@@ -511,7 +512,7 @@ public sealed class Agent365ReplayCoordinatorTests
         var coordinator = CreateCoordinator(
             storage,
             gate: gate,
-            sendAsync: _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden)));
+            sendAsync: (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden)));
 
         await coordinator.ReplayOnceAsync(CancellationToken.None);
 
@@ -530,7 +531,7 @@ public sealed class Agent365ReplayCoordinatorTests
         var coordinator = CreateCoordinator(
             storage,
             gate: gate,
-            sendAsync: _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)));
+            sendAsync: (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)));
 
         await coordinator.ReplayOnceAsync(CancellationToken.None);
 
@@ -547,7 +548,7 @@ public sealed class Agent365ReplayCoordinatorTests
         var sends = 0;
         var coordinator = CreateCoordinator(
             storage,
-            sendAsync: _ =>
+            sendAsync: (_, _) =>
             {
                 sends++;
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
@@ -570,7 +571,7 @@ public sealed class Agent365ReplayCoordinatorTests
             storage,
             delayAsync: delay.WaitAsync,
             replayInterval: TimeSpan.FromMinutes(2),
-            sendAsync: _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)));
+            sendAsync: (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)));
 
         coordinator.Start();
 
@@ -611,6 +612,212 @@ public sealed class Agent365ReplayCoordinatorTests
         delay.Calls.Should().Be(1, "a single background loop runs even after repeated Start calls");
 
         await coordinator.StopAsync(CancellationToken.None);
+    }
+
+    // ------------------------------------------------------------------ per-record exception isolation
+
+    [TestMethod]
+    public async Task ReplayThrowingRecordIsQuarantinedAndPassContinues()
+    {
+        var poison = FakeStoredRecord.From(CreateRecord(agentId: "poison"));
+        var good = FakeStoredRecord.From(CreateRecord(agentId: "good"));
+        var storage = new FakeStorage(poison, good);
+        var sends = 0;
+        var coordinator = CreateCoordinator(
+            storage,
+            sendAsync: (request, _) =>
+            {
+                sends++;
+                if (request.RequestUri!.ToString().Contains("poison"))
+                    throw new InvalidOperationException("replay boom");
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+            });
+
+        Func<Task> act = () => coordinator.ReplayOnceAsync(CancellationToken.None);
+
+        await act.Should().NotThrowAsync("one record's replay exception must not tear down the whole pass");
+        sends.Should().Be(2, "the pass continues to the next record after a throwing one");
+        poison.DeleteCalls.Should().Be(1, "a record whose replay throws is quarantined as poison and deleted");
+        good.DeleteCalls.Should().Be(1, "the following record is still delivered and deleted");
+    }
+
+    [TestMethod]
+    public async Task ThrownCancellationDuringReplayRetainsRecordAndPropagates()
+    {
+        var stored = FakeStoredRecord.From(CreateRecord());
+        var storage = new FakeStorage(stored);
+        using var cts = new CancellationTokenSource();
+        var coordinator = CreateCoordinator(
+            storage,
+            sendAsync: (request, token) =>
+            {
+                cts.Cancel();
+                token.ThrowIfCancellationRequested();
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+            });
+
+        Func<Task> act = () => coordinator.ReplayOnceAsync(cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>(
+            "cooperative cancellation is preserved, not swallowed and treated as poison");
+        stored.DeleteCalls.Should().Be(0, "a cancelled replay retains the record rather than deleting it");
+    }
+
+    // ------------------------------------------------------------------ lease-failure spin guard
+
+    [TestMethod]
+    public async Task LeaseFailureDoesNotSpinWhenStorageReservesSameBlob()
+    {
+        // The real FileBlobProvider.TryGetNext is non-destructive: it re-serves the same first
+        // unleased blob on every call. A failed lease must stop the pass, not loop up to
+        // maxRecordsPerPass times re-fetching and re-leasing the identical blob.
+        var leased = FakeStoredRecord.From(CreateRecord());
+        leased.LeaseResult = false;
+        var storage = new ReServingStorage(leased);
+        var coordinator = CreateCoordinator(storage, maxRecordsPerPass: 10);
+
+        await coordinator.ReplayOnceAsync(CancellationToken.None);
+
+        leased.LeaseCalls.Should().Be(1, "a failed lease stops the pass instead of re-leasing the re-served blob");
+        storage.GetNextCalls.Should().Be(1, "the pass does not repeatedly re-fetch the same unleased blob");
+    }
+
+    // ------------------------------------------------------------------ interval validation
+
+    [TestMethod]
+    public void NonPositiveReplayIntervalThrows()
+    {
+        Action zero = () => CreateCoordinator(new FakeStorage(), replayInterval: TimeSpan.Zero);
+        Action negative = () => CreateCoordinator(new FakeStorage(), replayInterval: TimeSpan.FromSeconds(-1));
+
+        zero.Should().Throw<ArgumentOutOfRangeException>("a zero interval would spin the loop with no delay");
+        negative.Should().Throw<ArgumentOutOfRangeException>("a negative interval is invalid");
+    }
+
+    // ------------------------------------------------------------------ non-shutdown cancellation
+
+    [TestMethod]
+    public async Task NonShutdownCancellationDoesNotKillTheLoop()
+    {
+        var storage = new FakeStorage();
+        var calls = 0;
+        var secondReached = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Func<TimeSpan, CancellationToken, Task> delay = (interval, token) =>
+        {
+            var n = Interlocked.Increment(ref calls);
+            if (n == 1)
+            {
+                // A cancellation that is NOT the coordinator's shutdown must not tear down the loop.
+                throw new OperationCanceledException();
+            }
+
+            if (n == 2)
+            {
+                secondReached.TrySetResult(true);
+            }
+
+            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(() => tcs.TrySetCanceled());
+            return tcs.Task;
+        };
+        var coordinator = CreateCoordinator(storage, delayAsync: delay);
+
+        coordinator.Start();
+        await Task.WhenAny(secondReached.Task, Task.Delay(TimeSpan.FromSeconds(3)));
+        await coordinator.StopAsync(CancellationToken.None);
+
+        secondReached.Task.IsCompletedSuccessfully.Should().BeTrue(
+            "a non-shutdown cancellation must be logged and the loop must keep running for later passes");
+    }
+
+    // ------------------------------------------------------------------ start/stop lifecycle race
+
+    [TestMethod]
+    public async Task StopAsyncAwaitsTheLoopLaunchedByStart()
+    {
+        var storage = new FakeStorage();
+        var delay = new ControlledDelay();
+        var coordinator = CreateCoordinator(storage, delayAsync: delay.WaitAsync);
+
+        coordinator.Start();
+        await delay.WaitForCallAsync(1);
+
+        Func<Task> stop = () => coordinator.StopAsync(CancellationToken.None);
+        await stop.Should().CompleteWithinAsync(
+            TimeSpan.FromSeconds(5),
+            "StopAsync must observe and await the run task launched by Start, then return once it unwinds");
+
+        var callsAtStop = delay.Calls;
+        await Task.Delay(50);
+        delay.Calls.Should().Be(callsAtStop, "the loop has fully stopped after StopAsync returns");
+    }
+
+    // ------------------------------------------------------------------ coordinator token reaches the send
+
+    [TestMethod]
+    public async Task InFlightSendReceivesCoordinatorToken()
+    {
+        var stored = FakeStoredRecord.From(CreateRecord());
+        var storage = new FakeStorage(stored);
+        using var cts = new CancellationTokenSource();
+        CancellationToken received = default;
+        var coordinator = CreateCoordinator(
+            storage,
+            sendAsync: (request, token) =>
+            {
+                received = token;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+            });
+
+        await coordinator.ReplayOnceAsync(cts.Token);
+
+        received.Should().Be(cts.Token, "the coordinator's cancellation token flows to the actual HTTP send");
+    }
+
+    [TestMethod]
+    public async Task MidFlightShutdownCancelsInFlightSendAndRetainsRecord()
+    {
+        var stored = FakeStoredRecord.From(CreateRecord());
+        var storage = new FakeStorage(stored);
+        using var cts = new CancellationTokenSource();
+        var coordinator = CreateCoordinator(
+            storage,
+            sendAsync: async (request, token) =>
+            {
+                // Shutdown arrives while the request is in flight; the send observes the token.
+                cts.Cancel();
+                await Task.Delay(Timeout.Infinite, token);
+                return new HttpResponseMessage(HttpStatusCode.OK);
+            });
+
+        Func<Task> act = () => coordinator.ReplayOnceAsync(cts.Token);
+
+        await act.Should().NotThrowAsync("a mid-flight cancellation is classified as a Canceled outcome, not thrown");
+        stored.DeleteCalls.Should().Be(0, "a send cancelled mid-flight by shutdown retains the record for a later pass");
+    }
+
+    // ------------------------------------------------------------------ S2S endpoint
+
+    [TestMethod]
+    public async Task ReplayWithS2SEndpointBuildsS2SUri()
+    {
+        var stored = FakeStoredRecord.From(CreateRecord(tenantId: "tenant-9", agentId: "agent-9", useS2SEndpoint: true));
+        var storage = new FakeStorage(stored);
+        Uri? sentUri = null;
+        var coordinator = CreateCoordinator(
+            storage,
+            sendAsync: (request, _) =>
+            {
+                sentUri = request.RequestUri;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+            });
+
+        await coordinator.ReplayOnceAsync(CancellationToken.None);
+
+        sentUri.Should().NotBeNull();
+        sentUri!.ToString().Should().Be(
+            "https://api.example.com/observabilityService/tenants/tenant-9/otlp/agents/agent-9/traces?api-version=1");
+        stored.DeleteCalls.Should().Be(1);
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 5000)
@@ -695,5 +902,32 @@ internal sealed class ControlledDelay
                 throw new TimeoutException($"Delay was not awaited {callCount} time(s) within the timeout.");
             await Task.Delay(10);
         }
+    }
+}
+
+/// <summary>
+/// Non-destructive storage double that reproduces the real <c>FileBlobProvider</c> contract: every
+/// <see cref="TryGetNext"/> re-serves the same unleased record (it is never dequeued). Used to prove
+/// the coordinator does not spin over a re-served blob whose lease keeps failing.
+/// </summary>
+internal sealed class ReServingStorage : IAgent365PersistentStorage
+{
+    private readonly IAgent365StoredRecord _record;
+
+    public ReServingStorage(IAgent365StoredRecord record) => _record = record;
+
+    public int GetNextCalls { get; private set; }
+
+    public bool TryStore(Agent365DurableRecord record) => true;
+
+    public bool TryGetNext([NotNullWhen(true)] out IAgent365StoredRecord? record)
+    {
+        GetNextCalls++;
+        record = _record;
+        return true;
+    }
+
+    public void Dispose()
+    {
     }
 }
