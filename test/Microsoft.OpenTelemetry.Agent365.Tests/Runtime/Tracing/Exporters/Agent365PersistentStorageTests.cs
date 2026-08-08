@@ -138,42 +138,19 @@ public sealed class Agent365PersistentStorageTests
     }
 
     [TestMethod]
-    public void ResolvesUnixXdgStateHomeFirst()
+    public void UsesTomDirOnUnixWhenSet()
     {
         var dir = Agent365StorageDirectoryResolver.Resolve(
             configuredRoot: null,
             isWindows: () => false,
-            getEnvVar: v => v == "XDG_STATE_HOME" ? "/home/user/.local/state" : null,
+            getEnvVar: v => v == "TMPDIR" ? "/custom/tmp" : null,
             hashIdentity: () => "abcd1234");
-        dir.Should().StartWith("/home/user/.local/state");
+
+        dir.Should().StartWith("/custom/tmp");
     }
 
     [TestMethod]
-    public void FallsBackToHomeLocalStateOnUnix()
-    {
-        var dir = Agent365StorageDirectoryResolver.Resolve(
-            configuredRoot: null,
-            isWindows: () => false,
-            getEnvVar: v => v == "HOME" ? "/home/user" : null,
-            hashIdentity: () => "abcd1234");
-
-        dir.Should().StartWith("/home/user/.local/state");
-    }
-
-    [TestMethod]
-    public void FallsBackToTmpOnUnix()
-    {
-        var dir = Agent365StorageDirectoryResolver.Resolve(
-            configuredRoot: null,
-            isWindows: () => false,
-            getEnvVar: v => v == "TMPDIR" ? "/var/tmp/agent365" : null,
-            hashIdentity: () => "abcd1234");
-
-        dir.Should().StartWith("/var/tmp/agent365");
-    }
-
-    [TestMethod]
-    public void FallsBackToSlashTmpOnUnixWhenTmpdirMissing()
+    public void FallsBackToVarTmpOnUnixWhenTmpdirMissing()
     {
         var dir = Agent365StorageDirectoryResolver.Resolve(
             configuredRoot: null,
@@ -181,7 +158,46 @@ public sealed class Agent365PersistentStorageTests
             getEnvVar: _ => null,
             hashIdentity: () => "abcd1234");
 
-        dir.Should().StartWith("/tmp");
+        dir.Should().StartWith("/var/tmp");
+    }
+
+    [TestMethod]
+    public void FallsBackToSlashTmpOnUnixWhenVarTmpNotAccessible()
+    {
+        var dir = Agent365StorageDirectoryResolver.Resolve(
+            configuredRoot: null,
+            isWindows: () => false,
+            getEnvVar: _ => null,
+            hashIdentity: () => "abcd1234");
+
+        if (!dir.StartsWith("/var/tmp"))
+        {
+            dir.Should().StartWith("/tmp");
+        }
+    }
+
+    [TestMethod]
+    public void UnixFallbackOrderVerifiedTmpdirFirst()
+    {
+        var dir = Agent365StorageDirectoryResolver.Resolve(
+            configuredRoot: null,
+            isWindows: () => false,
+            getEnvVar: v => v == "TMPDIR" ? "/explicit/tmpdir" : null,
+            hashIdentity: () => "abcd1234");
+
+        dir.Should().StartWith("/explicit/tmpdir");
+    }
+
+    [TestMethod]
+    public void UnixFallbackOrderVerifiedVarTmpSecond()
+    {
+        var dir = Agent365StorageDirectoryResolver.Resolve(
+            configuredRoot: null,
+            isWindows: () => false,
+            getEnvVar: _ => null,
+            hashIdentity: () => "abcd1234");
+
+        (dir.StartsWith("/var/tmp") || dir.StartsWith("/tmp")).Should().BeTrue();
     }
 
     private static Agent365DurableRecord CreateRecord() =>

@@ -188,25 +188,41 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
         private static string ResolveUnixRoot(Func<string, string?> getEnvVar)
         {
-            var xdgStateHome = getEnvVar("XDG_STATE_HOME");
-            if (!string.IsNullOrWhiteSpace(xdgStateHome))
-            {
-                return xdgStateHome!;
-            }
-
-            var home = getEnvVar("HOME");
-            if (!string.IsNullOrWhiteSpace(home))
-            {
-                return home!.TrimEnd('/') + "/.local/state";
-            }
-
             var tempDirectory = getEnvVar("TMPDIR");
             if (!string.IsNullOrWhiteSpace(tempDirectory))
             {
                 return tempDirectory!;
             }
 
-            return "/tmp";
+            if (TryCreateDirectory("/var/tmp"))
+            {
+                return "/var/tmp";
+            }
+
+            if (TryCreateDirectory("/tmp"))
+            {
+                return "/tmp";
+            }
+
+            return Environment.CurrentDirectory;
+        }
+
+        private static bool TryCreateDirectory(string path)
+        {
+            try
+            {
+                if (Directory.Exists(path))
+                {
+                    return true;
+                }
+
+                Directory.CreateDirectory(path);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static string ComputeHashIdentity()
