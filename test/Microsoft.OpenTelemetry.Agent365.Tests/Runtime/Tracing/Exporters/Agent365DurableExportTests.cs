@@ -7,11 +7,13 @@ using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.OpenTelemetry.AzureMonitor.SdkStats;
 using OpenTelemetry;
 using OpenTelemetry.Resources;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Threading;
@@ -672,6 +674,50 @@ public sealed class Agent365DurableExportTests
         var error = logger.Entries.Should().ContainSingle(e => e.Level == LogLevel.Error).Which;
         error.Message.Should().Contain("Agent365.Observability.OtelWrite");
         error.Message.Should().Contain("aka.ms/a365-403");
+    }
+
+    // ---- Exception_Count metric (SDKStats) -----------------------------------------------
+
+    [TestMethod]
+    public async Task HttpRequestExceptionRecordsExceptionCountMetric()
+    {
+        DistroNetworkSdkStats.ResetForTesting();
+        DistroNetworkSdkStats.Initialize("N/A", "test");
+        try
+        {
+            var recorded = new List<(string Instrument, long Value, string? ExceptionType)>();
+            using var listener = new MeterListener
+            {
+                InstrumentPublished = (instrument, l) =>
+                {
+                    if (instrument.Meter.Name == DistroNetworkSdkStats.MeterName)
+                        l.EnableMeasurementEvents(instrument);
+                },
+            };
+            listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
+            {
+                if (instrument.Name != "Exception_Count") return;
+                string? exType = null;
+                foreach (var tag in tags)
+                {
+                    if (tag.Key == "exceptionType") { exType = tag.Value as string; break; }
+                }
+                recorded.Add((instrument.Name, value, exType));
+            });
+            listener.Start();
+
+            await ExportOneAsync(
+                CreateCore(),
+                _ => Task.FromException<HttpResponseMessage>(new HttpRequestException("network")));
+
+            recorded.Should().ContainSingle(m =>
+                m.Instrument == "Exception_Count" &&
+                m.ExceptionType == typeof(HttpRequestException).FullName);
+        }
+        finally
+        {
+            DistroNetworkSdkStats.ResetForTesting();
+        }
     }
 
     // ---- Helpers -------------------------------------------------------------------------
