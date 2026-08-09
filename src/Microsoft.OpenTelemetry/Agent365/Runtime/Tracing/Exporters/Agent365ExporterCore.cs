@@ -548,58 +548,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             return request;
         }
 
-        // HTTP status codes with special handling in RecordResponseStats, mirroring the
-        // DistroNetworkSdkStats.TrackResponse contract. 200 is the sole Request_Success_Count code;
-        // 206 (partial success accepted by the pipeline) and the 307/308 redirects are not terminal
-        // outcomes and record duration only.
-        private const int StatusOk = 200;
-        private const int StatusPartialContent = 206;
-        private const int StatusTemporaryRedirect = 307;
-        private const int StatusPermanentRedirect = 308;
-
-        /// <summary>
-        /// Records SDKStats for a single HTTP response attempt, aligned with the
-        /// <see cref="DistroNetworkSdkStats.TrackResponse"/> contract. Duration is recorded for every
-        /// attempt. Only HTTP 200 records <c>Request_Success_Count</c>; 206/307/308 record neither
-        /// success nor failure/retry/throttle. Otherwise a retryable attempt that will be retried
-        /// records <c>Retry_Count</c>, a throttling status records <c>Throttle_Count</c>, and any
-        /// remaining non-success (including a retryable status on the final, exhausted attempt)
-        /// records <c>Request_Failure_Count</c>.
-        /// </summary>
-        private static void RecordResponseStats(string? requestHost, HttpStatusCode statusCode, double durationMs, bool willRetry)
-        {
-            var stats = DistroNetworkSdkStats.Instance;
-            if (stats == null)
-                return;
-
-            stats.TrackDuration(requestHost, durationMs);
-
-            var code = (int)statusCode;
-            if (code == StatusOk)
-            {
-                stats.TrackSuccess(requestHost);
-                return;
-            }
-
-            if (code == StatusPartialContent || code == StatusTemporaryRedirect || code == StatusPermanentRedirect)
-            {
-                return;
-            }
-
-            if (willRetry)
-            {
-                stats.TrackRetry(requestHost, code);
-            }
-            else if (DistroNetworkSdkStatsHelper.IsThrottle(code))
-            {
-                stats.TrackThrottle(requestHost, code);
-            }
-            else
-            {
-                stats.TrackFinalFailure(requestHost, code);
-            }
-        }
-
         private static void TrackExceptionAttempt(string? requestHost, Exception exception)
         {
             DistroNetworkSdkStats.Instance?.TrackException(requestHost, exception.GetType().FullName);
@@ -641,7 +589,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
                 if (response.IsSuccessStatusCode)
                 {
-                    RecordResponseStats(requestHost, response.StatusCode, stopwatch.Elapsed.TotalMilliseconds, willRetry: false);
+                    DistroNetworkSdkStats.Instance?.TrackResponse(requestHost, (int)response.StatusCode, stopwatch.Elapsed.TotalMilliseconds);
                     return new Agent365SendOutcome(Agent365SendDisposition.Delivered, null);
                 }
 
@@ -650,11 +598,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                     : null;
                 var retryable = Agent365TransmissionGate.IsRetryable(response.StatusCode);
 
-                RecordResponseStats(
-                    requestHost,
-                    response.StatusCode,
-                    stopwatch.Elapsed.TotalMilliseconds,
-                    willRetry: retryable);
+                DistroNetworkSdkStats.Instance?.TrackResponse(requestHost, (int)response.StatusCode, stopwatch.Elapsed.TotalMilliseconds);
 
                 if (retryable)
                 {
