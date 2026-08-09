@@ -649,6 +649,69 @@ public sealed class Agent365DurableExportTests
         gate.CurrentDelay.Should().BeLessThanOrEqualTo(Agent365TransmissionGate.MaximumDelay);
     }
 
+    // ---- Disabled offline storage: retryable outcomes must surface as Failure --------------
+
+    /// <summary>
+    /// When the core uses <see cref="DisabledAgent365Storage"/> (offline storage disabled or init
+    /// failed), a retryable 503 cannot be durably queued: <see cref="ExportResult.Failure"/> is
+    /// returned so the caller knows the telemetry was dropped, not silently swallowed.
+    /// </summary>
+    [TestMethod]
+    public async Task DisabledStorage_503_ReturnsFailure()
+    {
+        var result = await ExportOneAsync(
+            CreateCore(storage: new DisabledAgent365Storage()),
+            _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)));
+
+        result.Should().Be(ExportResult.Failure);
+    }
+
+    [TestMethod]
+    public async Task PublicCtor_503_ReturnsFailure()
+    {
+        // The public Agent365ExporterCore(formatter, logger) constructor wires DisabledAgent365Storage.
+        var core = new Agent365ExporterCore(
+            new ExportFormatter(NullLogger<ExportFormatter>.Instance),
+            NullLogger<Agent365ExporterCore>.Instance);
+
+        var result = await ExportOneAsync(
+            core,
+            _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)));
+
+        result.Should().Be(ExportResult.Failure);
+    }
+
+    [TestMethod]
+    public async Task DisabledStorage_TransportFailure_ReturnsFailure()
+    {
+        var result = await ExportOneAsync(
+            CreateCore(storage: new DisabledAgent365Storage()),
+            _ => Task.FromException<HttpResponseMessage>(new HttpRequestException("network")));
+
+        result.Should().Be(ExportResult.Failure);
+    }
+
+    [TestMethod]
+    public async Task DisabledStorage_GateClosed_ReturnsFailure()
+    {
+        var result = await ExportOneAsync(
+            CreateCore(storage: new DisabledAgent365Storage(), gate: OpenGate()),
+            _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)));
+
+        result.Should().Be(ExportResult.Failure);
+    }
+
+    [TestMethod]
+    public async Task DisabledStorage_TokenResolverException_ReturnsFailure()
+    {
+        var result = await ExportOneAsync(
+            CreateCore(storage: new DisabledAgent365Storage()),
+            _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)),
+            tokenResolver: (_, _) => throw new InvalidOperationException("token boom"));
+
+        result.Should().Be(ExportResult.Failure);
+    }
+
     // ---- 403 actionable logging (preserved) ----------------------------------------------
 
     [TestMethod]

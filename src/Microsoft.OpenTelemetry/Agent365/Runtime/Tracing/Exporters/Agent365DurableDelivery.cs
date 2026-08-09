@@ -103,14 +103,15 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
     /// <summary>
     /// No-op <see cref="IAgent365PersistentStorage"/> used when offline storage is disabled or its
-    /// initialization failed. It never touches disk: <see cref="TryStore"/> accepts and silently drops
-    /// the record (so a transient live failure with durability off is not surfaced as an exporter
-    /// failure), <see cref="TryGetNext"/> always reports an empty queue, and <see cref="Dispose"/> is a
-    /// no-op. Existing solely so the live core is never handed a null store.
+    /// initialization failed. It never touches disk: <see cref="TryStore"/> returns <c>false</c> so
+    /// every retryable outcome (gate deferral, retryable HTTP status, transport failure, token-resolver
+    /// exception) correctly surfaces as <c>ExportResult.Failure</c> — the caller never claims durable
+    /// persistence when nothing was actually written. <see cref="TryGetNext"/> always reports an empty
+    /// queue, and <see cref="Dispose"/> is a no-op.
     /// </summary>
     internal sealed class DisabledAgent365Storage : IAgent365PersistentStorage
     {
-        public bool TryStore(Agent365DurableRecord record) => true;
+        public bool TryStore(Agent365DurableRecord record) => false;
 
         public bool TryGetNext(
 #if NETSTANDARD2_0

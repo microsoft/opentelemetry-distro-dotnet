@@ -323,7 +323,7 @@ public sealed class Agent365ExporterLifecycleTests
 
         storage.Should().BeOfType<DisabledAgent365Storage>();
         storage.TryStore(new Agent365DurableRecord("t", "a", null, false, "{}", DateTimeOffset.UtcNow))
-            .Should().BeTrue("the disabled store accepts and silently drops records");
+            .Should().BeFalse("the disabled store never persists; callers surface ExportResult.Failure instead of claiming durable persistence");
         storage.TryGetNext(out var record).Should().BeFalse();
         record.Should().BeNull();
     }

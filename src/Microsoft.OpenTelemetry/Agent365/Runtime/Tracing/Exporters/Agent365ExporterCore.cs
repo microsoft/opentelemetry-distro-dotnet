@@ -342,12 +342,19 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
                     if (!_gate.TryAcquire(out var ownsProbe))
                     {
-                        // Gate is in backoff: skip the network entirely and persist for later delivery.
-                        this._logger?.LogWarning(
-                            "Agent365ExporterCore: Transmission gate closed; persisting chunk {ChunkIndex} of {ChunkCount} for durable retry.",
-                            i + 1, chunks.Count);
+                        // Gate is in backoff: skip the network entirely. Only log the outcome after
+                        // TryStore so the message is accurate regardless of storage type.
                         if (!_storage.Value.TryStore(record))
+                        {
+                            this._logger?.LogWarning(
+                                "Agent365ExporterCore: Transmission gate closed; persistence failed or is disabled for chunk {ChunkIndex} of {ChunkCount} — dropping.",
+                                i + 1, chunks.Count);
                             return ExportResult.Failure;
+                        }
+
+                        this._logger?.LogWarning(
+                            "Agent365ExporterCore: Transmission gate closed; persisted chunk {ChunkIndex} of {ChunkCount} for durable retry.",
+                            i + 1, chunks.Count);
                         continue;
                     }
 
@@ -378,7 +385,13 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                             case Agent365SendDisposition.RetryableFailure:
                                 _gate.RecordRetryableFailure(outcome.RetryAfter);
                                 if (!_storage.Value.TryStore(record))
+                                {
+                                    this._logger?.LogWarning(
+                                        "Agent365ExporterCore: Retryable failure; persistence failed or is disabled for chunk {ChunkIndex} of {ChunkCount} — dropping.",
+                                        i + 1, chunks.Count);
                                     return ExportResult.Failure;
+                                }
+
                                 break;
 
                             case Agent365SendDisposition.PermanentFailure:
