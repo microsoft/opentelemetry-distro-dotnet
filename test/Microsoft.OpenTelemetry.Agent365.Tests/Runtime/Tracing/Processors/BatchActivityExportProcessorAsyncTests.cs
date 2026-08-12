@@ -420,6 +420,59 @@ public sealed class BatchActivityExportProcessorAsyncTests
 
     [TestMethod]
     [Timeout(60_000)]
+    public async Task ConcurrentProducersNeverExceedConfiguredQueueCapacity()
+    {
+        const int producerCount = 64;
+        var activities = CreateRecordedActivities(producerCount, "contender");
+
+        for (var trial = 0; trial < 25; trial++)
+        {
+            var exporter = new RecordingAsyncExporter(blockFirstExport: true);
+            var processor = new BatchActivityExportProcessorAsync(
+                exporter,
+                maxQueueSize: 1,
+                scheduledDelayMilliseconds: 60_000,
+                maxExportBatchSize: 1);
+
+            processor.OnEnd(CreateRecordedActivity($"in-flight-{trial}"));
+            exporter.WaitForExportStarted();
+
+            using var go = new Barrier(producerCount + 1);
+            var producers = new Thread[producerCount];
+            for (var i = 0; i < producerCount; i++)
+            {
+                var activity = activities[i];
+                producers[i] = new Thread(() =>
+                {
+                    go.SignalAndWait();
+                    processor.OnEnd(activity);
+                });
+                producers[i].Start();
+            }
+
+            try
+            {
+                go.SignalAndWait();
+                foreach (var producer in producers)
+                {
+                    producer.Join();
+                }
+            }
+            finally
+            {
+                exporter.ReleaseFirstExport();
+                await processor.ShutdownAsync(CancellationToken.None);
+                processor.Dispose();
+            }
+
+            exporter.ExportedNames.Count(name => name.StartsWith("contender", StringComparison.Ordinal)).Should().BeLessThanOrEqualTo(
+                1,
+                "only one contender can be admitted while the configured one-slot queue is blocked");
+        }
+    }
+
+    [TestMethod]
+    [Timeout(60_000)]
     public async Task ConcurrentOnEndRacingShutdownNeverStrandsItemsNorThrows()
     {
         // Producers keep calling OnEnd while shutdown flips the lifecycle underneath them. The

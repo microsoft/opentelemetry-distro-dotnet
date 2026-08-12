@@ -288,6 +288,29 @@ public sealed class Agent365ReplayCoordinatorTests
         poison.DeleteCalls.Should().Be(1, "an unreadable poison blob is deleted");
     }
 
+    [TestMethod]
+    public async Task StorageReadFailureRetainsRecordAndStopsPass()
+    {
+        var unreadable = FakeStoredRecord.From(CreateRecord(agentId: "first"));
+        unreadable.ReadResult = Agent365StoredRecordReadResult.ReadFailure;
+        var next = FakeStoredRecord.From(CreateRecord(agentId: "second"));
+        var storage = new FakeStorage(unreadable, next);
+        var sends = 0;
+        var coordinator = CreateCoordinator(
+            storage,
+            sendAsync: (_, _) =>
+            {
+                sends++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+            });
+
+        await coordinator.ReplayOnceAsync(CancellationToken.None);
+
+        sends.Should().Be(0, "a record that could not be read must not be sent");
+        unreadable.DeleteCalls.Should().Be(0, "a transient storage read failure must retain durable telemetry");
+        storage.PendingCount.Should().Be(1, "the pass stops so later records are not reordered past the unreadable record");
+    }
+
     // ------------------------------------------------------------------ missing token
 
     [TestMethod]

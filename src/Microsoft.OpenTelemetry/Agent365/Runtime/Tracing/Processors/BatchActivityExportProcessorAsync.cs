@@ -50,6 +50,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
         private int state;
         private int activeExport;
         private int activeProducers;
+        private int queuedCount;
         private int exporterShutdownStarted;
         private int exporterDisposeClaim;
         private int disposeRequested;
@@ -119,7 +120,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
         /// Gets the number of activities currently buffered in the queue. Test-only diagnostic used to
         /// assert that no accepted activity is stranded after the worker exits.
         /// </summary>
-        internal int QueueCount => this.queue.Count;
+        internal int QueueCount => Volatile.Read(ref this.queuedCount);
 
         /// <summary>
         /// Called when an <see cref="Activity"/> is ended.
@@ -171,10 +172,18 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
                     return;
                 }
 
-                if (this.queue.Count < this.maxQueueSize)
+                if (this.TryReserveQueueSlot())
                 {
-                    this.queue.Enqueue(data);
-                    this.TryReleaseSignal();
+                    try
+                    {
+                        this.queue.Enqueue(data);
+                        this.TryReleaseSignal();
+                    }
+                    catch
+                    {
+                        Interlocked.Decrement(ref this.queuedCount);
+                        throw;
+                    }
                 }
 
                 // else: queue full, drop (could count dropped).
@@ -403,6 +412,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
                 var batch = new List<Activity>(this.maxExportBatchSize);
                 while (batch.Count < this.maxExportBatchSize && this.queue.TryDequeue(out var item))
                 {
+                    Interlocked.Decrement(ref this.queuedCount);
                     batch.Add(item);
                 }
 
@@ -476,7 +486,24 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors
         /// </summary>
         /// <returns><c>true</c> when there is no pending or in-flight work.</returns>
         private bool IsDrained()
-            => this.queue.IsEmpty && Volatile.Read(ref this.activeExport) == 0;
+            => Volatile.Read(ref this.queuedCount) == 0 && Volatile.Read(ref this.activeExport) == 0;
+
+        private bool TryReserveQueueSlot()
+        {
+            while (true)
+            {
+                var count = Volatile.Read(ref this.queuedCount);
+                if (count >= this.maxQueueSize)
+                {
+                    return false;
+                }
+
+                if (Interlocked.CompareExchange(ref this.queuedCount, count + 1, count) == count)
+                {
+                    return true;
+                }
+            }
+        }
 
         /// <summary>
         /// Shuts the exporter down exactly once, swallowing exceptions so the worker never faults.

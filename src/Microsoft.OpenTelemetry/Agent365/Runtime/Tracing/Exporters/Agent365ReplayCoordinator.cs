@@ -271,9 +271,18 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                         break;
                     }
 
-                    if (!stored.TryRead(out var record))
+                    var readResult = stored.Read(out var record);
+                    if (readResult == Agent365StoredRecordReadResult.ReadFailure)
                     {
-                        // Unreadable/unsupported poison blob: discard it so it cannot wedge the queue.
+                        _logger.LogWarning(
+                            "Agent365ReplayCoordinator: A durable record could not be read; retaining it and " +
+                            "stopping the pass so a transient storage failure does not delete telemetry.");
+                        return;
+                    }
+
+                    if (readResult == Agent365StoredRecordReadResult.InvalidPayload)
+                    {
+                        // Confirmed unsupported/corrupt payload: discard it so it cannot wedge the queue.
                         DeleteRecord(stored, delivered: false);
                         continue;
                     }

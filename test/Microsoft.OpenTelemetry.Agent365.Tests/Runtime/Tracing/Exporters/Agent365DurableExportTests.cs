@@ -850,7 +850,7 @@ internal sealed class FakeStorage : IAgent365PersistentStorage
 
 /// <summary>
 /// In-memory <see cref="IAgent365StoredRecord"/> test double for the replay path. Each of
-/// <see cref="TryLease"/>, <see cref="TryRead"/> and <see cref="TryDelete"/> returns its configurable
+/// <see cref="TryLease"/>, <see cref="Read"/> and <see cref="TryDelete"/> returns its configurable
 /// result and records how often it was called; <see cref="DeleteCalls"/> lets a test distinguish a
 /// deleted record from a retained one. Never touches disk.
 /// </summary>
@@ -866,11 +866,11 @@ internal sealed class FakeStoredRecord : IAgent365StoredRecord
     /// <summary>Creates a readable stored record wrapping <paramref name="record"/>.</summary>
     public static FakeStoredRecord From(Agent365DurableRecord record) => new(record);
 
-    /// <summary>Creates a poison stored record whose <see cref="TryRead"/> always fails.</summary>
-    public static FakeStoredRecord Corrupt() => new(null) { ReadResult = false };
+    /// <summary>Creates a poison stored record whose payload is invalid.</summary>
+    public static FakeStoredRecord Corrupt() => new(null) { ReadResult = Agent365StoredRecordReadResult.InvalidPayload };
 
     public bool LeaseResult { get; set; } = true;
-    public bool ReadResult { get; set; } = true;
+    public Agent365StoredRecordReadResult ReadResult { get; set; } = Agent365StoredRecordReadResult.Success;
     public bool DeleteResult { get; set; } = true;
 
     public int LeaseCalls { get; private set; }
@@ -886,17 +886,17 @@ internal sealed class FakeStoredRecord : IAgent365StoredRecord
         return LeaseResult;
     }
 
-    public bool TryRead([NotNullWhen(true)] out Agent365DurableRecord? record)
+    public Agent365StoredRecordReadResult Read([NotNullWhen(true)] out Agent365DurableRecord? record)
     {
         ReadCalls++;
-        if (ReadResult && _record != null)
+        if (ReadResult == Agent365StoredRecordReadResult.Success && _record != null)
         {
             record = _record;
-            return true;
+            return Agent365StoredRecordReadResult.Success;
         }
 
         record = null;
-        return false;
+        return ReadResult;
     }
 
     public bool TryDelete()

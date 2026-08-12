@@ -31,7 +31,7 @@ public sealed class Agent365PersistentStorageTests
         storage.TryStore(expected).Should().BeTrue();
         storage.TryGetNext(out var stored).Should().BeTrue();
         stored!.TryLease(TimeSpan.FromMinutes(2)).Should().BeTrue();
-        stored.TryRead(out var actual).Should().BeTrue();
+        stored.Read(out var actual).Should().Be(Agent365StoredRecordReadResult.Success);
         actual.Should().BeEquivalentTo(expected);
     }
 
@@ -82,7 +82,7 @@ public sealed class Agent365PersistentStorageTests
         using var storage = Agent365PersistentStorage.Create(temp.Path);
         storage.TryGetNext(out var stored).Should().BeTrue();
         stored!.TryLease(TimeSpan.FromMinutes(2)).Should().BeTrue();
-        stored.TryRead(out var record).Should().BeFalse();
+        stored.Read(out var record).Should().Be(Agent365StoredRecordReadResult.InvalidPayload);
         record.Should().BeNull();
     }
 

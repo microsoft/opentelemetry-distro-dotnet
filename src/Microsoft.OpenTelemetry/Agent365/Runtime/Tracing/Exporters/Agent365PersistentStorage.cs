@@ -29,7 +29,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
     {
         bool TryLease(TimeSpan duration);
 
-        bool TryRead(
+        Agent365StoredRecordReadResult Read(
 #if NETSTANDARD2_0
             out Agent365DurableRecord? record);
 #else
@@ -37,6 +37,13 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 #endif
 
         bool TryDelete();
+    }
+
+    internal enum Agent365StoredRecordReadResult
+    {
+        Success,
+        ReadFailure,
+        InvalidPayload,
     }
 
     internal sealed class Agent365PersistentStorage : IAgent365PersistentStorage
@@ -110,7 +117,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             public bool TryLease(TimeSpan duration) =>
                 _blob.TryLease((int)duration.TotalMilliseconds);
 
-            public bool TryRead(
+            public Agent365StoredRecordReadResult Read(
 #if NETSTANDARD2_0
                 out Agent365DurableRecord? record)
 #else
@@ -120,10 +127,12 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 if (!_blob.TryRead(out var data))
                 {
                     record = null;
-                    return false;
+                    return Agent365StoredRecordReadResult.ReadFailure;
                 }
 
-                return Agent365DurableRecord.TryDeserialize(data, out record);
+                return Agent365DurableRecord.TryDeserialize(data, out record)
+                    ? Agent365StoredRecordReadResult.Success
+                    : Agent365StoredRecordReadResult.InvalidPayload;
             }
 
             public bool TryDelete() => _blob.TryDelete();
@@ -246,5 +255,4 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         }
     }
 }
-
 
