@@ -3,6 +3,7 @@
 
 using System;
 using System.Net;
+using System.Threading;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 {
@@ -11,76 +12,79 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         internal static readonly TimeSpan MinimumDelay = TimeSpan.FromSeconds(10);
         internal static readonly TimeSpan MaximumDelay = TimeSpan.FromHours(1);
 
-        private readonly object _lock = new();
         private readonly Func<DateTimeOffset> _utcNow;
-        private readonly Random _random;
+        private GateSnapshot _snapshot = GateSnapshot.CreateClosed();
+        private int _randomState;
 
         private enum GateState { Closed, Backoff, Probe }
-
-        private GateState _state;
-        private int _consecutiveErrors;
-        private DateTimeOffset _nextProbeTime;
-        private bool _probeInFlight;
 
         internal Agent365TransmissionGate(Func<DateTimeOffset>? utcNow = null, Random? random = null)
         {
             _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
-
-            // Random.Shared is unavailable on netstandard2.0. A per-gate Random instance is safe
-            // because every access is serialized under _lock.
-            _random = random ?? new Random();
+            _randomState = (random ?? new Random()).Next(1, int.MaxValue);
         }
 
-        internal int ConsecutiveErrors
-        {
-            get { lock (_lock) { return _consecutiveErrors; } }
-        }
+        internal int ConsecutiveErrors => Volatile.Read(ref _snapshot).ConsecutiveErrors;
 
-        internal TimeSpan CurrentDelay
-        {
-            get { lock (_lock) { return _nextProbeTime - _utcNow(); } }
-        }
+        internal TimeSpan CurrentDelay => Volatile.Read(ref _snapshot).NextProbeTime - _utcNow();
 
         internal bool TryAcquire(out bool ownsProbe)
         {
-            lock (_lock)
+            while (true)
             {
-                TransitionIfReady();
-
+                var current = Volatile.Read(ref _snapshot);
                 ownsProbe = false;
 
-                if (_state == GateState.Closed)
+                if (current.State == GateState.Closed)
                 {
                     return true;
                 }
 
-                if (_state == GateState.Probe && !_probeInFlight)
+                if (current.State == GateState.Backoff && _utcNow() < current.NextProbeTime)
                 {
-                    _probeInFlight = true;
+                    return false;
+                }
+
+                if (current.ProbeInFlight)
+                {
+                    return false;
+                }
+
+                var claimed = new GateSnapshot(
+                    GateState.Probe,
+                    current.ConsecutiveErrors,
+                    current.NextProbeTime,
+                    probeInFlight: true);
+
+                if (ReferenceEquals(Interlocked.CompareExchange(ref _snapshot, claimed, current), current))
+                {
                     ownsProbe = true;
                     return true;
                 }
-
-                return false;
             }
         }
 
         internal void RecordSuccess()
         {
-            lock (_lock)
+            while (true)
             {
-                _state = GateState.Closed;
-                _consecutiveErrors = 0;
-                _probeInFlight = false;
+                var current = Volatile.Read(ref _snapshot);
+                var closed = GateSnapshot.CreateClosed();
+                if (ReferenceEquals(Interlocked.CompareExchange(ref _snapshot, closed, current), current))
+                {
+                    return;
+                }
             }
         }
 
         internal void RecordRetryableFailure(TimeSpan? retryAfter)
         {
-            lock (_lock)
+            while (true)
             {
-                _consecutiveErrors++;
-                _probeInFlight = false;
+                var current = Volatile.Read(ref _snapshot);
+                var consecutiveErrors = current.ConsecutiveErrors == int.MaxValue
+                    ? int.MaxValue
+                    : current.ConsecutiveErrors + 1;
 
                 TimeSpan delay;
                 if (retryAfter.HasValue && retryAfter.Value > TimeSpan.Zero)
@@ -89,24 +93,43 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 }
                 else
                 {
-                    delay = CalculateFallback();
+                    delay = CalculateFallback(consecutiveErrors);
                 }
 
                 var now = _utcNow();
-                // Guard against overflow
                 var maxSafe = DateTimeOffset.MaxValue - now;
-                _nextProbeTime = now + (delay > maxSafe ? maxSafe : delay);
-                _state = GateState.Backoff;
+                var failed = new GateSnapshot(
+                    GateState.Backoff,
+                    consecutiveErrors,
+                    now + (delay > maxSafe ? maxSafe : delay),
+                    probeInFlight: false);
+
+                if (ReferenceEquals(Interlocked.CompareExchange(ref _snapshot, failed, current), current))
+                {
+                    return;
+                }
             }
         }
 
         internal void ReleaseProbe()
         {
-            lock (_lock)
+            while (true)
             {
-                if (_state == GateState.Probe)
+                var current = Volatile.Read(ref _snapshot);
+                if (current.State != GateState.Probe || !current.ProbeInFlight)
                 {
-                    _probeInFlight = false;
+                    return;
+                }
+
+                var released = new GateSnapshot(
+                    GateState.Probe,
+                    current.ConsecutiveErrors,
+                    current.NextProbeTime,
+                    probeInFlight: false);
+
+                if (ReferenceEquals(Interlocked.CompareExchange(ref _snapshot, released, current), current))
+                {
+                    return;
                 }
             }
         }
@@ -120,24 +143,57 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 || code >= 500 && code <= 599;
         }
 
-        private void TransitionIfReady()
+        private TimeSpan CalculateFallback(int consecutiveErrors)
         {
-            if (_state == GateState.Backoff && _utcNow() >= _nextProbeTime)
-            {
-                _state = GateState.Probe;
-                _probeInFlight = false;
-            }
-        }
-
-        private TimeSpan CalculateFallback()
-        {
-            var slot = (Math.Pow(2, _consecutiveErrors) - 1) / 2;
+            var slot = (Math.Pow(2, consecutiveErrors) - 1) / 2;
             var upperSeconds = Math.Max(
                 MinimumDelay.TotalSeconds,
                 Math.Min(slot * MinimumDelay.TotalSeconds, MaximumDelay.TotalSeconds));
-            var seconds = _random.Next(1, Math.Max(2, (int)Math.Ceiling(upperSeconds)));
+            var seconds = NextRandom(1, Math.Max(2, (int)Math.Ceiling(upperSeconds)));
             return TimeSpan.FromSeconds(
                 Math.Max(MinimumDelay.TotalSeconds, Math.Min(seconds, MaximumDelay.TotalSeconds)));
+        }
+
+        private int NextRandom(int minValue, int maxValue)
+        {
+            while (true)
+            {
+                var current = Volatile.Read(ref _randomState);
+                var next = unchecked((int)(((uint)current * 1664525U) + 1013904223U));
+                if (Interlocked.CompareExchange(ref _randomState, next, current) == current)
+                {
+                    return minValue + (int)((uint)next % (uint)(maxValue - minValue));
+                }
+            }
+        }
+
+        private sealed class GateSnapshot
+        {
+            internal GateSnapshot(
+                GateState state,
+                int consecutiveErrors,
+                DateTimeOffset nextProbeTime,
+                bool probeInFlight)
+            {
+                State = state;
+                ConsecutiveErrors = consecutiveErrors;
+                NextProbeTime = nextProbeTime;
+                ProbeInFlight = probeInFlight;
+            }
+
+            internal GateState State { get; }
+
+            internal int ConsecutiveErrors { get; }
+
+            internal DateTimeOffset NextProbeTime { get; }
+
+            internal bool ProbeInFlight { get; }
+
+            internal static GateSnapshot CreateClosed() => new GateSnapshot(
+                GateState.Closed,
+                consecutiveErrors: 0,
+                nextProbeTime: default,
+                probeInFlight: false);
         }
     }
 }

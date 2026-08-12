@@ -3,6 +3,8 @@
 
 using System;
 using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
 
@@ -171,6 +173,82 @@ public class Agent365TransmissionGateTests
         gate.RecordSuccess();
         gate.TryAcquire(out var ownsProbe).Should().BeTrue();
         ownsProbe.Should().BeFalse(); // Closed state, no probe ownership
+    }
+
+    [TestMethod]
+    public async Task SlowFailureCalculationDoesNotBlockClosedGateAcquire()
+    {
+        using var clockEntered = new ManualResetEventSlim();
+        using var releaseClock = new ManualResetEventSlim();
+        var gate = new Agent365TransmissionGate(
+            () =>
+            {
+                clockEntered.Set();
+                releaseClock.Wait();
+                return _now;
+            });
+
+        var failure = Task.Run(() => gate.RecordRetryableFailure(TimeSpan.FromSeconds(30)));
+        try
+        {
+            clockEntered.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+
+            var acquire = Task.Run(() => gate.TryAcquire(out _));
+            var completed = await Task.WhenAny(acquire, Task.Delay(TimeSpan.FromSeconds(1)));
+
+            completed.Should().Be(
+                acquire,
+                "calculating a failure transition must not serialize unrelated gate callers");
+            (await acquire).Should().BeTrue("the previously published state is still closed");
+        }
+        finally
+        {
+            releaseClock.Set();
+            await failure;
+        }
+    }
+
+    [TestMethod]
+    public async Task StaleFailureRecalculatesDeadlineAfterClosedStateIsRepublished()
+    {
+        using var firstClockEntered = new ManualResetEventSlim();
+        using var releaseFirstClock = new ManualResetEventSlim();
+        var firstClockCall = 0;
+        var originalNow = _now;
+        var gate = new Agent365TransmissionGate(
+            () =>
+            {
+                if (Interlocked.Increment(ref firstClockCall) == 1)
+                {
+                    firstClockEntered.Set();
+                    releaseFirstClock.Wait();
+                    return originalNow;
+                }
+
+                return _now;
+            });
+
+        var staleFailure = Task.Run(
+            () => gate.RecordRetryableFailure(TimeSpan.FromSeconds(30)));
+        try
+        {
+            firstClockEntered.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+
+            gate.RecordRetryableFailure(TimeSpan.FromMinutes(5));
+            gate.RecordSuccess();
+            Advance(TimeSpan.FromMinutes(1));
+
+            releaseFirstClock.Set();
+            await staleFailure;
+
+            gate.TryAcquire(out _).Should().BeFalse(
+                "a stale transition must retry against the newly published closed state and current time");
+        }
+        finally
+        {
+            releaseFirstClock.Set();
+            await staleFailure;
+        }
     }
 }
 
