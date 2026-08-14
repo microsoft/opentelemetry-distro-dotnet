@@ -113,5 +113,22 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         /// Default is 900,000 bytes.
         /// </summary>
         public long MaxPayloadBytes { get; set; } = 900_000;
+
+        /// <summary>
+        /// When true, disables the on-disk store-and-forward pipeline: undeliverable exports are dropped
+        /// instead of being persisted for later replay, and no background replay loop is started.
+        /// When false (default), the exporter persists failed/deferred exports and drains them on a
+        /// background cadence. If offline storage is enabled but its initialization fails, the exporter
+        /// logs the error and continues as if this were set to <c>true</c>.
+        /// Default is false.
+        /// </summary>
+        public bool DisableOfflineStorage { get; set; }
+
+        /// <summary>
+        /// Root directory for the on-disk store-and-forward pipeline. When null (default), a
+        /// per-user/per-process location is resolved automatically (LOCALAPPDATA/TEMP on Windows,
+        /// TMPDIR//var/tmp//tmp on Unix). Ignored when <see cref="DisableOfflineStorage"/> is true.
+        /// </summary>
+        public string? StorageDirectory { get; set; }
     }
 }
