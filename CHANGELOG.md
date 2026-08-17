@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Enable Customer SDK Stats by default. Set `APPLICATIONINSIGHTS_SDKSTATS_DISABLED=true` to opt out.
 - Flow the GenAI session id into GenAI scopes and add custom baggage propagation: `BaggageBuilder.CustomAttribute`/`CustomAttributes` register user-defined attributes that are propagated via W3C baggage and coalesced onto every GenAI span by `ActivityProcessor`. Custom keys are normalized (trimmed) so they resolve against the processor's lookup, keys containing the `,` delimiter are rejected, and the reserved internal key (`_internal.custom_keys`) is never registered as a custom attribute nor emitted as a span tag (even if present in ambient baggage) ([#116](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/116))
 - Filter extra attributes dynamically instead of against a static reserved-key list: `BaseDataBuilder.AddExtraAttributes` now skips any key already set by the builder on the span (`!attributes.ContainsKey(key)`), removing the hard-coded `ReservedAttributeKeys` set so newly added builder attributes are protected automatically ([#107](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/107))
 
