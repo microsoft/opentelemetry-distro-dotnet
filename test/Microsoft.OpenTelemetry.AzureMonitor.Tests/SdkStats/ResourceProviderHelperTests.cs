@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 {
-    [Collection(nameof(ResourceProviderHelperCollection))]
+    [Collection("EnvironmentVariableTests")]
     public class ResourceProviderHelperTests : IDisposable
     {
         // Snapshot existing env vars so we can restore them after the test.
@@ -83,11 +83,18 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         {
             Assert.Equal("Manual", ResourceProviderHelper.GetAttachMode());
         }
-    }
 
-    [CollectionDefinition(nameof(ResourceProviderHelperCollection), DisableParallelization = true)]
-    public class ResourceProviderHelperCollection
-    {
-        // Resource provider detection caches results process-wide; serialize tests.
+        [Theory]
+        [InlineData("Windows", "linux", "windows")]
+        [InlineData("Linux", "windows", "linux")]
+        [InlineData("linux", "linux", "linux")]
+        [InlineData(null, "linux", "linux")]
+        [InlineData("", "windows", "windows")]
+        [InlineData("Unknown", "osx", "osx")]
+        [InlineData("unknown", "windows", "windows")]
+        public void ResolveOperatingSystem_FallsBackToProcessOsWhenUnknownOrNull(string? vmOsType, string processOs, string expected)
+        {
+            Assert.Equal(expected, ResourceProviderHelper.ResolveOperatingSystem(vmOsType, processOs));
+        }
     }
 }

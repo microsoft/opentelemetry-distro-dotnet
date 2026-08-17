@@ -5,6 +5,7 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenTelemetry.AzureMonitor.SdkStats;
 using OpenTelemetry;
+using OpenTelemetry.Metrics;
 using Xunit;
 
 namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
@@ -12,32 +13,34 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
     /// <summary>
     /// Tests for <see cref="SdkStatsPin"/> and the eager-pin glue in
     /// <see cref="MicrosoftOpenTelemetryBuilderExtensions.UseMicrosoftOpenTelemetry{TBuilder}"/>.
-    /// The pin is a process-wide singleton that triggers the Azure Monitor exporter's
-    /// SDK Stats MeterProvider (and the Attach observable gauge it owns) as a ctor-time
-    /// side effect of an inert <c>AzureMonitorMetricExporter</c>. Reuses the
-    /// non-parallel <see cref="DistroFeatureSdkStatsCollection"/> so other tests in the
-    /// SdkStats namespace don't race on the process-wide singleton state.
+    /// In the shared non-parallel <c>EnvironmentVariableTests</c> collection to avoid env-var races.
     /// </summary>
-    [Collection(nameof(DistroFeatureSdkStatsCollection))]
+    [Collection("EnvironmentVariableTests")]
     public class SdkStatsPinTests : IDisposable
     {
         private const string KillSwitchEnvVar = "APPLICATIONINSIGHTS_STATSBEAT_DISABLED";
+        private const string DisabledAllEnvVar = "APPLICATIONINSIGHTS_SDKSTATS_DISABLED_ALL";
 
         private readonly string? _previousKillSwitch;
+        private readonly string? _previousDisabledAll;
 
         public SdkStatsPinTests()
         {
             _previousKillSwitch = Environment.GetEnvironmentVariable(KillSwitchEnvVar);
+            _previousDisabledAll = Environment.GetEnvironmentVariable(DisabledAllEnvVar);
             // Default each test to "stats off" so we don't fire real HTTP traffic during
             // CI unless the test explicitly opts in by clearing the env var.
             Environment.SetEnvironmentVariable(KillSwitchEnvVar, "true");
+            Environment.SetEnvironmentVariable(DisabledAllEnvVar, null);
             SdkStatsPin.ResetForTesting();
         }
 
         public void Dispose()
         {
             SdkStatsPin.ResetForTesting();
+            DistroFeatureSdkStats.ResetForTesting();
             Environment.SetEnvironmentVariable(KillSwitchEnvVar, _previousKillSwitch);
+            Environment.SetEnvironmentVariable(DisabledAllEnvVar, _previousDisabledAll);
         }
 
         [Fact]
@@ -158,6 +161,74 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             });
 
             Assert.False(SdkStatsPin.IsInitializedForTesting);
+        }
+
+        [Fact]
+        public void EnsureIfApplicable_HonorsDisabledAllKillSwitch()
+        {
+            // The pin must honor the disabled-all kill switch.
+            Environment.SetEnvironmentVariable(KillSwitchEnvVar, null);
+            Environment.SetEnvironmentVariable(DisabledAllEnvVar, "true");
+
+            SdkStatsPin.EnsureIfApplicable(ExportTarget.Otlp);
+
+            Assert.False(SdkStatsPin.IsInitializedForTesting);
+        }
+
+        [Fact]
+        public void UseMicrosoftOpenTelemetry_HonorsDisabledAllKillSwitch()
+        {
+            Environment.SetEnvironmentVariable(KillSwitchEnvVar, null);
+            Environment.SetEnvironmentVariable(DisabledAllEnvVar, "true");
+
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry().UseMicrosoftOpenTelemetry(o =>
+            {
+                o.Exporters = ExportTarget.Otlp;
+            });
+
+            Assert.False(SdkStatsPin.IsInitializedForTesting);
+        }
+
+        [Fact]
+        public void UseMicrosoftOpenTelemetry_DisabledAll_DoesNotInitializeDistroFeatureProducer()
+        {
+            // Disabled-all must also gate the deferred Feature producer registration.
+            Environment.SetEnvironmentVariable(KillSwitchEnvVar, null);
+            Environment.SetEnvironmentVariable(DisabledAllEnvVar, "true");
+            DistroFeatureSdkStats.ResetForTesting();
+
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry().UseMicrosoftOpenTelemetry(o =>
+            {
+                o.Exporters = ExportTarget.Otlp;
+            });
+
+            using var sp = services.BuildServiceProvider();
+            // Runs the deferred MeterProvider callback.
+            _ = sp.GetRequiredService<MeterProvider>();
+
+            Assert.Null(DistroFeatureSdkStats.Instance);
+        }
+
+        [Fact]
+        public void UseMicrosoftOpenTelemetry_WithoutDisabledAll_InitializesDistroFeatureProducer()
+        {
+            // Positive control.
+            Environment.SetEnvironmentVariable(KillSwitchEnvVar, null);
+            Environment.SetEnvironmentVariable(DisabledAllEnvVar, null);
+            DistroFeatureSdkStats.ResetForTesting();
+
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry().UseMicrosoftOpenTelemetry(o =>
+            {
+                o.Exporters = ExportTarget.Otlp;
+            });
+
+            using var sp = services.BuildServiceProvider();
+            _ = sp.GetRequiredService<MeterProvider>();
+
+            Assert.NotNull(DistroFeatureSdkStats.Instance);
         }
     }
 }

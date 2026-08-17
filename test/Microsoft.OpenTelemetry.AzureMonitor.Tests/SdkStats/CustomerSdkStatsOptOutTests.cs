@@ -8,6 +8,9 @@ using Xunit;
 
 namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 {
+    // Guards the on-by-default opt-out semantics of customer SDK stats. This is a behavior
+    // change that is easy to regress (e.g. accidental inversion back to opt-in), so the
+    // env-var parsing and its mapping onto the CustomerSdkStats feature bit are pinned here.
     [Collection(nameof(CustomerSdkStatsOptOutCollection))]
     public class CustomerSdkStatsOptOutTests : IDisposable
     {
@@ -31,11 +34,11 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         }
 
         [Theory]
-        [InlineData(null)]
-        [InlineData("")]
-        [InlineData("false")]
+        [InlineData(null)]      // unset => enabled (on by default)
+        [InlineData("")]        // empty => enabled
+        [InlineData("false")]   // explicit opt-in value => enabled
         [InlineData("False")]
-        [InlineData("0")]
+        [InlineData("0")]       // only the literal "true" opts out
         [InlineData("yes")]
         public void IsCustomerSdkStatsEnabled_ReturnsTrue_WhenNotDisabled(string? value)
         {

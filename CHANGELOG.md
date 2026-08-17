@@ -2,7 +2,13 @@
 
 ## Unreleased
 
-- Enable Customer SDK Stats by default. Set `APPLICATIONINSIGHTS_SDKSTATS_DISABLED=true` to opt out.
+- Add durable Agent365 store-and-forward delivery with bounded local storage, restart replay, adaptive shared backoff, and draining shutdown for the asynchronous processor.
+- Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.8.3, enabling Customer SDK Stats by default; the distro reports the `CustomerSdkStats` feature bit unless `APPLICATIONINSIGHTS_SDKSTATS_DISABLED=true`.
+- Prefix the distro-owned SDK Stats `version` dimension with the `mot` component label (e.g. `mot1.0.6`) so Feature and Network SDK Stats report the highest-level emitting component per the SDK Version spec, matching the Azure Monitor exporter's format.
+
+## 1.0.7 - 2026-07-13
+
+- Subscribe to the `Experimental.Microsoft.Extensions.AI` source (and meter) in `UseAgentFramework()` so the inference (`chat`) span emitted by the underlying `IChatClient` is captured alongside `invoke_agent` and `execute_tool`, giving full Agent 365 span coverage ([#115](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/115))
 - Flow the GenAI session id into GenAI scopes and add custom baggage propagation: `BaggageBuilder.CustomAttribute`/`CustomAttributes` register user-defined attributes that are propagated via W3C baggage and coalesced onto every GenAI span by `ActivityProcessor`. Custom keys are normalized (trimmed) so they resolve against the processor's lookup, keys containing the `,` delimiter are rejected, and the reserved internal key (`_internal.custom_keys`) is never registered as a custom attribute nor emitted as a span tag (even if present in ambient baggage) ([#116](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/116))
 - Filter extra attributes dynamically instead of against a static reserved-key list: `BaseDataBuilder.AddExtraAttributes` now skips any key already set by the builder on the span (`!attributes.ContainsKey(key)`), removing the hard-coded `ReservedAttributeKeys` set so newly added builder attributes are protected automatically ([#107](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/107))
 

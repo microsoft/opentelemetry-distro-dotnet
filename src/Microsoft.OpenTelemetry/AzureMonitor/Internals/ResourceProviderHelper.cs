@@ -135,8 +135,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Internals
 
                 if (document.RootElement.TryGetProperty("osType", out var osType) && osType.ValueKind == JsonValueKind.String)
                 {
-                    var value = osType.GetString();
-                    s_operatingSystem = string.IsNullOrEmpty(value) ? "unknown" : value!.ToLowerInvariant();
+                    s_operatingSystem = ResolveOperatingSystem(osType.GetString(), s_operatingSystem);
                 }
 
                 return true;
@@ -147,6 +146,21 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Internals
                 // fall back to "unknown" — this is best-effort telemetry, not user-visible.
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Returns the IMDS <paramref name="vmOsType"/> when it is a concrete value, otherwise
+        /// <paramref name="processOperatingSystem"/> (when null/empty or "Unknown").
+        /// </summary>
+        internal static string ResolveOperatingSystem(string? vmOsType, string processOperatingSystem)
+        {
+            if (!string.IsNullOrEmpty(vmOsType)
+                && !string.Equals(vmOsType, "unknown", StringComparison.OrdinalIgnoreCase))
+            {
+                return vmOsType!.ToLowerInvariant();
+            }
+
+            return processOperatingSystem;
         }
 
         private static string GetOs()

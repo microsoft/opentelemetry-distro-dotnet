@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 {
-    [Collection(nameof(DistroFeatureSdkStatsCollection))]
+    [Collection("EnvironmentVariableTests")]
     public class DistroSdkStatsRoutingSwitchTests
     {
         private const string SwitchName = "Azure.Monitor.OpenTelemetry.Exporter.RouteSdkStatsToDistroEndpoint";

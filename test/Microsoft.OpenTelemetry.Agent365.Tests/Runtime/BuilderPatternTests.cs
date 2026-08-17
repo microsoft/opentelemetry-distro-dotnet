@@ -1,7 +1,9 @@
 using FluentAssertions;
 using Microsoft.Agents.A365.Observability.Runtime;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using global::OpenTelemetry.Trace;
 
 namespace Microsoft.Agents.A365.Observability.Tests;
 
@@ -46,5 +48,28 @@ public sealed class BuilderPatternTests
 
         result.Should().NotBeNull();
         result.Should().BeSameAs(builder);
+    }
+
+    [TestMethod]
+    public void AddTracing_WithOfflineStorageDisabled_BuildsAndDisposesProviderCleanly()
+    {
+        var builder = new HostApplicationBuilder();
+        builder.Configuration["EnableAgent365Exporter"] = "true";
+        builder.Services.AddSingleton(new Agent365ExporterOptions
+        {
+            TokenResolver = (_, _) => Task.FromResult<string?>("unit-test-token"),
+            DisableOfflineStorage = true,
+        });
+
+        builder.AddA365Tracing();
+
+        using var host = builder.Build();
+
+        // Resolving the TracerProvider forces the deferred exporter configuration to run, wiring durable
+        // delivery. With offline storage disabled it must build without creating an on-disk store or
+        // starting a replay loop, and dispose cleanly when the host is disposed.
+        var tracerProvider = host.Services.GetService<TracerProvider>();
+
+        tracerProvider.Should().NotBeNull();
     }
 }
