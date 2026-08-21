@@ -98,6 +98,25 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         }
 
         [Fact]
+        public void Build_PreservesConfigurationBasedLiveMetricsAndAgentFrameworkSemantics()
+        {
+            var options = new MicrosoftOpenTelemetryOptions();
+            options.AzureMonitor.EnableLiveMetrics = true;
+
+            var snapshot = DistroFeatureSnapshot.Build(
+                options,
+                ValidConnectionString,
+                ExportTarget.AzureMonitor,
+                customerSdkStatsEnabled: false,
+                a365OnlyMode: false,
+                distroVersion: "1.0.0");
+
+            Assert.NotNull(snapshot);
+            Assert.True(snapshot!.Features.HasFlag(DistroFeature.LiveMetrics));
+            Assert.True(snapshot.Features.HasFlag(DistroFeature.AgentFramework));
+        }
+
+        [Fact]
         public void Build_WithAllExportersAndCustomerSdkStats_SetsAllExpectedBits()
         {
             var options = new MicrosoftOpenTelemetryOptions();
