@@ -5,6 +5,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenTelemetry.AzureMonitor.SdkStats;
 using Xunit;
 
@@ -72,6 +76,280 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             var measurements = CollectObservableMeasurements();
 
             Assert.Empty(measurements);
+        }
+
+        [Fact]
+        public void Observe_InstrumentationIsAbsentUntilActualUseAndThenUsesTypeOne()
+        {
+            var snapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.None,
+                customerInstrumentationKey: "N/A",
+                distroVersion: "9.9.9-instrumentation");
+            DistroFeatureSdkStats.Initialize(snapshot);
+
+            Assert.Empty(CollectObservableMeasurements());
+
+            DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.HttpClient);
+
+            var measurement = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal((long)DistroInstrumentation.HttpClient, measurement.value);
+            Assert.Equal((long)DistroInstrumentation.HttpClient, measurement.tags["feature"]);
+            Assert.Equal(1, measurement.tags["type"]);
+        }
+
+        [Fact]
+        public void Observe_LiveMetricsIsAbsentUntilActiveCollectionPostStarts()
+        {
+            var options = new MicrosoftOpenTelemetryOptions();
+            options.AzureMonitor.EnableLiveMetrics = true;
+            var configuredSnapshot = DistroFeatureSnapshot.Build(
+                options,
+                ValidConnectionString,
+                ExportTarget.AzureMonitor,
+                customerSdkStatsEnabled: false,
+                a365OnlyMode: false,
+                distroVersion: "9.9.9-live");
+
+            Assert.False(configuredSnapshot!.Features.HasFlag(DistroFeature.LiveMetrics));
+
+            var emptySnapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.None,
+                customerInstrumentationKey: "N/A",
+                distroVersion: "9.9.9-live");
+            DistroFeatureSdkStats.Initialize(emptySnapshot);
+
+            LiveMetricsUsageTrackingTransport.TrackRequest(
+                Azure.Core.RequestMethod.Post,
+                new Uri("https://example.test/QuickPulseService.svc/ping"));
+            Assert.Empty(CollectObservableMeasurements());
+
+            LiveMetricsUsageTrackingTransport.TrackRequest(
+                Azure.Core.RequestMethod.Post,
+                new Uri("https://example.test/QuickPulseService.svc/post"));
+
+            var measurement = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal((long)DistroFeature.LiveMetrics, measurement.value);
+            Assert.Equal(0, measurement.tags["type"]);
+        }
+
+        [Fact]
+        public void AzureMonitorOptions_WiresLiveMetricsUsageTrackingTransport()
+        {
+            var options = new AzureMonitorOptions();
+            var exporterOptions =
+                new Azure.Monitor.OpenTelemetry.Exporter.AzureMonitorExporterOptions();
+
+            options.SetValueToExporterOptions(exporterOptions);
+
+            Assert.IsType<LiveMetricsUsageTrackingTransport>(exporterOptions.Transport);
+        }
+
+        [Fact]
+        public void AzureMonitorOptions_PreservesPreconfiguredExporterTransport()
+        {
+            var options = new AzureMonitorOptions();
+            using var configuredTransport = new Azure.Core.Pipeline.HttpClientTransport(
+                new System.Net.Http.HttpClient());
+            var exporterOptions =
+                new Azure.Monitor.OpenTelemetry.Exporter.AzureMonitorExporterOptions
+                {
+                    Transport = configuredTransport,
+                };
+
+            options.SetValueToExporterOptions(exporterOptions);
+
+            var trackingTransport =
+                Assert.IsType<LiveMetricsUsageTrackingTransport>(exporterOptions.Transport);
+            Assert.Same(configuredTransport, trackingTransport.InnerTransport);
+        }
+
+        [Fact]
+        public void AzureMonitorOptions_ExplicitTransportOverridesPreconfiguredExporterTransport()
+        {
+            using var optionsTransport = new Azure.Core.Pipeline.HttpClientTransport(
+                new System.Net.Http.HttpClient());
+            using var exporterTransport = new Azure.Core.Pipeline.HttpClientTransport(
+                new System.Net.Http.HttpClient());
+            var options = new AzureMonitorOptions
+            {
+                Transport = optionsTransport,
+            };
+            var exporterOptions =
+                new Azure.Monitor.OpenTelemetry.Exporter.AzureMonitorExporterOptions
+                {
+                    Transport = exporterTransport,
+                };
+
+            options.SetValueToExporterOptions(exporterOptions);
+
+            var trackingTransport =
+                Assert.IsType<LiveMetricsUsageTrackingTransport>(exporterOptions.Transport);
+            Assert.Same(optionsTransport, trackingTransport.InnerTransport);
+        }
+
+        [Fact]
+        public void AzureMonitorOptions_PreservesExporterTransportWhenGlobalDefaultChanges()
+        {
+            var originalDefault = Azure.Core.ClientOptions.Default.Transport;
+            var options = new AzureMonitorOptions();
+            using var newDefault = new Azure.Core.Pipeline.HttpClientTransport(
+                new System.Net.Http.HttpClient());
+
+            try
+            {
+                Azure.Core.ClientOptions.Default.Transport = newDefault;
+                var exporterOptions =
+                    new Azure.Monitor.OpenTelemetry.Exporter.AzureMonitorExporterOptions();
+
+                options.SetValueToExporterOptions(exporterOptions);
+
+                var trackingTransport =
+                    Assert.IsType<LiveMetricsUsageTrackingTransport>(exporterOptions.Transport);
+                Assert.Same(newDefault, trackingTransport.InnerTransport);
+            }
+            finally
+            {
+                Azure.Core.ClientOptions.Default.Transport = originalDefault;
+            }
+        }
+
+        [Fact]
+        public void AzureMonitorOptions_TracksExplicitAssignmentOfInheritedTransport()
+        {
+            var originalDefault = Azure.Core.ClientOptions.Default.Transport;
+            var options = new AzureMonitorOptions();
+            var explicitlyAssignedTransport = options.Transport;
+            options.Transport = explicitlyAssignedTransport;
+            using var newDefault = new Azure.Core.Pipeline.HttpClientTransport(
+                new System.Net.Http.HttpClient());
+
+            try
+            {
+                Azure.Core.ClientOptions.Default.Transport = newDefault;
+                var exporterOptions =
+                    new Azure.Monitor.OpenTelemetry.Exporter.AzureMonitorExporterOptions();
+
+                options.SetValueToExporterOptions(exporterOptions);
+
+                var trackingTransport =
+                    Assert.IsType<LiveMetricsUsageTrackingTransport>(exporterOptions.Transport);
+                Assert.Same(explicitlyAssignedTransport, trackingTransport.InnerTransport);
+            }
+            finally
+            {
+                Azure.Core.ClientOptions.Default.Transport = originalDefault;
+            }
+        }
+
+        [Fact]
+        public void UseMicrosoftOpenTelemetry_PropagatesExplicitAzureMonitorTransport()
+        {
+            using var configuredTransport = new Azure.Core.Pipeline.HttpClientTransport(
+                new System.Net.Http.HttpClient());
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry().UseMicrosoftOpenTelemetry(options =>
+            {
+                options.Exporters = ExportTarget.AzureMonitor;
+                options.AzureMonitor.ConnectionString = ValidConnectionString;
+                options.AzureMonitor.Transport = configuredTransport;
+            });
+
+            using var serviceProvider = services.BuildServiceProvider();
+            var exporterOptions = serviceProvider
+                .GetRequiredService<IOptionsMonitor<Azure.Monitor.OpenTelemetry.Exporter.AzureMonitorExporterOptions>>()
+                .CurrentValue;
+
+            var trackingTransport =
+                Assert.IsType<LiveMetricsUsageTrackingTransport>(exporterOptions.Transport);
+            Assert.Same(configuredTransport, trackingTransport.InnerTransport);
+        }
+
+        [Fact]
+        public async Task Initialize_SynchronizesSnapshotAndUsageWithObserve()
+        {
+            var initialSnapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.Distro,
+                customerInstrumentationKey: "old-cikey",
+                distroVersion: "1.0.0");
+            var instance = DistroFeatureSdkStats.Initialize(initialSnapshot);
+            Assert.Single(CollectObservableMeasurements());
+
+            var updatedSnapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.Distro | DistroFeature.LiveMetrics,
+                customerInstrumentationKey: "new-cikey",
+                distroVersion: "2.0.0");
+            var emissionLock = typeof(DistroFeatureSdkStats)
+                .GetField("_emissionLock", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .GetValue(instance)!;
+            using var started = new ManualResetEventSlim();
+
+            Task<DistroFeatureSdkStats>? update = null;
+            Monitor.Enter(emissionLock);
+            try
+            {
+                update = Task.Run(() =>
+                {
+                    started.Set();
+                    return DistroFeatureSdkStats.Initialize(updatedSnapshot);
+                });
+                Assert.True(started.Wait(TimeSpan.FromSeconds(5)));
+                Thread.Sleep(TimeSpan.FromMilliseconds(100));
+                Assert.False(
+                    update.IsCompleted,
+                    "Initialize must wait for the same lock used by Observe before publishing new usage.");
+            }
+            finally
+            {
+                Monitor.Exit(emissionLock);
+            }
+
+            Assert.Same(instance, await update!);
+
+            var measurement = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal(
+                (long)(DistroFeature.Distro | DistroFeature.LiveMetrics),
+                measurement.value);
+            Assert.Equal("new-cikey", measurement.tags["cikey"]);
+            Assert.Equal("mot2.0.0", measurement.tags["version"]);
+        }
+
+        [Fact]
+        public void UsageTracker_UpdatesConcurrentlyAndNeverClearsObservedBits()
+        {
+            Parallel.Invoke(
+                () => DistroSdkStatsUsage.MarkFeatureInUse(DistroFeature.LiveMetrics),
+                () => DistroSdkStatsUsage.MarkFeatureInUse(DistroFeature.AgentFramework),
+                () => DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.HttpClient),
+                () => DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.SqlClient));
+
+            DistroSdkStatsUsage.MarkFeatureInUse(DistroFeature.LiveMetrics);
+            DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.HttpClient);
+
+            Assert.Equal(
+                DistroFeature.LiveMetrics | DistroFeature.AgentFramework,
+                DistroSdkStatsUsage.Features);
+            Assert.Equal(
+                DistroInstrumentation.HttpClient | DistroInstrumentation.SqlClient,
+                DistroSdkStatsUsage.Instrumentations);
+        }
+
+        [Fact]
+        public void Observe_NewUsageEmitsImmediatelyWithoutWaitingForLongInterval()
+        {
+            var snapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.Distro,
+                customerInstrumentationKey: "N/A",
+                distroVersion: "9.9.9-dynamic");
+            DistroFeatureSdkStats.Initialize(snapshot);
+
+            var initial = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal((long)DistroFeature.Distro, initial.value);
+
+            DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.HttpClient);
+
+            var update = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal((long)DistroInstrumentation.HttpClient, update.value);
+            Assert.Equal(1, update.tags["type"]);
         }
 
         [Fact]
@@ -149,6 +427,36 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         }
 
         [Fact]
+        public void Observe_ConcurrentCallbacksEmitOnlyOncePerUnchangedMask()
+        {
+            var snapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.Distro,
+                customerInstrumentationKey: "N/A",
+                distroVersion: "9.9.9-concurrent");
+            DistroFeatureSdkStats.Initialize(snapshot);
+
+            int emissions = 0;
+            using var listener = new MeterListener
+            {
+                InstrumentPublished = (instrument, l) =>
+                {
+                    if (instrument.Meter.Name == DistroFeatureSdkStats.MeterName
+                        && instrument.Name == DistroFeatureSdkStats.MetricName)
+                    {
+                        l.EnableMeasurementEvents(instrument);
+                    }
+                },
+            };
+            listener.SetMeasurementEventCallback<long>(
+                (_, _, _, _) => Interlocked.Increment(ref emissions));
+            listener.Start();
+
+            Parallel.For(0, 16, _ => listener.RecordObservableInstruments());
+
+            Assert.Equal(1, emissions);
+        }
+
+        [Fact]
         public void Observe_EmitsAgain_WhenClockJumpsBackwards()
         {
             // Simulate the last emission being recorded ~48 hr in the future, i.e. the wall
@@ -170,7 +478,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             var instance = DistroFeatureSdkStats.Instance!;
             long futureTicks = DateTime.UtcNow.Ticks + TimeSpan.FromHours(48).Ticks;
             typeof(DistroFeatureSdkStats)
-                .GetField("_lastEmissionTicks", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .GetField("_lastFeatureEmissionTicks", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .SetValue(instance, futureTicks);
 
             var measurements = CollectObservableMeasurements();
@@ -207,7 +515,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
                 var instance = DistroFeatureSdkStats.Instance!;
                 long twoSecondsAgo = DateTime.UtcNow.Ticks - TimeSpan.FromSeconds(2).Ticks;
                 typeof(DistroFeatureSdkStats)
-                    .GetField("_lastEmissionTicks", BindingFlags.NonPublic | BindingFlags.Instance)!
+                    .GetField("_lastFeatureEmissionTicks", BindingFlags.NonPublic | BindingFlags.Instance)!
                     .SetValue(instance, twoSecondsAgo);
 
                 Assert.Single(CollectObservableMeasurements());

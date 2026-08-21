@@ -6,9 +6,10 @@ using System;
 namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 {
     /// <summary>
-    /// Immutable snapshot of the distro feature flags reported on a given
-    /// <c>UseMicrosoftOpenTelemetry</c> invocation, plus the customer instrumentation key
-    /// extracted from the Azure Monitor connection string.
+    /// Immutable snapshot of startup facts reported on a given
+    /// <c>UseMicrosoftOpenTelemetry</c> invocation, plus the customer instrumentation key.
+    /// Runtime-observable usage such as Live Metrics active collection and instrumentation
+    /// telemetry is deliberately tracked separately by <see cref="DistroSdkStatsUsage"/>.
     /// </summary>
     internal sealed class DistroFeatureSnapshot
     {
@@ -29,7 +30,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
         /// <summary>
         /// Test-only factory that constructs a snapshot with an arbitrary feature bit mask.
         /// <see cref="Build"/> always sets at least
-        /// <see cref="DistroFeature.Distro"/> | <see cref="DistroFeature.AgentFramework"/>, so
+        /// <see cref="DistroFeature.Distro"/>, so
         /// tests that need to exercise the spec-mandated empty-features short-circuit (which
         /// <see cref="Build"/> can never produce) use this entry point.
         /// </summary>
@@ -39,7 +40,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             string distroVersion) =>
             new DistroFeatureSnapshot(features, customerInstrumentationKey, distroVersion);
 
-        /// <summary>Bit map of distro features enabled in the current process.</summary>
+        /// <summary>Bit map of startup/configuration facts active in the current process.</summary>
         internal DistroFeature Features { get; }
 
         /// <summary>Customer instrumentation key (without the surrounding connection-string envelope).</summary>
@@ -92,35 +93,36 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 
             var features = DistroFeature.Distro;
 
-            // AzureMonitor-scoped feature flags.
-            if (options.AzureMonitor.Credential != null)
+            // Azure Monitor options represent actual constructed behavior only when that
+            // exporter is selected. LiveMetrics is intentionally excluded here: enabling it
+            // starts silent pinging, while usage begins only after the service subscribes and
+            // the SDK enters active collection.
+            if (effectiveExporters.HasFlag(ExportTarget.AzureMonitor))
             {
-                features |= DistroFeature.AadHandling;
-            }
+                if (options.AzureMonitor.Credential != null)
+                {
+                    features |= DistroFeature.AadHandling;
+                }
 
-            if (options.AzureMonitor.EnableLiveMetrics)
-            {
-                features |= DistroFeature.LiveMetrics;
-            }
+                if (options.AzureMonitor.EnableStandardMetrics)
+                {
+                    features |= DistroFeature.StandardMetrics;
+                }
 
-            if (options.AzureMonitor.EnableStandardMetrics)
-            {
-                features |= DistroFeature.StandardMetrics;
-            }
+                if (options.AzureMonitor.EnablePerfCounters)
+                {
+                    features |= DistroFeature.PerfCounters;
+                }
 
-            if (options.AzureMonitor.EnablePerfCounters)
-            {
-                features |= DistroFeature.PerfCounters;
-            }
+                if (!options.AzureMonitor.DisableOfflineStorage)
+                {
+                    features |= DistroFeature.DiskRetry;
+                }
 
-            if (!options.AzureMonitor.DisableOfflineStorage)
-            {
-                features |= DistroFeature.DiskRetry;
-            }
-
-            if (options.AzureMonitor.EnableTraceBasedLogsSampler)
-            {
-                features |= DistroFeature.TraceBasedLogsSampler;
+                if (options.AzureMonitor.EnableTraceBasedLogsSampler)
+                {
+                    features |= DistroFeature.TraceBasedLogsSampler;
+                }
             }
 
             if (customerSdkStatsEnabled)
@@ -148,9 +150,6 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             {
                 features |= DistroFeature.ExporterConsole;
             }
-
-            // Distro behavior flags.
-            features |= DistroFeature.AgentFramework; // UseAgentFramework is unconditional today.
 
             if (a365OnlyMode)
             {
