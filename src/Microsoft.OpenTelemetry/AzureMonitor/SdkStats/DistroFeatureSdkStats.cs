@@ -27,7 +27,8 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
     /// </para>
     /// <para>
     /// Per the SDKStats specification, the gauge returns no measurements when the
-    /// current feature and instrumentation bit masks are both empty. The
+    /// current snapshot features combined with runtime-observed features and the current
+    /// instrumentation bit mask are all empty. The
     /// <see cref="Func{TResult}"/> of <see cref="IEnumerable{T}"/> overload is used (not the
     /// single-<c>Measurement</c> overload) so an empty result actually skips emission
     /// instead of publishing a phantom zero-valued data point with no tags.
@@ -69,6 +70,8 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
         private long _lastInstrumentationEmissionTicks;
         private DistroFeature _lastEmittedFeatures;
         private DistroInstrumentation _lastEmittedInstrumentations;
+        private DistroFeatureSnapshot? _lastFeatureSnapshot;
+        private DistroFeatureSnapshot? _lastInstrumentationSnapshot;
 
         private DistroFeatureSdkStats(DistroFeatureSnapshot snapshot)
         {
@@ -132,21 +135,13 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             {
                 if (s_instance is null)
                 {
-                    var created = new DistroFeatureSdkStats(snapshot);
-                    lock (created._emissionLock)
-                    {
-                        DistroSdkStatsUsage.MarkFeatureInUse(snapshot.Features);
-                        s_instance = created;
-                    }
+                    s_instance = new DistroFeatureSdkStats(snapshot);
                 }
                 else
                 {
-                    // Publish context before its corresponding usage bits while holding the
-                    // same lock as Observe so masks and tags always come from one state.
                     lock (s_instance._emissionLock)
                     {
                         Volatile.Write(ref s_instance._snapshot, snapshot);
-                        DistroSdkStatsUsage.MarkFeatureInUse(snapshot.Features);
                     }
                 }
 
@@ -175,42 +170,79 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 
         private IEnumerable<Measurement<long>> Observe()
         {
+            bool emissionNeeded;
             lock (_emissionLock)
             {
-                DistroFeatureSnapshot snapshot;
-                DistroFeature features;
-                DistroInstrumentation instrumentations;
                 try
                 {
-                    snapshot = Volatile.Read(ref _snapshot);
-                    features = DistroSdkStatsUsage.Features;
-                    instrumentations = DistroSdkStatsUsage.Instrumentations;
-                    if (features == DistroFeature.None
-                        && instrumentations == DistroInstrumentation.None)
-                    {
-                        // SDKStats spec: "Don't send feature/instrumentation SDKStats when the
-                        // feature/instrumentation list is empty." Returning an empty enumerable
-                        // (not a default Measurement) is required to truly skip emission for
-                        // this collection cycle.
-                        return EmptyMeasurements;
-                    }
+                    var snapshot = Volatile.Read(ref _snapshot);
+                    var features = snapshot.Features | DistroSdkStatsUsage.Features;
+                    var instrumentations = DistroSdkStatsUsage.Instrumentations;
+                    long nowTicks = DateTime.UtcNow.Ticks;
+                    emissionNeeded =
+                        ShouldEmit(
+                            (ulong)features,
+                            (ulong)_lastEmittedFeatures,
+                            _lastFeatureEmissionTicks,
+                            snapshot,
+                            _lastFeatureSnapshot,
+                            nowTicks)
+                        || ShouldEmit(
+                            (ulong)instrumentations,
+                            (ulong)_lastEmittedInstrumentations,
+                            _lastInstrumentationEmissionTicks,
+                            snapshot,
+                            _lastInstrumentationSnapshot,
+                            nowTicks);
                 }
                 catch (Exception ex)
                 {
                     AzureMonitorAspNetCoreEventSource.Log.DistroFeatureSdkStatsCallbackFailed(ex);
                     return EmptyMeasurements;
                 }
+            }
 
+            if (!emissionNeeded)
+            {
+                return EmptyMeasurements;
+            }
+
+            string resourceProvider;
+            string attachMode;
+            string operatingSystem;
+            try
+            {
+                // The first resource-provider lookup may perform IMDS discovery. Keep that
+                // potentially blocking work outside the emission lock, then revalidate below.
+                resourceProvider = ResourceProviderHelper.GetResourceProvider();
+                attachMode = ResourceProviderHelper.GetAttachMode();
+                operatingSystem = ResourceProviderHelper.GetOperatingSystem();
+            }
+            catch (Exception ex)
+            {
+                AzureMonitorAspNetCoreEventSource.Log.DistroFeatureSdkStatsCallbackFailed(ex);
+                return EmptyMeasurements;
+            }
+
+            lock (_emissionLock)
+            {
+                var snapshot = Volatile.Read(ref _snapshot);
+                var features = snapshot.Features | DistroSdkStatsUsage.Features;
+                var instrumentations = DistroSdkStatsUsage.Instrumentations;
                 long nowTicks = DateTime.UtcNow.Ticks;
                 bool emitFeatures = ShouldEmit(
                     (ulong)features,
                     (ulong)_lastEmittedFeatures,
                     _lastFeatureEmissionTicks,
+                    snapshot,
+                    _lastFeatureSnapshot,
                     nowTicks);
                 bool emitInstrumentations = ShouldEmit(
                     (ulong)instrumentations,
                     (ulong)_lastEmittedInstrumentations,
                     _lastInstrumentationEmissionTicks,
+                    snapshot,
+                    _lastInstrumentationSnapshot,
                     nowTicks);
 
                 if (!emitFeatures && !emitInstrumentations)
@@ -223,24 +255,38 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
                     var measurements = new List<Measurement<long>>(2);
                     if (emitInstrumentations)
                     {
-                        measurements.Add(CreateMeasurement((long)instrumentations, type: 1, snapshot));
+                        measurements.Add(CreateMeasurement(
+                            (long)instrumentations,
+                            type: 1,
+                            snapshot,
+                            resourceProvider,
+                            attachMode,
+                            operatingSystem));
                     }
 
                     if (emitFeatures)
                     {
-                        measurements.Add(CreateMeasurement((long)features, type: 0, snapshot));
+                        measurements.Add(CreateMeasurement(
+                            (long)features,
+                            type: 0,
+                            snapshot,
+                            resourceProvider,
+                            attachMode,
+                            operatingSystem));
                     }
 
                     if (emitInstrumentations)
                     {
                         _lastEmittedInstrumentations = instrumentations;
                         _lastInstrumentationEmissionTicks = nowTicks;
+                        _lastInstrumentationSnapshot = snapshot;
                     }
 
                     if (emitFeatures)
                     {
                         _lastEmittedFeatures = features;
                         _lastFeatureEmissionTicks = nowTicks;
+                        _lastFeatureSnapshot = snapshot;
                     }
 
                     return measurements;
@@ -257,6 +303,8 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             ulong currentMask,
             ulong lastEmittedMask,
             long lastEmissionTicks,
+            DistroFeatureSnapshot currentSnapshot,
+            DistroFeatureSnapshot? lastEmissionSnapshot,
             long nowTicks)
         {
             if (currentMask == 0)
@@ -264,7 +312,8 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
                 return false;
             }
 
-            if (currentMask != lastEmittedMask)
+            if (currentMask != lastEmittedMask
+                || !ReferenceEquals(currentSnapshot, lastEmissionSnapshot))
             {
                 return true;
             }
@@ -278,15 +327,18 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
         private static Measurement<long> CreateMeasurement(
             long mask,
             int type,
-            DistroFeatureSnapshot snapshot) =>
+            DistroFeatureSnapshot snapshot,
+            string resourceProvider,
+            string attachMode,
+            string operatingSystem) =>
             new Measurement<long>(
                 mask,
-                new KeyValuePair<string, object?>("rp", ResourceProviderHelper.GetResourceProvider()),
-                new KeyValuePair<string, object?>("attach", ResourceProviderHelper.GetAttachMode()),
+                new KeyValuePair<string, object?>("rp", resourceProvider),
+                new KeyValuePair<string, object?>("attach", attachMode),
                 new KeyValuePair<string, object?>("cikey", snapshot.CustomerInstrumentationKey),
                 new KeyValuePair<string, object?>("feature", mask),
                 new KeyValuePair<string, object?>("type", type),
-                new KeyValuePair<string, object?>("os", ResourceProviderHelper.GetOperatingSystem()),
+                new KeyValuePair<string, object?>("os", operatingSystem),
                 new KeyValuePair<string, object?>("language", "dotnet"),
                 new KeyValuePair<string, object?>("version", SdkVersion.GetSdkStatsVersion(snapshot.DistroVersion)));
     }

@@ -181,6 +181,71 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         }
 
         [Fact]
+        public void Initialize_StrictSubsetClearsOldConfigurationBitsButKeepsRuntimeFeatures()
+        {
+            var initialSnapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.Distro | DistroFeature.LiveMetrics,
+                customerInstrumentationKey: "N/A",
+                distroVersion: "1.0.0");
+            DistroFeatureSdkStats.Initialize(initialSnapshot);
+            DistroSdkStatsUsage.MarkFeatureInUse(DistroFeature.AgentFramework);
+
+            var initial = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal(
+                (long)(DistroFeature.Distro | DistroFeature.LiveMetrics | DistroFeature.AgentFramework),
+                initial.value);
+
+            var strictSubsetSnapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.Distro,
+                customerInstrumentationKey: "N/A",
+                distroVersion: "1.0.0");
+            DistroFeatureSdkStats.Initialize(strictSubsetSnapshot);
+
+            var updated = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal(
+                (long)(DistroFeature.Distro | DistroFeature.AgentFramework),
+                updated.value);
+            Assert.False(
+                ((DistroFeature)updated.value).HasFlag(DistroFeature.LiveMetrics));
+            Assert.True(
+                DistroSdkStatsUsage.Features.HasFlag(DistroFeature.AgentFramework));
+        }
+
+        [Fact]
+        public void Initialize_TagOnlyChangeImmediatelyReemitsBothTypesWithNewTags()
+        {
+            var initialSnapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.Distro,
+                customerInstrumentationKey: "old-cikey",
+                distroVersion: "1.0.0");
+            DistroFeatureSdkStats.Initialize(initialSnapshot);
+            DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.HttpClient);
+
+            Assert.Equal(2, CollectObservableMeasurements().Count);
+            Assert.Empty(CollectObservableMeasurements());
+
+            var updatedSnapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.Distro,
+                customerInstrumentationKey: "new-cikey",
+                distroVersion: "2.0.0");
+            DistroFeatureSdkStats.Initialize(updatedSnapshot);
+
+            var updated = CollectObservableMeasurements();
+            Assert.Equal(2, updated.Count);
+            Assert.Contains(updated, measurement =>
+                (int)measurement.tags["type"]! == 0
+                && measurement.value == (long)DistroFeature.Distro);
+            Assert.Contains(updated, measurement =>
+                (int)measurement.tags["type"]! == 1
+                && measurement.value == (long)DistroInstrumentation.HttpClient);
+            Assert.All(updated, measurement =>
+            {
+                Assert.Equal("new-cikey", measurement.tags["cikey"]);
+                Assert.Equal("mot2.0.0", measurement.tags["version"]);
+            });
+        }
+
+        [Fact]
         public async Task Initialize_SynchronizesSnapshotAndUsageWithObserve()
         {
             var initialSnapshot = DistroFeatureSnapshot.CreateForTesting(
@@ -349,6 +414,9 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
                 distroVersion: "9.9.9-clockback")!;
 
             DistroFeatureSdkStats.Initialize(snapshot);
+
+            Assert.Single(CollectObservableMeasurements());
+            Assert.Empty(CollectObservableMeasurements());
 
             var instance = DistroFeatureSdkStats.Instance!;
             long futureTicks = DateTime.UtcNow.Ticks + TimeSpan.FromHours(48).Ticks;

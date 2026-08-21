@@ -6,7 +6,8 @@ using System.Threading;
 namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 {
     /// <summary>
-    /// Process-wide, monotonic record of features and instrumentations observed by the distro.
+    /// Process-wide, monotonic record of runtime-observed features and instrumentations.
+    /// Configuration features remain in the last-write-wins <see cref="DistroFeatureSnapshot"/>.
     /// </summary>
     internal static class DistroSdkStatsUsage
     {
