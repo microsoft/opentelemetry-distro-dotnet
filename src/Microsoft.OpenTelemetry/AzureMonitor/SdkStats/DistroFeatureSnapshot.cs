@@ -8,8 +8,8 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
     /// <summary>
     /// Immutable snapshot of the distro configuration reported by the most recent
     /// <c>UseMicrosoftOpenTelemetry</c> invocation, plus the customer instrumentation key.
-    /// Emission combines these last-write-wins baseline features with separately tracked,
-    /// monotonic runtime-observed features.
+    /// At each scheduled long-interval export, emission combines these last-write-wins
+    /// baseline features with separately tracked, monotonic runtime-observed features.
     /// </summary>
     internal sealed class DistroFeatureSnapshot
     {

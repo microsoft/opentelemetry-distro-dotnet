@@ -13,9 +13,9 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
     /// Owns the distro's Feature and Instrumentation SDKStats meter and observable gauge. The Azure Monitor
     /// exporter's Statsbeat <c>MeterProvider</c> subscribes to the meter name advertised by
     /// this class (see <c>StatsbeatConstants.DistroFeatureSdkStatsMeterName</c> in the
-    /// exporter). That provider collects on the shared 15-minute reader. Unchanged masks
-    /// throttle to one emission per <see cref="EmissionInterval"/> (24 hr), while newly
-    /// observed usage emits on the next collection.
+    /// exporter). That provider collects on the shared 15-minute reader, while this gauge
+    /// evaluates the latest masks and tags only once per <see cref="EmissionInterval"/>
+    /// (24 hr), matching the JavaScript distro's long-interval Feature SDKStats cadence.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -66,12 +66,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 
         private DistroFeatureSnapshot _snapshot;
 
-        private long _lastFeatureEmissionTicks;
-        private long _lastInstrumentationEmissionTicks;
-        private DistroFeature _lastEmittedFeatures;
-        private DistroInstrumentation _lastEmittedInstrumentations;
-        private DistroFeatureSnapshot? _lastFeatureSnapshot;
-        private DistroFeatureSnapshot? _lastInstrumentationSnapshot;
+        private long _lastCollectionTicks;
 
         private DistroFeatureSdkStats(DistroFeatureSnapshot snapshot)
         {
@@ -170,41 +165,25 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 
         private IEnumerable<Measurement<long>> Observe()
         {
-            bool emissionNeeded;
             lock (_emissionLock)
             {
-                try
+                long nowTicks = DateTime.UtcNow.Ticks;
+                if (!IsCollectionEligible(nowTicks))
                 {
-                    var snapshot = Volatile.Read(ref _snapshot);
-                    var features = snapshot.Features | DistroSdkStatsUsage.Features;
-                    var instrumentations = DistroSdkStatsUsage.Instrumentations;
-                    long nowTicks = DateTime.UtcNow.Ticks;
-                    emissionNeeded =
-                        ShouldEmit(
-                            (ulong)features,
-                            (ulong)_lastEmittedFeatures,
-                            _lastFeatureEmissionTicks,
-                            snapshot,
-                            _lastFeatureSnapshot,
-                            nowTicks)
-                        || ShouldEmit(
-                            (ulong)instrumentations,
-                            (ulong)_lastEmittedInstrumentations,
-                            _lastInstrumentationEmissionTicks,
-                            snapshot,
-                            _lastInstrumentationSnapshot,
-                            nowTicks);
-                }
-                catch (Exception ex)
-                {
-                    AzureMonitorAspNetCoreEventSource.Log.DistroFeatureSdkStatsCallbackFailed(ex);
                     return EmptyMeasurements;
                 }
-            }
 
-            if (!emissionNeeded)
-            {
-                return EmptyMeasurements;
+                var snapshot = Volatile.Read(ref _snapshot);
+                var features = snapshot.Features | DistroSdkStatsUsage.Features;
+                var instrumentations = DistroSdkStatsUsage.Instrumentations;
+                if (features == DistroFeature.None
+                    && instrumentations == DistroInstrumentation.None)
+                {
+                    // Empty masks still consume this shared long-interval collection slot.
+                    // A type that becomes nonempty later waits for the next scheduled export.
+                    _lastCollectionTicks = nowTicks;
+                    return EmptyMeasurements;
+                }
             }
 
             string resourceProvider;
@@ -226,34 +205,26 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 
             lock (_emissionLock)
             {
+                long nowTicks = DateTime.UtcNow.Ticks;
+                if (!IsCollectionEligible(nowTicks))
+                {
+                    return EmptyMeasurements;
+                }
+
                 var snapshot = Volatile.Read(ref _snapshot);
                 var features = snapshot.Features | DistroSdkStatsUsage.Features;
                 var instrumentations = DistroSdkStatsUsage.Instrumentations;
-                long nowTicks = DateTime.UtcNow.Ticks;
-                bool emitFeatures = ShouldEmit(
-                    (ulong)features,
-                    (ulong)_lastEmittedFeatures,
-                    _lastFeatureEmissionTicks,
-                    snapshot,
-                    _lastFeatureSnapshot,
-                    nowTicks);
-                bool emitInstrumentations = ShouldEmit(
-                    (ulong)instrumentations,
-                    (ulong)_lastEmittedInstrumentations,
-                    _lastInstrumentationEmissionTicks,
-                    snapshot,
-                    _lastInstrumentationSnapshot,
-                    nowTicks);
-
-                if (!emitFeatures && !emitInstrumentations)
+                if (features == DistroFeature.None
+                    && instrumentations == DistroInstrumentation.None)
                 {
+                    _lastCollectionTicks = nowTicks;
                     return EmptyMeasurements;
                 }
 
                 try
                 {
                     var measurements = new List<Measurement<long>>(2);
-                    if (emitInstrumentations)
+                    if (instrumentations != DistroInstrumentation.None)
                     {
                         measurements.Add(CreateMeasurement(
                             (long)instrumentations,
@@ -264,7 +235,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
                             operatingSystem));
                     }
 
-                    if (emitFeatures)
+                    if (features != DistroFeature.None)
                     {
                         measurements.Add(CreateMeasurement(
                             (long)features,
@@ -275,20 +246,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
                             operatingSystem));
                     }
 
-                    if (emitInstrumentations)
-                    {
-                        _lastEmittedInstrumentations = instrumentations;
-                        _lastInstrumentationEmissionTicks = nowTicks;
-                        _lastInstrumentationSnapshot = snapshot;
-                    }
-
-                    if (emitFeatures)
-                    {
-                        _lastEmittedFeatures = features;
-                        _lastFeatureEmissionTicks = nowTicks;
-                        _lastFeatureSnapshot = snapshot;
-                    }
-
+                    _lastCollectionTicks = nowTicks;
                     return measurements;
                 }
                 catch (Exception ex)
@@ -299,27 +257,10 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             }
         }
 
-        private bool ShouldEmit(
-            ulong currentMask,
-            ulong lastEmittedMask,
-            long lastEmissionTicks,
-            DistroFeatureSnapshot currentSnapshot,
-            DistroFeatureSnapshot? lastEmissionSnapshot,
-            long nowTicks)
+        private bool IsCollectionEligible(long nowTicks)
         {
-            if (currentMask == 0)
-            {
-                return false;
-            }
-
-            if (currentMask != lastEmittedMask
-                || !ReferenceEquals(currentSnapshot, lastEmissionSnapshot))
-            {
-                return true;
-            }
-
-            long elapsedTicks = nowTicks - lastEmissionTicks;
-            return lastEmissionTicks == 0
+            long elapsedTicks = nowTicks - _lastCollectionTicks;
+            return _lastCollectionTicks == 0
                 || elapsedTicks < 0
                 || elapsedTicks >= _emissionInterval.Ticks;
         }

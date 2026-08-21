@@ -74,6 +74,14 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             var measurements = CollectObservableMeasurements();
 
             Assert.Empty(measurements);
+
+            DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.HttpClient);
+            Assert.Empty(CollectObservableMeasurements());
+
+            MakeNextCollectionEligible();
+            var instrumentation = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal(1, instrumentation.tags["type"]);
+            Assert.Equal((long)DistroInstrumentation.HttpClient, instrumentation.value);
         }
 
         [Fact]
@@ -89,6 +97,9 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.HttpClient);
 
+            Assert.Empty(CollectObservableMeasurements());
+
+            MakeNextCollectionEligible();
             var measurement = Assert.Single(CollectObservableMeasurements());
             Assert.Equal((long)DistroInstrumentation.HttpClient, measurement.value);
             Assert.Equal((long)DistroInstrumentation.HttpClient, measurement.tags["feature"]);
@@ -137,7 +148,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         }
 
         [Fact]
-        public void Observe_NewMaskEmitsImmediatelyWithoutWaitingForLongInterval()
+        public void Observe_NewMaskWaitsForSharedLongInterval()
         {
             var snapshot = DistroFeatureSnapshot.CreateForTesting(
                 DistroFeature.Distro,
@@ -150,13 +161,19 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.HttpClient);
 
-            var update = Assert.Single(CollectObservableMeasurements());
-            Assert.Equal((long)DistroInstrumentation.HttpClient, update.value);
-            Assert.Equal(1, update.tags["type"]);
+            Assert.Empty(CollectObservableMeasurements());
+
+            MakeNextCollectionEligible();
+            var update = CollectObservableMeasurements();
+            Assert.Equal(2, update.Count);
+            var instrumentation = Assert.Single(
+                update,
+                measurement => (int)measurement.tags["type"]! == 1);
+            Assert.Equal((long)DistroInstrumentation.HttpClient, instrumentation.value);
         }
 
         [Fact]
-        public void Initialize_ReplacesSnapshotAndEmitsUpdatedMaskWithMatchingTags()
+        public void Initialize_ReplacesSnapshotAtNextScheduledCollection()
         {
             var initialSnapshot = DistroFeatureSnapshot.CreateForTesting(
                 DistroFeature.Distro,
@@ -172,6 +189,9 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             Assert.Same(instance, DistroFeatureSdkStats.Initialize(updatedSnapshot));
 
+            Assert.Empty(CollectObservableMeasurements());
+
+            MakeNextCollectionEligible();
             var measurement = Assert.Single(CollectObservableMeasurements());
             Assert.Equal(
                 (long)(DistroFeature.Distro | DistroFeature.LiveMetrics),
@@ -201,6 +221,9 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
                 distroVersion: "1.0.0");
             DistroFeatureSdkStats.Initialize(strictSubsetSnapshot);
 
+            Assert.Empty(CollectObservableMeasurements());
+
+            MakeNextCollectionEligible();
             var updated = Assert.Single(CollectObservableMeasurements());
             Assert.Equal(
                 (long)(DistroFeature.Distro | DistroFeature.AgentFramework),
@@ -212,7 +235,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         }
 
         [Fact]
-        public void Initialize_TagOnlyChangeImmediatelyReemitsBothTypesWithNewTags()
+        public void Initialize_TagOnlyChangeWaitsAndThenReemitsBothTypesWithNewTags()
         {
             var initialSnapshot = DistroFeatureSnapshot.CreateForTesting(
                 DistroFeature.Distro,
@@ -230,6 +253,9 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
                 distroVersion: "2.0.0");
             DistroFeatureSdkStats.Initialize(updatedSnapshot);
 
+            Assert.Empty(CollectObservableMeasurements());
+
+            MakeNextCollectionEligible();
             var updated = CollectObservableMeasurements();
             Assert.Equal(2, updated.Count);
             Assert.Contains(updated, measurement =>
@@ -284,6 +310,9 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             Assert.Same(instance, await update!);
 
+            Assert.Empty(CollectObservableMeasurements());
+
+            MakeNextCollectionEligible();
             var measurement = Assert.Single(CollectObservableMeasurements());
             Assert.Equal(
                 (long)(DistroFeature.Distro | DistroFeature.LiveMetrics),
@@ -421,7 +450,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             var instance = DistroFeatureSdkStats.Instance!;
             long futureTicks = DateTime.UtcNow.Ticks + TimeSpan.FromHours(48).Ticks;
             typeof(DistroFeatureSdkStats)
-                .GetField("_lastFeatureEmissionTicks", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .GetField("_lastCollectionTicks", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .SetValue(instance, futureTicks);
 
             var measurements = CollectObservableMeasurements();
@@ -458,7 +487,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
                 var instance = DistroFeatureSdkStats.Instance!;
                 long twoSecondsAgo = DateTime.UtcNow.Ticks - TimeSpan.FromSeconds(2).Ticks;
                 typeof(DistroFeatureSdkStats)
-                    .GetField("_lastFeatureEmissionTicks", BindingFlags.NonPublic | BindingFlags.Instance)!
+                    .GetField("_lastCollectionTicks", BindingFlags.NonPublic | BindingFlags.Instance)!
                     .SetValue(instance, twoSecondsAgo);
 
                 Assert.Single(CollectObservableMeasurements());
@@ -497,6 +526,16 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             listener.Start();
             listener.RecordObservableInstruments();
             return results;
+        }
+
+        private static void MakeNextCollectionEligible()
+        {
+            var instance = DistroFeatureSdkStats.Instance!;
+            long previousIntervalTicks =
+                DateTime.UtcNow.Ticks - DistroFeatureSdkStats.EmissionInterval.Ticks - 1;
+            typeof(DistroFeatureSdkStats)
+                .GetField("_lastCollectionTicks", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .SetValue(instance, previousIntervalTicks);
         }
     }
 }
