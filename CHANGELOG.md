@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Report runtime-detectable Feature and Instrumentation SDKStats from actual process usage while retaining established construction/configuration feature facts. Live Metrics is reported only after active portal collection starts, instrumentation bits are added only after their sources produce telemetry, and the latest monotonic usage masks are emitted at the next scheduled long-interval export.
 - Add a thread-safe SDK Stats usage foundation that independently emits feature (`type=0`) and instrumentation (`type=1`) masks at the next scheduled long-interval export.
 - Report enabled distro instrumentations in SDK Stats when their `ActivitySource` or first metric instrument is published, without per-span or per-measurement callbacks.
 - Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.8.3.

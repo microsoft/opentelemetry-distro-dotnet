@@ -39,6 +39,11 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             if (instrumentation != DistroInstrumentation.None)
             {
                 DistroSdkStatsUsage.MarkInstrumentationInUse(instrumentation);
+
+                if ((instrumentation & DistroInstrumentation.AgentFramework) != 0)
+                {
+                    DistroSdkStatsUsage.MarkFeatureInUse(DistroFeature.AgentFramework);
+                }
             }
         }
     }

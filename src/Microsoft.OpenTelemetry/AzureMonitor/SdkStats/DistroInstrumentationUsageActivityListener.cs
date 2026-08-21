@@ -33,9 +33,16 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
         private bool ObserveActivitySource(ActivitySource source)
         {
             var used = GetInstrumentations(source.Name) & _enabledInstrumentations;
-            if (used != DistroInstrumentation.None)
+            if (used == DistroInstrumentation.None)
             {
-                DistroSdkStatsUsage.MarkInstrumentationInUse(used);
+                return false;
+            }
+
+            DistroSdkStatsUsage.MarkInstrumentationInUse(used);
+
+            if ((used & DistroInstrumentation.AgentFramework) != 0)
+            {
+                DistroSdkStatsUsage.MarkFeatureInUse(DistroFeature.AgentFramework);
             }
 
             // This listener observes source publication only and never receives activities.

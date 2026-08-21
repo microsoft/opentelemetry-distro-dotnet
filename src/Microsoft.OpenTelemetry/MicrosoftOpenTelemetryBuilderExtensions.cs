@@ -186,6 +186,10 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             o.EnableTraceBasedLogsSampler = options.AzureMonitor.EnableTraceBasedLogsSampler;
             o.SamplingRatio = options.AzureMonitor.SamplingRatio;
             o.TracesPerSecond = options.AzureMonitor.TracesPerSecond;
+            if (options.AzureMonitor.ExplicitTransport is { } transport)
+            {
+                o.Transport = transport;
+            }
         }, effectiveInstrumentation);
 
         // --- Agent365 (always: scopes + baggage + span processors; exporter gated by Exporters flag) ---
@@ -413,10 +417,8 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         {
             services.AddSingleton(_ =>
                 new DistroInstrumentationUsageMeterListener(enabledInstrumentations));
-            services.ConfigureOpenTelemetryMeterProvider((sp, _) =>
-            {
-                sp.GetRequiredService<DistroInstrumentationUsageMeterListener>();
-            });
+            services.ConfigureOpenTelemetryMeterProvider((sp, meterProviderBuilder) =>
+                _ = sp.GetRequiredService<DistroInstrumentationUsageMeterListener>());
         }
 
         // Defer snapshot construction until the MeterProvider builds: by then the exporter's

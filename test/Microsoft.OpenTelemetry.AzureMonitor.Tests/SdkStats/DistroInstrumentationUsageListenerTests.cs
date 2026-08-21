@@ -68,7 +68,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         }
 
         [Fact]
-        public void ActivityListener_AgentFrameworkUpdatesOnlyInstrumentationUsage()
+        public void ActivityListener_AgentFrameworkMarksFeatureAndInstrumentationUsage()
         {
             using var usageListener = new DistroInstrumentationUsageActivityListener(
                 DistroInstrumentation.AgentFramework);
@@ -80,7 +80,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             Assert.Equal(
                 DistroInstrumentation.AgentFramework,
                 DistroSdkStatsUsage.Instrumentations);
-            Assert.Equal(DistroFeature.None, DistroSdkStatsUsage.Features);
+            Assert.Equal(DistroFeature.AgentFramework, DistroSdkStatsUsage.Features);
         }
 
         [Fact]
@@ -176,6 +176,22 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             Assert.Equal(
                 DistroInstrumentation.None,
                 DistroSdkStatsUsage.Instrumentations);
+        }
+
+        [Fact]
+        public void MeterListener_AgentFrameworkMarksFeatureAndInstrumentationUsage()
+        {
+            using var usageListener = new DistroInstrumentationUsageMeterListener(
+                DistroInstrumentation.AgentFramework);
+            DistroSdkStatsUsage.ResetForTesting();
+            using var meter = new Meter("Experimental.Microsoft.Agents.AI.Agent");
+
+            _ = meter.CreateCounter<long>("requests");
+
+            Assert.Equal(
+                DistroInstrumentation.AgentFramework,
+                DistroSdkStatsUsage.Instrumentations);
+            Assert.Equal(DistroFeature.AgentFramework, DistroSdkStatsUsage.Features);
         }
 
         [Theory]
