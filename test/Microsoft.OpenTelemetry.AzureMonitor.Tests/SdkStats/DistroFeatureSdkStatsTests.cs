@@ -276,7 +276,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         }
 
         [Fact]
-        public async Task Initialize_SynchronizesSnapshotAndUsageWithObserve()
+        public void Initialize_DoesNotBlock()
         {
             var initialSnapshot = DistroFeatureSnapshot.CreateForTesting(
                 DistroFeature.Distro,
@@ -293,26 +293,28 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
                 .GetField("_emissionLock", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .GetValue(instance)!;
             using var started = new ManualResetEventSlim();
+            using var completed = new ManualResetEventSlim();
+            DistroFeatureSdkStats? result = null;
+            var updateThread = new Thread(() =>
+            {
+                started.Set();
+                result = DistroFeatureSdkStats.Initialize(updatedSnapshot);
+                completed.Set();
+            });
 
-            Task<DistroFeatureSdkStats>? update = null;
             Monitor.Enter(emissionLock);
             try
             {
-                update = Task.Run(() =>
-                {
-                    started.Set();
-                    return DistroFeatureSdkStats.Initialize(updatedSnapshot);
-                });
+                updateThread.Start();
                 Assert.True(started.Wait(TimeSpan.FromSeconds(5)));
-                Thread.Sleep(TimeSpan.FromMilliseconds(100));
-                Assert.False(update.IsCompleted);
+                Assert.True(completed.Wait(TimeSpan.FromSeconds(5)));
+                Assert.Same(instance, result);
             }
             finally
             {
                 Monitor.Exit(emissionLock);
             }
-
-            Assert.Same(instance, await update!);
+            updateThread.Join();
 
             Assert.Empty(CollectObservableMeasurements());
 

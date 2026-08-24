@@ -134,10 +134,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
                 }
                 else
                 {
-                    lock (s_instance._emissionLock)
-                    {
-                        Volatile.Write(ref s_instance._snapshot, snapshot);
-                    }
+                    Volatile.Write(ref s_instance._snapshot, snapshot);
                 }
 
                 return s_instance;
