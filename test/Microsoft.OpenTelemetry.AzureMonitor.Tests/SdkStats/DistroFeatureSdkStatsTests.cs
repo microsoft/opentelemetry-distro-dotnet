@@ -43,8 +43,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             var match = Assert.Single(measurements, m => m.tags.TryGetValue("version", out var v) && (string?)v == "mot9.9.9-test");
 
-            // The numeric value equals the feature mask.
-            Assert.Equal((long)snapshot.Features, match.value);
+            Assert.Equal(1, match.value);
 
             Assert.Equal("dotnet", match.tags["language"]);
             Assert.Equal(0, match.tags["type"]);
@@ -81,7 +80,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             MakeNextCollectionEligible();
             var instrumentation = Assert.Single(CollectObservableMeasurements());
             Assert.Equal(1, instrumentation.tags["type"]);
-            Assert.Equal((long)DistroInstrumentation.HttpClient, instrumentation.value);
+            Assert.Equal(1, instrumentation.value);
         }
 
         [Fact]
@@ -101,7 +100,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             MakeNextCollectionEligible();
             var measurement = Assert.Single(CollectObservableMeasurements());
-            Assert.Equal((long)DistroInstrumentation.HttpClient, measurement.value);
+            Assert.Equal(1, measurement.value);
             Assert.Equal((long)DistroInstrumentation.HttpClient, measurement.tags["feature"]);
             Assert.Equal(1, measurement.tags["type"]);
         }
@@ -119,11 +118,11 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             var measurements = CollectObservableMeasurements();
 
             var feature = Assert.Single(measurements, measurement => (int)measurement.tags["type"]! == 0);
-            Assert.Equal((long)DistroFeature.Distro, feature.value);
+            Assert.Equal(1, feature.value);
             Assert.Equal((long)DistroFeature.Distro, feature.tags["feature"]);
 
             var instrumentation = Assert.Single(measurements, measurement => (int)measurement.tags["type"]! == 1);
-            Assert.Equal((long)DistroInstrumentation.SqlClient, instrumentation.value);
+            Assert.Equal(1, instrumentation.value);
             Assert.Equal((long)DistroInstrumentation.SqlClient, instrumentation.tags["feature"]);
         }
 
@@ -157,7 +156,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             DistroFeatureSdkStats.Initialize(snapshot);
 
             var initial = Assert.Single(CollectObservableMeasurements());
-            Assert.Equal((long)DistroFeature.Distro, initial.value);
+            Assert.Equal(1, initial.value);
 
             DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.HttpClient);
 
@@ -169,7 +168,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             var instrumentation = Assert.Single(
                 update,
                 measurement => (int)measurement.tags["type"]! == 1);
-            Assert.Equal((long)DistroInstrumentation.HttpClient, instrumentation.value);
+            Assert.Equal(1, instrumentation.value);
         }
 
         [Fact]
@@ -193,9 +192,10 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             MakeNextCollectionEligible();
             var measurement = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal(1, measurement.value);
             Assert.Equal(
                 (long)(DistroFeature.Distro | DistroFeature.LiveMetrics),
-                measurement.value);
+                measurement.tags["feature"]);
             Assert.Equal("new-cikey", measurement.tags["cikey"]);
             Assert.Equal("mot2.0.0", measurement.tags["version"]);
         }
@@ -211,9 +211,10 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             DistroSdkStatsUsage.MarkFeatureInUse(DistroFeature.AgentFramework);
 
             var initial = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal(1, initial.value);
             Assert.Equal(
                 (long)(DistroFeature.Distro | DistroFeature.LiveMetrics | DistroFeature.AgentFramework),
-                initial.value);
+                initial.tags["feature"]);
 
             var strictSubsetSnapshot = DistroFeatureSnapshot.CreateForTesting(
                 DistroFeature.Distro,
@@ -225,11 +226,12 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             MakeNextCollectionEligible();
             var updated = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal(1, updated.value);
             Assert.Equal(
                 (long)(DistroFeature.Distro | DistroFeature.AgentFramework),
-                updated.value);
+                updated.tags["feature"]);
             Assert.False(
-                ((DistroFeature)updated.value).HasFlag(DistroFeature.LiveMetrics));
+                ((DistroFeature)(long)updated.tags["feature"]!).HasFlag(DistroFeature.LiveMetrics));
             Assert.True(
                 DistroSdkStatsUsage.Features.HasFlag(DistroFeature.AgentFramework));
         }
@@ -260,10 +262,12 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             Assert.Equal(2, updated.Count);
             Assert.Contains(updated, measurement =>
                 (int)measurement.tags["type"]! == 0
-                && measurement.value == (long)DistroFeature.Distro);
+                && measurement.value == 1
+                && (long)measurement.tags["feature"]! == (long)DistroFeature.Distro);
             Assert.Contains(updated, measurement =>
                 (int)measurement.tags["type"]! == 1
-                && measurement.value == (long)DistroInstrumentation.HttpClient);
+                && measurement.value == 1
+                && (long)measurement.tags["feature"]! == (long)DistroInstrumentation.HttpClient);
             Assert.All(updated, measurement =>
             {
                 Assert.Equal("new-cikey", measurement.tags["cikey"]);
@@ -314,9 +318,10 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             MakeNextCollectionEligible();
             var measurement = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal(1, measurement.value);
             Assert.Equal(
                 (long)(DistroFeature.Distro | DistroFeature.LiveMetrics),
-                measurement.value);
+                measurement.tags["feature"]);
             Assert.Equal("new-cikey", measurement.tags["cikey"]);
             Assert.Equal("mot2.0.0", measurement.tags["version"]);
         }
@@ -347,7 +352,8 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             var match = Assert.Single(measurements, m => m.tags.TryGetValue("version", out var v) && (string?)v == "mot9.9.9-otlp-only");
             Assert.Equal("N/A", match.tags["cikey"]);
-            Assert.Equal((long)snapshot.Features, match.value);
+            Assert.Equal(1, match.value);
+            Assert.Equal((long)snapshot.Features, match.tags["feature"]);
         }
 
         [Fact]

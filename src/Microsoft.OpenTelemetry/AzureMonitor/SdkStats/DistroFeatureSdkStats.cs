@@ -273,7 +273,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             string attachMode,
             string operatingSystem) =>
             new Measurement<long>(
-                mask,
+                1,
                 new KeyValuePair<string, object?>("rp", resourceProvider),
                 new KeyValuePair<string, object?>("attach", attachMode),
                 new KeyValuePair<string, object?>("cikey", snapshot.CustomerInstrumentationKey),
