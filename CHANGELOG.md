@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add a thread-safe SDK Stats usage foundation that independently emits feature (`type=0`) and instrumentation (`type=1`) masks at the next scheduled long-interval export.
+- Report enabled distro instrumentations in SDK Stats when their `ActivitySource` or first metric instrument is published, without per-span or per-measurement callbacks.
 - Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.8.3.
 - Add durable Agent365 store-and-forward delivery with bounded local storage, restart replay, adaptive shared backoff, and draining shutdown for the asynchronous processor.
 - Customer SDK Stats are now on by default; the distro reports the `CustomerSdkStats` feature bit unless `APPLICATIONINSIGHTS_SDKSTATS_DISABLED=true`.
