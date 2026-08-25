@@ -6,9 +6,10 @@ using System;
 namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 {
     /// <summary>
-    /// Immutable snapshot of the distro feature flags reported on a given
-    /// <c>UseMicrosoftOpenTelemetry</c> invocation, plus the customer instrumentation key
-    /// extracted from the Azure Monitor connection string.
+    /// Immutable snapshot of the distro configuration reported by the most recent
+    /// <c>UseMicrosoftOpenTelemetry</c> invocation, plus the customer instrumentation key.
+    /// At each scheduled long-interval export, emission combines these last-write-wins
+    /// baseline features with separately tracked, monotonic runtime-observed features.
     /// </summary>
     internal sealed class DistroFeatureSnapshot
     {
@@ -39,7 +40,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             string distroVersion) =>
             new DistroFeatureSnapshot(features, customerInstrumentationKey, distroVersion);
 
-        /// <summary>Bit map of distro features enabled in the current process.</summary>
+        /// <summary>Bit map of features enabled by this configuration snapshot.</summary>
         internal DistroFeature Features { get; }
 
         /// <summary>Customer instrumentation key (without the surrounding connection-string envelope).</summary>

@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.OpenTelemetry.AzureMonitor.SdkStats;
 using Xunit;
 
@@ -41,8 +43,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             var match = Assert.Single(measurements, m => m.tags.TryGetValue("version", out var v) && (string?)v == "mot9.9.9-test");
 
-            // The numeric value equals the feature mask.
-            Assert.Equal((long)snapshot.Features, match.value);
+            Assert.Equal(1, match.value);
 
             Assert.Equal("dotnet", match.tags["language"]);
             Assert.Equal(0, match.tags["type"]);
@@ -72,6 +73,206 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             var measurements = CollectObservableMeasurements();
 
             Assert.Empty(measurements);
+
+            DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.HttpClient);
+            Assert.Empty(CollectObservableMeasurements());
+
+            MakeNextCollectionEligible();
+            var instrumentation = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal(1, instrumentation.tags["type"]);
+            Assert.Equal(1, instrumentation.value);
+        }
+
+        [Fact]
+        public void Observe_InstrumentationIsAbsentUntilObservedAndThenUsesTypeOne()
+        {
+            var snapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.None,
+                customerInstrumentationKey: "N/A",
+                distroVersion: "9.9.9-instrumentation");
+            DistroFeatureSdkStats.Initialize(snapshot);
+
+            Assert.Empty(CollectObservableMeasurements());
+
+            DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.HttpClient);
+
+            Assert.Empty(CollectObservableMeasurements());
+
+            MakeNextCollectionEligible();
+            var measurement = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal(1, measurement.value);
+            Assert.Equal((long)DistroInstrumentation.HttpClient, measurement.tags["feature"]);
+            Assert.Equal(1, measurement.tags["type"]);
+        }
+
+        [Fact]
+        public void Observe_EmitsFeatureAndInstrumentationMasksIndependently()
+        {
+            var snapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.Distro,
+                customerInstrumentationKey: "N/A",
+                distroVersion: "9.9.9-types");
+            DistroFeatureSdkStats.Initialize(snapshot);
+            DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.SqlClient);
+
+            var measurements = CollectObservableMeasurements();
+
+            var feature = Assert.Single(measurements, measurement => (int)measurement.tags["type"]! == 0);
+            Assert.Equal(1, feature.value);
+            Assert.Equal((long)DistroFeature.Distro, feature.tags["feature"]);
+
+            var instrumentation = Assert.Single(measurements, measurement => (int)measurement.tags["type"]! == 1);
+            Assert.Equal(1, instrumentation.value);
+            Assert.Equal((long)DistroInstrumentation.SqlClient, instrumentation.tags["feature"]);
+        }
+
+        [Fact]
+        public void UsageRegistry_UpdatesConcurrentlyAndNeverClearsObservedBits()
+        {
+            Parallel.Invoke(
+                () => DistroSdkStatsUsage.MarkFeatureInUse(DistroFeature.LiveMetrics),
+                () => DistroSdkStatsUsage.MarkFeatureInUse(DistroFeature.AgentFramework),
+                () => DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.HttpClient),
+                () => DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.SqlClient));
+
+            DistroSdkStatsUsage.MarkFeatureInUse(DistroFeature.LiveMetrics);
+            DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.HttpClient);
+
+            Assert.Equal(
+                DistroFeature.LiveMetrics | DistroFeature.AgentFramework,
+                DistroSdkStatsUsage.Features);
+            Assert.Equal(
+                DistroInstrumentation.HttpClient | DistroInstrumentation.SqlClient,
+                DistroSdkStatsUsage.Instrumentations);
+        }
+
+        [Fact]
+        public void Observe_NewMaskWaitsForSharedLongInterval()
+        {
+            var snapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.Distro,
+                customerInstrumentationKey: "N/A",
+                distroVersion: "9.9.9-dynamic");
+            DistroFeatureSdkStats.Initialize(snapshot);
+
+            var initial = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal(1, initial.value);
+
+            DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.HttpClient);
+
+            Assert.Empty(CollectObservableMeasurements());
+
+            MakeNextCollectionEligible();
+            var update = CollectObservableMeasurements();
+            Assert.Equal(2, update.Count);
+            var instrumentation = Assert.Single(
+                update,
+                measurement => (int)measurement.tags["type"]! == 1);
+            Assert.Equal(1, instrumentation.value);
+        }
+
+        [Fact]
+        public void Initialize_ReplacesSnapshotAtNextScheduledCollection()
+        {
+            var initialSnapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.Distro,
+                customerInstrumentationKey: "old-cikey",
+                distroVersion: "1.0.0");
+            var instance = DistroFeatureSdkStats.Initialize(initialSnapshot);
+            Assert.Single(CollectObservableMeasurements());
+
+            var updatedSnapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.Distro | DistroFeature.LiveMetrics,
+                customerInstrumentationKey: "new-cikey",
+                distroVersion: "2.0.0");
+
+            Assert.Same(instance, DistroFeatureSdkStats.Initialize(updatedSnapshot));
+
+            Assert.Empty(CollectObservableMeasurements());
+
+            MakeNextCollectionEligible();
+            var measurement = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal(1, measurement.value);
+            Assert.Equal(
+                (long)(DistroFeature.Distro | DistroFeature.LiveMetrics),
+                measurement.tags["feature"]);
+            Assert.Equal("new-cikey", measurement.tags["cikey"]);
+            Assert.Equal("mot2.0.0", measurement.tags["version"]);
+        }
+
+        [Fact]
+        public void Initialize_StrictSubsetClearsOldConfigurationBitsButKeepsRuntimeFeatures()
+        {
+            var initialSnapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.Distro | DistroFeature.LiveMetrics,
+                customerInstrumentationKey: "N/A",
+                distroVersion: "1.0.0");
+            DistroFeatureSdkStats.Initialize(initialSnapshot);
+            DistroSdkStatsUsage.MarkFeatureInUse(DistroFeature.AgentFramework);
+
+            var initial = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal(1, initial.value);
+            Assert.Equal(
+                (long)(DistroFeature.Distro | DistroFeature.LiveMetrics | DistroFeature.AgentFramework),
+                initial.tags["feature"]);
+
+            var strictSubsetSnapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.Distro,
+                customerInstrumentationKey: "N/A",
+                distroVersion: "1.0.0");
+            DistroFeatureSdkStats.Initialize(strictSubsetSnapshot);
+
+            Assert.Empty(CollectObservableMeasurements());
+
+            MakeNextCollectionEligible();
+            var updated = Assert.Single(CollectObservableMeasurements());
+            Assert.Equal(1, updated.value);
+            Assert.Equal(
+                (long)(DistroFeature.Distro | DistroFeature.AgentFramework),
+                updated.tags["feature"]);
+            Assert.False(
+                ((DistroFeature)(long)updated.tags["feature"]!).HasFlag(DistroFeature.LiveMetrics));
+            Assert.True(
+                DistroSdkStatsUsage.Features.HasFlag(DistroFeature.AgentFramework));
+        }
+
+        [Fact]
+        public void Initialize_TagOnlyChangeWaitsAndThenReemitsBothTypesWithNewTags()
+        {
+            var initialSnapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.Distro,
+                customerInstrumentationKey: "old-cikey",
+                distroVersion: "1.0.0");
+            DistroFeatureSdkStats.Initialize(initialSnapshot);
+            DistroSdkStatsUsage.MarkInstrumentationInUse(DistroInstrumentation.HttpClient);
+
+            Assert.Equal(2, CollectObservableMeasurements().Count);
+            Assert.Empty(CollectObservableMeasurements());
+
+            var updatedSnapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.Distro,
+                customerInstrumentationKey: "new-cikey",
+                distroVersion: "2.0.0");
+            DistroFeatureSdkStats.Initialize(updatedSnapshot);
+
+            Assert.Empty(CollectObservableMeasurements());
+
+            MakeNextCollectionEligible();
+            var updated = CollectObservableMeasurements();
+            Assert.Equal(2, updated.Count);
+            Assert.Contains(updated, measurement =>
+                (int)measurement.tags["type"]! == 0
+                && measurement.value == 1
+                && (long)measurement.tags["feature"]! == (long)DistroFeature.Distro);
+            Assert.Contains(updated, measurement =>
+                (int)measurement.tags["type"]! == 1
+                && measurement.value == 1
+                && (long)measurement.tags["feature"]! == (long)DistroInstrumentation.HttpClient);
+            Assert.All(updated, measurement =>
+            {
+                Assert.Equal("new-cikey", measurement.tags["cikey"]);
+                Assert.Equal("mot2.0.0", measurement.tags["version"]);
+            });
         }
 
         [Fact]
@@ -100,7 +301,8 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             var match = Assert.Single(measurements, m => m.tags.TryGetValue("version", out var v) && (string?)v == "mot9.9.9-otlp-only");
             Assert.Equal("N/A", match.tags["cikey"]);
-            Assert.Equal((long)snapshot.Features, match.value);
+            Assert.Equal(1, match.value);
+            Assert.Equal((long)snapshot.Features, match.tags["feature"]);
         }
 
         [Fact]
@@ -149,6 +351,36 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         }
 
         [Fact]
+        public void Observe_ConcurrentCallbacksEmitOnlyOncePerUnchangedMask()
+        {
+            var snapshot = DistroFeatureSnapshot.CreateForTesting(
+                DistroFeature.Distro,
+                customerInstrumentationKey: "N/A",
+                distroVersion: "9.9.9-concurrent");
+            DistroFeatureSdkStats.Initialize(snapshot);
+
+            int emissions = 0;
+            using var listener = new MeterListener
+            {
+                InstrumentPublished = (instrument, l) =>
+                {
+                    if (instrument.Meter.Name == DistroFeatureSdkStats.MeterName
+                        && instrument.Name == DistroFeatureSdkStats.MetricName)
+                    {
+                        l.EnableMeasurementEvents(instrument);
+                    }
+                },
+            };
+            listener.SetMeasurementEventCallback<long>(
+                (_, _, _, _) => Interlocked.Increment(ref emissions));
+            listener.Start();
+
+            Parallel.For(0, 16, _ => listener.RecordObservableInstruments());
+
+            Assert.Equal(1, emissions);
+        }
+
+        [Fact]
         public void Observe_EmitsAgain_WhenClockJumpsBackwards()
         {
             // Simulate the last emission being recorded ~48 hr in the future, i.e. the wall
@@ -167,10 +399,13 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             DistroFeatureSdkStats.Initialize(snapshot);
 
+            Assert.Single(CollectObservableMeasurements());
+            Assert.Empty(CollectObservableMeasurements());
+
             var instance = DistroFeatureSdkStats.Instance!;
             long futureTicks = DateTime.UtcNow.Ticks + TimeSpan.FromHours(48).Ticks;
             typeof(DistroFeatureSdkStats)
-                .GetField("_lastEmissionTicks", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .GetField("_lastCollectionTicks", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .SetValue(instance, futureTicks);
 
             var measurements = CollectObservableMeasurements();
@@ -207,7 +442,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
                 var instance = DistroFeatureSdkStats.Instance!;
                 long twoSecondsAgo = DateTime.UtcNow.Ticks - TimeSpan.FromSeconds(2).Ticks;
                 typeof(DistroFeatureSdkStats)
-                    .GetField("_lastEmissionTicks", BindingFlags.NonPublic | BindingFlags.Instance)!
+                    .GetField("_lastCollectionTicks", BindingFlags.NonPublic | BindingFlags.Instance)!
                     .SetValue(instance, twoSecondsAgo);
 
                 Assert.Single(CollectObservableMeasurements());
@@ -246,6 +481,16 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             listener.Start();
             listener.RecordObservableInstruments();
             return results;
+        }
+
+        private static void MakeNextCollectionEligible()
+        {
+            var instance = DistroFeatureSdkStats.Instance!;
+            long previousIntervalTicks =
+                DateTime.UtcNow.Ticks - DistroFeatureSdkStats.EmissionInterval.Ticks - 1;
+            typeof(DistroFeatureSdkStats)
+                .GetField("_lastCollectionTicks", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .SetValue(instance, previousIntervalTicks);
         }
     }
 }
