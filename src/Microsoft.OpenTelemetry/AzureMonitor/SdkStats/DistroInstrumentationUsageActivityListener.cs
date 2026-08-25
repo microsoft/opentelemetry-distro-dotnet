@@ -3,34 +3,43 @@
 
 using System;
 using System.Diagnostics;
-using OpenTelemetry;
 
 namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 {
     /// <summary>
-    /// Marks an enabled instrumentation as used after its source produces a completed span.
+    /// Marks enabled instrumentations when their activity sources are created.
     /// </summary>
-    internal sealed class DistroInstrumentationUsageProcessor : BaseProcessor<Activity>
+    internal sealed class DistroInstrumentationUsageActivityListener : IDisposable
     {
         private readonly DistroInstrumentation _enabledInstrumentations;
+        private readonly ActivityListener _listener;
 
-        internal DistroInstrumentationUsageProcessor(DistroInstrumentation enabledInstrumentations)
+        internal DistroInstrumentationUsageActivityListener(
+            DistroInstrumentation enabledInstrumentations)
         {
             _enabledInstrumentations = enabledInstrumentations;
+            _listener = new ActivityListener
+            {
+                ShouldListenTo = ObserveActivitySource,
+            };
+            ActivitySource.AddActivityListener(_listener);
         }
 
-        public override void OnEnd(Activity activity)
+        public void Dispose()
         {
-            if (activity is null)
-            {
-                return;
-            }
+            _listener.Dispose();
+        }
 
-            var used = GetInstrumentations(activity.Source.Name) & _enabledInstrumentations;
+        private bool ObserveActivitySource(ActivitySource source)
+        {
+            var used = GetInstrumentations(source.Name) & _enabledInstrumentations;
             if (used != DistroInstrumentation.None)
             {
                 DistroSdkStatsUsage.MarkInstrumentationInUse(used);
             }
+
+            // This listener observes source publication only and never receives activities.
+            return false;
         }
 
         internal static DistroInstrumentation GetEnabledInstrumentations(InstrumentationOptions options)
