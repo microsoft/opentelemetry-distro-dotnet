@@ -62,7 +62,6 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
         private readonly Meter _meter;
 
         private readonly TimeSpan _emissionInterval;
-        private readonly object _emissionLock = new();
 
         private DistroFeatureSnapshot _snapshot;
 
@@ -162,25 +161,25 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 
         private IEnumerable<Measurement<long>> Observe()
         {
-            lock (_emissionLock)
+            if (!TryGetEligibleCollectionWindow(out long previousTicks, out long nowTicks))
             {
-                long nowTicks = DateTime.UtcNow.Ticks;
-                if (!IsCollectionEligible(nowTicks))
+                return EmptyMeasurements;
+            }
+
+            var snapshot = Volatile.Read(ref _snapshot);
+            var features = snapshot.Features | DistroSdkStatsUsage.Features;
+            var instrumentations = DistroSdkStatsUsage.Instrumentations;
+            if (features == DistroFeature.None
+                && instrumentations == DistroInstrumentation.None)
+            {
+                // Empty masks still consume this shared long-interval collection slot.
+                // A type that becomes nonempty later waits for the next scheduled export.
+                if (!TryClaimCollection(previousTicks, nowTicks))
                 {
                     return EmptyMeasurements;
                 }
 
-                var snapshot = Volatile.Read(ref _snapshot);
-                var features = snapshot.Features | DistroSdkStatsUsage.Features;
-                var instrumentations = DistroSdkStatsUsage.Instrumentations;
-                if (features == DistroFeature.None
-                    && instrumentations == DistroInstrumentation.None)
-                {
-                    // Empty masks still consume this shared long-interval collection slot.
-                    // A type that becomes nonempty later waits for the next scheduled export.
-                    _lastCollectionTicks = nowTicks;
-                    return EmptyMeasurements;
-                }
+                return EmptyMeasurements;
             }
 
             string resourceProvider;
@@ -188,8 +187,8 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             string operatingSystem;
             try
             {
-                // The first resource-provider lookup may perform IMDS discovery. Keep that
-                // potentially blocking work outside the emission lock, then revalidate below.
+                // The first resource-provider lookup may perform IMDS discovery. Complete that
+                // potentially blocking work before atomically claiming the collection slot.
                 resourceProvider = ResourceProviderHelper.GetResourceProvider();
                 attachMode = ResourceProviderHelper.GetAttachMode();
                 operatingSystem = ResourceProviderHelper.GetOperatingSystem();
@@ -200,64 +199,78 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
                 return EmptyMeasurements;
             }
 
-            lock (_emissionLock)
+            if (!TryGetEligibleCollectionWindow(out previousTicks, out nowTicks))
             {
-                long nowTicks = DateTime.UtcNow.Ticks;
-                if (!IsCollectionEligible(nowTicks))
+                return EmptyMeasurements;
+            }
+
+            snapshot = Volatile.Read(ref _snapshot);
+            features = snapshot.Features | DistroSdkStatsUsage.Features;
+            instrumentations = DistroSdkStatsUsage.Instrumentations;
+
+            // A single callback claims the shared slot so concurrent readers cannot double-emit.
+            if (!TryClaimCollection(previousTicks, nowTicks))
+            {
+                return EmptyMeasurements;
+            }
+
+            if (features == DistroFeature.None
+                && instrumentations == DistroInstrumentation.None)
+            {
+                return EmptyMeasurements;
+            }
+
+            try
+            {
+                var measurements = new List<Measurement<long>>(2);
+                if (instrumentations != DistroInstrumentation.None)
                 {
-                    return EmptyMeasurements;
+                    measurements.Add(CreateMeasurement(
+                        (long)instrumentations,
+                        type: 1,
+                        snapshot,
+                        resourceProvider,
+                        attachMode,
+                        operatingSystem));
                 }
 
-                var snapshot = Volatile.Read(ref _snapshot);
-                var features = snapshot.Features | DistroSdkStatsUsage.Features;
-                var instrumentations = DistroSdkStatsUsage.Instrumentations;
-                if (features == DistroFeature.None
-                    && instrumentations == DistroInstrumentation.None)
+                if (features != DistroFeature.None)
                 {
-                    _lastCollectionTicks = nowTicks;
-                    return EmptyMeasurements;
+                    measurements.Add(CreateMeasurement(
+                        (long)features,
+                        type: 0,
+                        snapshot,
+                        resourceProvider,
+                        attachMode,
+                        operatingSystem));
                 }
 
-                try
-                {
-                    var measurements = new List<Measurement<long>>(2);
-                    if (instrumentations != DistroInstrumentation.None)
-                    {
-                        measurements.Add(CreateMeasurement(
-                            (long)instrumentations,
-                            type: 1,
-                            snapshot,
-                            resourceProvider,
-                            attachMode,
-                            operatingSystem));
-                    }
-
-                    if (features != DistroFeature.None)
-                    {
-                        measurements.Add(CreateMeasurement(
-                            (long)features,
-                            type: 0,
-                            snapshot,
-                            resourceProvider,
-                            attachMode,
-                            operatingSystem));
-                    }
-
-                    _lastCollectionTicks = nowTicks;
-                    return measurements;
-                }
-                catch (Exception ex)
-                {
-                    AzureMonitorAspNetCoreEventSource.Log.DistroFeatureSdkStatsCallbackFailed(ex);
-                    return EmptyMeasurements;
-                }
+                return measurements;
+            }
+            catch (Exception ex)
+            {
+                AzureMonitorAspNetCoreEventSource.Log.DistroFeatureSdkStatsCallbackFailed(ex);
+                Interlocked.CompareExchange(ref _lastCollectionTicks, previousTicks, nowTicks);
+                return EmptyMeasurements;
             }
         }
 
-        private bool IsCollectionEligible(long nowTicks)
+        private bool TryGetEligibleCollectionWindow(out long previousTicks, out long nowTicks)
         {
-            long elapsedTicks = nowTicks - _lastCollectionTicks;
-            return _lastCollectionTicks == 0
+            // Read the slot before the clock so a concurrent claim cannot resemble a backwards
+            // clock jump. The subsequent CAS rejects any claim made after this read.
+            previousTicks = Volatile.Read(ref _lastCollectionTicks);
+            nowTicks = DateTime.UtcNow.Ticks;
+            return IsCollectionEligible(nowTicks, previousTicks);
+        }
+
+        private bool TryClaimCollection(long previousTicks, long nowTicks) =>
+            Interlocked.CompareExchange(ref _lastCollectionTicks, nowTicks, previousTicks) == previousTicks;
+
+        private bool IsCollectionEligible(long nowTicks, long previousTicks)
+        {
+            long elapsedTicks = nowTicks - previousTicks;
+            return previousTicks == 0
                 || elapsedTicks < 0
                 || elapsedTicks >= _emissionInterval.Ticks;
         }

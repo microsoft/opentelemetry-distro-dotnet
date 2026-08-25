@@ -276,59 +276,6 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         }
 
         [Fact]
-        public void Initialize_DoesNotBlock()
-        {
-            var initialSnapshot = DistroFeatureSnapshot.CreateForTesting(
-                DistroFeature.Distro,
-                customerInstrumentationKey: "old-cikey",
-                distroVersion: "1.0.0");
-            var instance = DistroFeatureSdkStats.Initialize(initialSnapshot);
-            Assert.Single(CollectObservableMeasurements());
-
-            var updatedSnapshot = DistroFeatureSnapshot.CreateForTesting(
-                DistroFeature.Distro | DistroFeature.LiveMetrics,
-                customerInstrumentationKey: "new-cikey",
-                distroVersion: "2.0.0");
-            var emissionLock = typeof(DistroFeatureSdkStats)
-                .GetField("_emissionLock", BindingFlags.NonPublic | BindingFlags.Instance)!
-                .GetValue(instance)!;
-            using var started = new ManualResetEventSlim();
-            using var completed = new ManualResetEventSlim();
-            DistroFeatureSdkStats? result = null;
-            var updateThread = new Thread(() =>
-            {
-                started.Set();
-                result = DistroFeatureSdkStats.Initialize(updatedSnapshot);
-                completed.Set();
-            });
-
-            Monitor.Enter(emissionLock);
-            try
-            {
-                updateThread.Start();
-                Assert.True(started.Wait(TimeSpan.FromSeconds(5)));
-                Assert.True(completed.Wait(TimeSpan.FromSeconds(5)));
-                Assert.Same(instance, result);
-            }
-            finally
-            {
-                Monitor.Exit(emissionLock);
-            }
-            updateThread.Join();
-
-            Assert.Empty(CollectObservableMeasurements());
-
-            MakeNextCollectionEligible();
-            var measurement = Assert.Single(CollectObservableMeasurements());
-            Assert.Equal(1, measurement.value);
-            Assert.Equal(
-                (long)(DistroFeature.Distro | DistroFeature.LiveMetrics),
-                measurement.tags["feature"]);
-            Assert.Equal("new-cikey", measurement.tags["cikey"]);
-            Assert.Equal("mot2.0.0", measurement.tags["version"]);
-        }
-
-        [Fact]
         public void Observe_WithoutAzureMonitorConnectionString_UsesNAForCikey()
         {
             // Deployments without Azure Monitor (OTLP-only, Console-only, A365-only) still
