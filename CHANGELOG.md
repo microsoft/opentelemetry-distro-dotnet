@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add a thread-safe SDK Stats usage foundation that independently emits feature (`type=0`) and instrumentation (`type=1`) masks at the next scheduled long-interval export.
+- Shift Microsoft distro Feature SDK Stats flags to bits 8–21, reserving bits 0–7 for existing .NET `Track*` feature mappings and preventing backend bitmap conflicts.
 - Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.8.3.
 - Add durable Agent365 store-and-forward delivery with bounded local storage, restart replay, adaptive shared backoff, and draining shutdown for the asynchronous processor.
 - Customer SDK Stats are now on by default; the distro reports the `CustomerSdkStats` feature bit unless `APPLICATIONINSIGHTS_SDKSTATS_DISABLED=true`.

@@ -12,6 +12,25 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             "InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https://westus-0.in.applicationinsights.azure.com/";
 
         [Fact]
+        public void DistroFeatureBits_StartAfterLegacyTrackFeatureRange()
+        {
+            Assert.Equal(1UL << 8, (ulong)DistroFeature.Distro);
+            Assert.Equal(1UL << 9, (ulong)DistroFeature.AadHandling);
+            Assert.Equal(1UL << 10, (ulong)DistroFeature.LiveMetrics);
+            Assert.Equal(1UL << 11, (ulong)DistroFeature.StandardMetrics);
+            Assert.Equal(1UL << 12, (ulong)DistroFeature.PerfCounters);
+            Assert.Equal(1UL << 13, (ulong)DistroFeature.DiskRetry);
+            Assert.Equal(1UL << 14, (ulong)DistroFeature.CustomerSdkStats);
+            Assert.Equal(1UL << 15, (ulong)DistroFeature.TraceBasedLogsSampler);
+            Assert.Equal(1UL << 16, (ulong)DistroFeature.ExporterAzureMonitor);
+            Assert.Equal(1UL << 17, (ulong)DistroFeature.ExporterOtlp);
+            Assert.Equal(1UL << 18, (ulong)DistroFeature.ExporterAgent365);
+            Assert.Equal(1UL << 19, (ulong)DistroFeature.ExporterConsole);
+            Assert.Equal(1UL << 20, (ulong)DistroFeature.AgentFramework);
+            Assert.Equal(1UL << 21, (ulong)DistroFeature.A365OnlyMode);
+        }
+
+        [Fact]
         public void Build_WithoutConnectionString_UsesNAForCikey()
         {
             // For OTLP-only / Console-only / Agent365-only deployments there is no customer
