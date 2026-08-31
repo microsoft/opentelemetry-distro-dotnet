@@ -55,7 +55,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             SetTagMaybe(OpenTelemetryConstants.GenAiToolNameKey, toolName);
 
             // Per OTEL spec: arguments SHOULD be recorded in structured form.
-            // Prefer ArgumentsObject (dict → JSON); fall back to string with JSON check.
+            // Prefer typed arguments, then legacy dictionary arguments, then legacy string payloads.
             if (details.ToolCallArguments != null)
             {
                 SetTagMaybe(
