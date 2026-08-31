@@ -230,7 +230,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
             legacyLogger.LoggedConversationId.Should().Be("conv-tool-legacy");
             JsonNode.DeepEquals(
                 JsonNode.Parse(legacyLogger.LoggedResponseContent!),
-                JsonNode.Parse("{\"outcome\":{\"status\":\"success\"},\"provider_summary\":\"ok\"}"))
+                JsonNode.Parse("{\"schema_version\":\"1.0\",\"outcome\":{\"status\":\"success\"},\"provider_summary\":\"ok\"}"))
                 .Should().BeTrue();
         }
 

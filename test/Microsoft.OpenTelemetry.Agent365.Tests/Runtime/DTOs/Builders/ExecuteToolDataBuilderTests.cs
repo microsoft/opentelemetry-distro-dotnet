@@ -464,6 +464,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
                 (string)data.Attributes[OpenTelemetryConstants.GenAiToolCallResultKey]!);
 
             argumentsJson.RootElement.GetProperty("action").GetString().Should().Be("read");
+            resultJson.RootElement.GetProperty("schema_version").GetString().Should().Be("1.0");
             resultJson.RootElement.GetProperty("outcome")
                 .GetProperty("status").GetString().Should().Be("success");
         }

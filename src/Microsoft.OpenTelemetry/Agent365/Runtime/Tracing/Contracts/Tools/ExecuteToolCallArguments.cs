@@ -51,6 +51,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools
         public ExecuteToolCallArguments(IDictionary<string, object?> values)
             : base(values ?? throw new System.ArgumentNullException(nameof(values)))
         {
+            if (!ContainsKey("schema_version"))
+            {
+                SchemaVersion = "1.0";
+            }
         }
 
         /// <summary>

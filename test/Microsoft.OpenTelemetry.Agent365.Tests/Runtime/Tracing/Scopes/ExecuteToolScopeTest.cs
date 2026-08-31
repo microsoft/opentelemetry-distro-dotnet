@@ -343,6 +343,7 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         var json = activity.Tags.Single(
             pair => pair.Key == OpenTelemetryConstants.GenAiToolCallResultKey).Value;
         using var document = JsonDocument.Parse(json!);
+        document.RootElement.GetProperty("schema_version").GetString().Should().Be("1.0");
         document.RootElement.GetProperty("outcome")
             .GetProperty("status").GetString().Should().Be("success");
     }

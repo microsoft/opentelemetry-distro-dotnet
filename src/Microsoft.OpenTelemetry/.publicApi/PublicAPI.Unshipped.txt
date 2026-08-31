@@ -35,6 +35,8 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolC
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult.Pagination.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult.Resources.get -> System.Collections.Generic.IList<Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultResource!>?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult.Resources.set -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult.SchemaVersion.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult.SchemaVersion.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallAction
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallAction.Create = 0 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallAction
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallAction.Delete = 3 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallAction

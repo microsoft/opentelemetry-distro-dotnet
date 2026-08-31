@@ -47,6 +47,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools
         /// </summary>
         public ExecuteToolCallResult()
         {
+            SchemaVersion = "1.0";
         }
 
         /// <summary>
@@ -56,6 +57,19 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools
         public ExecuteToolCallResult(IDictionary<string, object?> values)
             : base(values ?? throw new System.ArgumentNullException(nameof(values)))
         {
+            if (!ContainsKey("schema_version"))
+            {
+                SchemaVersion = "1.0";
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the schema version.
+        /// </summary>
+        public string? SchemaVersion
+        {
+            get => ToolCallDictionaryAccessor.GetReference<string>(this, "schema_version");
+            set => ToolCallDictionaryAccessor.SetReference(this, "schema_version", value);
         }
 
         /// <summary>

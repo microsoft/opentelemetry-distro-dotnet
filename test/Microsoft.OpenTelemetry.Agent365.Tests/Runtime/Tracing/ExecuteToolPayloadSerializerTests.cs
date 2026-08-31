@@ -128,6 +128,7 @@ public sealed class ExecuteToolPayloadSerializerTests
         using var document = JsonDocument.Parse(ExecuteToolPayloadSerializer.Serialize(result));
         var resource = document.RootElement.GetProperty("resources")[0];
 
+        document.RootElement.GetProperty("schema_version").GetString().Should().Be("1.0");
         document.RootElement.GetProperty("outcome")
             .GetProperty("status").GetString().Should().Be("success");
         resource.GetProperty("sensitivity")

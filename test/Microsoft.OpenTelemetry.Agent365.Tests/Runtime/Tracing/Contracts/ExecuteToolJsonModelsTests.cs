@@ -27,6 +27,25 @@ public sealed class ExecuteToolJsonModelsTests
     }
 
     [TestMethod]
+    public void Result_DefaultsSchemaVersion()
+    {
+        var result = new ExecuteToolCallResult();
+
+        result.SchemaVersion.Should().Be("1.0");
+        result["schema_version"].Should().Be("1.0");
+    }
+
+    [TestMethod]
+    public void CopyConstructors_DefaultSchemaVersionWhenMissing()
+    {
+        var arguments = new ExecuteToolCallArguments(new Dictionary<string, object?>());
+        var result = new ExecuteToolCallResult(new Dictionary<string, object?>());
+
+        arguments.SchemaVersion.Should().Be("1.0");
+        result.SchemaVersion.Should().Be("1.0");
+    }
+
+    [TestMethod]
     public void StandardAndIndexerWritesUseLastWriteWins()
     {
         var policy = new ToolCallResultPolicy
