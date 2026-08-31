@@ -118,7 +118,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
                 AddIfNotNull(
                     attributes,
                     OpenTelemetryConstants.GenAiToolArgumentsKey,
-                    ExecuteToolPayloadSerializer.Serialize(ExecuteToolPayloadSerializer.ToNullableDictionary(toolCallDetails.ArgumentsObject)));
+                    ExecuteToolPayloadSerializer.Serialize(toolCallDetails.ArgumentsObject));
             }
             else if (arguments != null)
             {

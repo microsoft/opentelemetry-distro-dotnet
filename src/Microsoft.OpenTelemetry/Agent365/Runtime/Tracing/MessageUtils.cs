@@ -16,7 +16,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing
     /// </summary>
     internal static class MessageUtils
     {
-        private static readonly JsonSerializerOptions SerializerOptions = CreateSerializerOptions();
+        internal static readonly JsonSerializerOptions SerializerOptions = CreateSerializerOptions();
 
         private static readonly string DiagnosticFallback =
             "[{\"role\":\"system\",\"parts\":[{\"type\":\"text\",\"content\":\"[serialization failed]\"}],\"finish_reason\":\"error\"}]";

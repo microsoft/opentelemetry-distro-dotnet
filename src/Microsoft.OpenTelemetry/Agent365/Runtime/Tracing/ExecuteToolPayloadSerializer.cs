@@ -13,7 +13,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing
     {
         private const int MaximumDepth = 64;
 
-        public static string Serialize(IDictionary<string, object?> payload)
+        public static string Serialize<TValue>(IDictionary<string, TValue>? payload)
         {
             if (payload == null)
             {
@@ -22,11 +22,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing
 
             var active = new HashSet<object>(ReferenceComparer.Instance);
             var normalized = NormalizeDictionary(payload, active, 0);
-            return JsonSerializer.Serialize(normalized);
+            return JsonSerializer.Serialize(normalized, MessageUtils.SerializerOptions);
         }
 
-        private static Dictionary<string, object?> NormalizeDictionary(
-            IDictionary<string, object?> source,
+        private static Dictionary<string, object?> NormalizeDictionary<TValue>(
+            IDictionary<string, TValue> source,
             HashSet<object> active,
             int depth)
         {
@@ -61,26 +61,24 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing
             }
         }
 
-        internal static IDictionary<string, object?> ToNullableDictionary(IDictionary<string, object> payload)
-        {
-            var converted = new Dictionary<string, object?>(payload.Count);
-            foreach (var pair in payload)
-            {
-                converted[pair.Key] = pair.Value;
-            }
-
-            return converted;
-        }
-
         private static object? NormalizeValue(object? value, HashSet<object> active, int depth)
         {
             if (value == null || value is string || value is bool ||
                 value is byte || value is sbyte || value is short ||
                 value is ushort || value is int || value is uint ||
-                value is long || value is ulong || value is float ||
-                value is double || value is decimal)
+                value is long || value is ulong || value is decimal)
             {
                 return value;
+            }
+
+            if (value is float single)
+            {
+                return float.IsFinite(single) ? value : GetFallback(single);
+            }
+
+            if (value is double number)
+            {
+                return double.IsFinite(number) ? value : GetFallback(number);
             }
 
             if (depth >= MaximumDepth || active.Contains(value))
@@ -91,6 +89,16 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing
             if (value is IDictionary<string, object?> dictionary)
             {
                 return NormalizeDictionary(dictionary, active, depth);
+            }
+
+            if (value is IDictionary<string, object> nonNullableDictionary)
+            {
+                return NormalizeDictionary(nonNullableDictionary, active, depth);
+            }
+
+            if (value is byte[] || value.GetType().IsEnum)
+            {
+                return NormalizeSerializableValue(value);
             }
 
             if (value is IEnumerable enumerable)
@@ -120,10 +128,15 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing
                 }
             }
 
+            return NormalizeSerializableValue(value);
+        }
+
+        private static object? NormalizeSerializableValue(object value)
+        {
             try
             {
                 using var document = JsonDocument.Parse(
-                    JsonSerializer.Serialize(value, value.GetType()));
+                    JsonSerializer.Serialize(value, value.GetType(), MessageUtils.SerializerOptions));
                 return document.RootElement.Clone();
             }
             catch (Exception)

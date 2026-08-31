@@ -187,6 +187,45 @@ public sealed class ExecuteToolPayloadSerializerTests
         items[2].GetString().Should().Be("last");
     }
 
+    [TestMethod]
+    public void Serialize_ReplacesNonFiniteFloatingPointValuesWithFallbackStrings()
+    {
+        IDictionary<string, object> payload = new Dictionary<string, object>
+        {
+            ["float_nan"] = float.NaN,
+            ["float_positive_infinity"] = float.PositiveInfinity,
+            ["double_negative_infinity"] = double.NegativeInfinity,
+            ["items"] = new object?[] { 12.5d, double.PositiveInfinity, float.NegativeInfinity },
+        };
+
+        using var document = JsonDocument.Parse(ExecuteToolPayloadSerializer.Serialize(payload));
+        var root = document.RootElement;
+        var items = root.GetProperty("items");
+
+        root.GetProperty("float_nan").GetString().Should().Be(float.NaN.ToString());
+        root.GetProperty("float_positive_infinity").GetString().Should().Be(float.PositiveInfinity.ToString());
+        root.GetProperty("double_negative_infinity").GetString().Should().Be(double.NegativeInfinity.ToString());
+        items[0].GetDouble().Should().Be(12.5d);
+        items[1].GetString().Should().Be(double.PositiveInfinity.ToString());
+        items[2].GetString().Should().Be(float.NegativeInfinity.ToString());
+    }
+
+    [TestMethod]
+    public void Serialize_PreservesLegacyDictionaryContractForEnumsAndByteArrays()
+    {
+        IDictionary<string, object> payload = new Dictionary<string, object>
+        {
+            ["action"] = ToolCallAction.Read,
+            ["bytes"] = new byte[] { 0, 1, 2, 3 },
+        };
+
+        using var document = JsonDocument.Parse(ExecuteToolPayloadSerializer.Serialize(payload));
+        var root = document.RootElement;
+
+        root.GetProperty("action").GetString().Should().Be("read");
+        root.GetProperty("bytes").GetString().Should().Be("AAECAw==");
+    }
+
     private sealed class ThrowingEnumerable : IEnumerable
     {
         public IEnumerator GetEnumerator() => throw new InvalidOperationException("test");

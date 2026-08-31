@@ -1,11 +1,13 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System.Collections;
 using FluentAssertions;
 using Microsoft.Agents.A365.Observability.Runtime.DTOs;
 using Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
+using System.Text.Json;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
 {
@@ -348,6 +350,47 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
 
             // Assert
             data.SpanKind.Should().Be(SpanKindConstants.Client);
+        }
+
+        [TestMethod]
+        public void Build_WithThrowingArgumentsDictionary_UsesFallbackJson()
+        {
+            var tool = new ToolCallDetails("tool-throwing", new ThrowingDictionary());
+            var agent = new AgentDetails("agent-throwing");
+            var conversationId = "conv-throwing";
+
+            var data = ExecuteToolDataBuilder.Build(tool, agent, conversationId);
+
+            using var document = JsonDocument.Parse(data.Attributes[OpenTelemetryConstants.GenAiToolArgumentsKey]!.ToString()!);
+            document.RootElement.GetProperty("value").GetString().Should().Be(nameof(ThrowingDictionary));
+        }
+
+        private sealed class ThrowingDictionary : IDictionary<string, object>
+        {
+            public object this[string key] { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+            public ICollection<string> Keys => Array.Empty<string>();
+            public ICollection<object> Values => Array.Empty<object>();
+            public int Count => 1;
+            public bool IsReadOnly => true;
+
+            public void Add(string key, object value) => throw new NotSupportedException();
+            public void Add(KeyValuePair<string, object> item) => throw new NotSupportedException();
+            public void Clear() => throw new NotSupportedException();
+            public bool Contains(KeyValuePair<string, object> item) => false;
+            public bool ContainsKey(string key) => false;
+            public void CopyTo(KeyValuePair<string, object>[] array, int arrayIndex) => throw new NotSupportedException();
+            public IEnumerator<KeyValuePair<string, object>> GetEnumerator() => throw new InvalidOperationException("test");
+            public bool Remove(string key) => throw new NotSupportedException();
+            public bool Remove(KeyValuePair<string, object> item) => throw new NotSupportedException();
+            public bool TryGetValue(string key, out object value)
+            {
+                value = null!;
+                return false;
+            }
+
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+            public override string ToString() => nameof(ThrowingDictionary);
         }
     }
 }

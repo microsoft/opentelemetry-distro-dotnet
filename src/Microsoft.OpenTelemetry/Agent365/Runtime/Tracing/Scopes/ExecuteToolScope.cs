@@ -59,7 +59,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             {
                 SetTagMaybe(
                     OpenTelemetryConstants.GenAiToolArgumentsKey,
-                    ExecuteToolPayloadSerializer.Serialize(ExecuteToolPayloadSerializer.ToNullableDictionary(details.ArgumentsObject)));
+                    ExecuteToolPayloadSerializer.Serialize(details.ArgumentsObject));
             }
             else if (arguments != null)
             {
@@ -126,7 +126,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         {
             SetTagMaybe(
                 OpenTelemetryConstants.GenAiToolCallResultKey,
-                ExecuteToolPayloadSerializer.Serialize(ExecuteToolPayloadSerializer.ToNullableDictionary(result)));
+                ExecuteToolPayloadSerializer.Serialize(result));
         }
 
         /// <summary>
