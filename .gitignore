@@ -426,3 +426,4 @@ api/
 *.lscache
 .github/copilot-instructions.md
 .worktrees/
+.superpowers/sdd/task-2-report.md
