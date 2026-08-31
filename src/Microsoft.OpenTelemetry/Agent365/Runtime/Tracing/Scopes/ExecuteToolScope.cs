@@ -57,7 +57,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             // Prefer ArgumentsObject (dict → JSON); fall back to string with JSON check.
             if (details.ArgumentsObject != null)
             {
-                SetTagMaybe(OpenTelemetryConstants.GenAiToolArgumentsKey, MessageUtils.Serialize(details.ArgumentsObject));
+                SetTagMaybe(
+                    OpenTelemetryConstants.GenAiToolArgumentsKey,
+                    ExecuteToolPayloadSerializer.Serialize(ExecuteToolPayloadSerializer.ToNullableDictionary(details.ArgumentsObject)));
             }
             else if (arguments != null)
             {
@@ -122,7 +124,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// <param name="result">Tool call result as a structured dictionary.</param>
         public void RecordResponse(IDictionary<string, object> result)
         {
-            SetTagMaybe(OpenTelemetryConstants.GenAiToolCallResultKey, MessageUtils.Serialize(result));
+            SetTagMaybe(
+                OpenTelemetryConstants.GenAiToolCallResultKey,
+                ExecuteToolPayloadSerializer.Serialize(ExecuteToolPayloadSerializer.ToNullableDictionary(result)));
         }
 
         /// <summary>

@@ -115,7 +115,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             // Arguments — prefer structured dict, then ensure JSON string per OTEL spec
             if (toolCallDetails.ArgumentsObject != null)
             {
-                AddIfNotNull(attributes, OpenTelemetryConstants.GenAiToolArgumentsKey, MessageUtils.Serialize(toolCallDetails.ArgumentsObject));
+                AddIfNotNull(
+                    attributes,
+                    OpenTelemetryConstants.GenAiToolArgumentsKey,
+                    ExecuteToolPayloadSerializer.Serialize(ExecuteToolPayloadSerializer.ToNullableDictionary(toolCallDetails.ArgumentsObject)));
             }
             else if (arguments != null)
             {
