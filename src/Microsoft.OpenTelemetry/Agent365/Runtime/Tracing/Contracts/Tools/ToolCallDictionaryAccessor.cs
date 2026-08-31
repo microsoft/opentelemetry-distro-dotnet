@@ -36,7 +36,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools
             }
 
             return value is string text &&
-                Enum.TryParse<TEnum>(text, true, out var parsed)
+                Enum.TryParse<TEnum>(text, true, out var parsed) &&
+                Enum.IsDefined(typeof(TEnum), parsed)
                     ? parsed
                     : null;
         }

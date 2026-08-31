@@ -96,6 +96,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing
                 return NormalizeDictionary(nonNullableDictionary, active, depth);
             }
 
+            if (TryNormalizeStringKeyDictionary(value, active, depth, out var normalizedDictionary))
+            {
+                return normalizedDictionary;
+            }
+
             if (value is byte[] || value.GetType().IsEnum)
             {
                 return NormalizeSerializableValue(value);
@@ -129,6 +134,111 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing
             }
 
             return NormalizeSerializableValue(value);
+        }
+
+        private static bool TryNormalizeStringKeyDictionary(
+            object value,
+            HashSet<object> active,
+            int depth,
+            out Dictionary<string, object?>? normalized)
+        {
+            if (!ImplementsStringKeyDictionary(value.GetType()))
+            {
+                normalized = null;
+                return false;
+            }
+
+            if (!active.Add(value))
+            {
+                normalized = new Dictionary<string, object?>
+                {
+                    ["value"] = GetFallback(value),
+                };
+                return true;
+            }
+
+            try
+            {
+                var result = new Dictionary<string, object?>();
+                foreach (var item in (IEnumerable)value)
+                {
+                    if (!TryGetDictionaryEntry(item, out var key, out var itemValue))
+                    {
+                        normalized = new Dictionary<string, object?>
+                        {
+                            ["value"] = GetFallback(value),
+                        };
+                        return true;
+                    }
+
+                    result[key] = NormalizeValue(itemValue, active, depth + 1);
+                }
+
+                normalized = result;
+                return true;
+            }
+            catch (Exception)
+            {
+                normalized = new Dictionary<string, object?>
+                {
+                    ["value"] = GetFallback(value),
+                };
+                return true;
+            }
+            finally
+            {
+                active.Remove(value);
+            }
+        }
+
+        private static bool ImplementsStringKeyDictionary(Type type)
+        {
+            foreach (var candidate in type.GetInterfaces())
+            {
+                if (candidate.IsGenericType &&
+                    (candidate.GetGenericTypeDefinition() == typeof(IDictionary<,>) ||
+                        candidate.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>)))
+                {
+                    var arguments = candidate.GetGenericArguments();
+                    if (arguments[0] == typeof(string))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryGetDictionaryEntry(object? item, out string key, out object? value)
+        {
+            if (item is DictionaryEntry entry && entry.Key is string dictionaryEntryKey)
+            {
+                key = dictionaryEntryKey;
+                value = entry.Value;
+                return true;
+            }
+
+            if (item == null)
+            {
+                key = string.Empty;
+                value = null;
+                return false;
+            }
+
+            var itemType = item.GetType();
+            var keyProperty = itemType.GetProperty("Key");
+            var valueProperty = itemType.GetProperty("Value");
+            if (keyProperty?.GetValue(item) is string propertyKey && valueProperty != null)
+            {
+                key = propertyKey;
+                value = valueProperty.GetValue(item);
+                return true;
+            }
+
+            key = string.Empty;
+            value = null;
+            return false;
         }
 
         private static object? NormalizeSerializableValue(object value)

@@ -226,6 +226,26 @@ public sealed class ExecuteToolPayloadSerializerTests
         root.GetProperty("bytes").GetString().Should().Be("AAECAw==");
     }
 
+    [TestMethod]
+    public void Serialize_PreservesNestedTypedStringKeyDictionariesAsJsonObjects()
+    {
+        IDictionary<string, object> payload = new Dictionary<string, object>
+        {
+            ["parameters"] = new Dictionary<string, int>
+            {
+                ["maxResults"] = 5,
+                ["offset"] = 2,
+            },
+        };
+
+        using var document = JsonDocument.Parse(ExecuteToolPayloadSerializer.Serialize(payload));
+        var parameters = document.RootElement.GetProperty("parameters");
+
+        parameters.ValueKind.Should().Be(JsonValueKind.Object);
+        parameters.GetProperty("maxResults").GetInt32().Should().Be(5);
+        parameters.GetProperty("offset").GetInt32().Should().Be(2);
+    }
+
     private sealed class ThrowingEnumerable : IEnumerable
     {
         public IEnumerator GetEnumerator() => throw new InvalidOperationException("test");

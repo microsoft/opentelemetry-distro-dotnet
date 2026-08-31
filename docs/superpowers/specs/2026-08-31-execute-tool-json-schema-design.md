@@ -297,8 +297,10 @@ The serializer first creates a JSON-safe graph from the dictionary-backed
 payload:
 
 1. JSON primitives and `null` pass through.
-2. `IDictionary<string, object?>` values are copied recursively.
-3. Non-string enumerable values are copied element by element.
+2. String-key dictionary values, including generic shapes such as
+   `Dictionary<string, int>`, are copied recursively before enumerable
+   handling.
+3. Non-string-key enumerable values are copied element by element.
 4. Other objects are serialized normally with `System.Text.Json`.
 5. If an individual dictionary value or collection element cannot be
    serialized, that value is replaced with `value.ToString()`.

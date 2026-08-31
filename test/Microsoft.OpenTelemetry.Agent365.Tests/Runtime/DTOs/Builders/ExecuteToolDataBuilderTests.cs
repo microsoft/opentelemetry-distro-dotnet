@@ -389,6 +389,32 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
         }
 
         [TestMethod]
+        public void Build_WithNestedTypedDictionaryArguments_PreservesObjectShape()
+        {
+            var tool = new ToolCallDetails(
+                "tool-nested-dictionary",
+                new Dictionary<string, object>
+                {
+                    ["parameters"] = new Dictionary<string, int>
+                    {
+                        ["maxResults"] = 5,
+                        ["offset"] = 2,
+                    },
+                });
+            var agent = new AgentDetails("agent-nested-dictionary");
+            var conversationId = "conv-nested-dictionary";
+
+            var data = ExecuteToolDataBuilder.Build(tool, agent, conversationId);
+
+            using var document = JsonDocument.Parse(data.Attributes[OpenTelemetryConstants.GenAiToolArgumentsKey]!.ToString()!);
+            var parameters = document.RootElement.GetProperty("parameters");
+
+            parameters.ValueKind.Should().Be(JsonValueKind.Object);
+            parameters.GetProperty("maxResults").GetInt32().Should().Be(5);
+            parameters.GetProperty("offset").GetInt32().Should().Be(2);
+        }
+
+        [TestMethod]
         public void Build_WithTypedArgumentsAndLegacyString_PrefersTypedArguments()
         {
             var tool = new ToolCallDetails("tool-precedence", "legacy");

@@ -87,4 +87,28 @@ public sealed class ExecuteToolJsonModelsTests
 
         result["provider_result"].Should().Be(42);
     }
+
+    [TestMethod]
+    public void EnumProperties_RejectUndefinedNumericStrings()
+    {
+        var arguments = new ExecuteToolCallArguments(
+            new Dictionary<string, object?>
+            {
+                ["action"] = "999",
+            });
+
+        arguments.Action.Should().BeNull();
+    }
+
+    [TestMethod]
+    public void EnumProperties_ParseCaseInsensitiveStrings()
+    {
+        var arguments = new ExecuteToolCallArguments(
+            new Dictionary<string, object?>
+            {
+                ["action"] = "ReAd",
+            });
+
+        arguments.Action.Should().Be(ToolCallAction.Read);
+    }
 }
