@@ -51,6 +51,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             string? traceId = null,
             Exception? error = null)
         {
+            ArgumentNullException.ThrowIfNull(result);
+
             var attributes = BuildAttributes(
                 toolCallDetails,
                 agentDetails,

@@ -442,6 +442,22 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
                 .GetProperty("status").GetString().Should().Be("success");
         }
 
+        [TestMethod]
+        public void Build_WithNullTypedResult_ThrowsArgumentNullException()
+        {
+            var tool = new ToolCallDetails("tool-null-result", (string?)null);
+            var agent = new AgentDetails("agent-null-result");
+
+            Action act = () => ExecuteToolDataBuilder.Build(
+                tool,
+                (ExecuteToolCallResult)null!,
+                agent,
+                "conversation-null-result");
+
+            act.Should().Throw<ArgumentNullException>()
+                .WithParameterName("result");
+        }
+
         private sealed class ThrowingDictionary : IDictionary<string, object>
         {
             public object this[string key] { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
