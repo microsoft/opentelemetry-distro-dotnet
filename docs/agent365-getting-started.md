@@ -620,12 +620,78 @@ using var scope = ExecuteToolScope.Start(
 scope.RecordResponse("{\"summary\": \"The text was summarized.\"}");
 ```
 
+You can also use the typed execute-tool JSON schema models:
+
+```csharp
+var arguments = new ExecuteToolCallArguments
+{
+    Action = ToolCallAction.Read,
+    Resources = new List<ToolCallResource>
+    {
+        new()
+        {
+            Id = "sharepoint://contoso.sharepoint.com/items/01ABCDEF",
+            Uri = "https://contoso.sharepoint.com/Architecture.docx",
+            Name = "Architecture.docx",
+            Type = "document",
+            Provider = "microsoft.sharepoint",
+            Identifiers = new List<ToolCallIdentifier>
+            {
+                new()
+                {
+                    Type = "microsoft.graph.drive_item_id",
+                    Value = "01ABCDEF",
+                },
+            },
+            Container = new ToolCallContainer
+            {
+                Id = "sharepoint://contoso.sharepoint.com/sites/Engineering",
+                Uri = "https://contoso.sharepoint.com/sites/Engineering",
+                Type = "site",
+                ["tenant_id"] = "contoso",
+            },
+        },
+    },
+    Parameters = new Dictionary<string, object?>
+    {
+        ["format"] = "text",
+        ["includeMetadata"] = true,
+    },
+};
+
+using var scope = ExecuteToolScope.Start(
+    request,
+    new ToolCallDetails("sharepoint_get_document", arguments),
+    agentDetails);
+
+var result = new ExecuteToolCallResult
+{
+    Outcome = new ToolCallResultOutcome
+    {
+        Status = ToolCallOutcomeStatus.Success,
+    },
+    Resources = new List<ToolCallResultResource>(),
+    Data = new Dictionary<string, object?>(),
+    Pagination = new ToolCallResultPagination
+    {
+        HasMore = false,
+        TotalCount = 0,
+    },
+};
+
+result["provider_summary"] = "Document retrieved";
+scope.RecordResponse(result);
+```
+
+The `gen_ai.tool.arguments` and `gen_ai.tool.call.result` span attributes contain JSON-serialized strings. Every execute-tool schema model is dictionary-backed, including nested identifiers and containers, so direct indexer writes can add provider-specific fields or replace standard fields when needed. The existing string and `IDictionary<string, object>` `ToolCallDetails` and `RecordResponse` overloads remain supported for existing integrations.
+
 **Available methods:**
 
 | Method | Description |
 |---|---|
 | `RecordResponse(string)` | Record a string result. |
 | `RecordResponse(IDictionary<string, object>)` | Record a structured result. |
+| `RecordResponse(ExecuteToolCallResult)` | Record a typed structured result. |
 | `RecordThreatDiagnosticsSummary(ThreatDiagnosticsSummary)` | Record threat diagnostics. |
 
 ### Inference (`InferenceScope`)

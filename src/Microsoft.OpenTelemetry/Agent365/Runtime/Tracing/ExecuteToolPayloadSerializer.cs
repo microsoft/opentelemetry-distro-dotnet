@@ -73,12 +73,12 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing
 
             if (value is float single)
             {
-                return float.IsFinite(single) ? value : GetFallback(single);
+                return !float.IsNaN(single) && !float.IsInfinity(single) ? value : GetFallback(single);
             }
 
             if (value is double number)
             {
-                return double.IsFinite(number) ? value : GetFallback(number);
+                return !double.IsNaN(number) && !double.IsInfinity(number) ? value : GetFallback(number);
             }
 
             if (depth >= MaximumDepth || active.Contains(value))

@@ -143,7 +143,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// <param name="result">Tool call result as a typed schema model.</param>
         public void RecordResponse(ExecuteToolCallResult result)
         {
-            ArgumentNullException.ThrowIfNull(result);
+            if (result == null)
+            {
+                throw new ArgumentNullException(nameof(result));
+            }
 
             SetTagMaybe(
                 OpenTelemetryConstants.GenAiToolCallResultKey,
