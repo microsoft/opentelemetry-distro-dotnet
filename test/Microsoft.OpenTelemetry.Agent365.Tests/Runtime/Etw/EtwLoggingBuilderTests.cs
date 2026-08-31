@@ -1,8 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using FluentAssertions;
 using Microsoft.Agents.A365.Observability.Runtime.Etw;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -164,6 +166,39 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
             Assert.AreEqual("tool-caller-id", attrsElement.GetProperty(OpenTelemetryConstants.UserIdKey).GetString());
             Assert.AreEqual("Tool Caller", attrsElement.GetProperty(OpenTelemetryConstants.UserNameKey).GetString());
             Assert.AreEqual("toolcaller@example.com", attrsElement.GetProperty(OpenTelemetryConstants.UserEmailKey).GetString());
+        }
+
+        [TestMethod]
+        public void Build_WritesTypedToolResultToEtw()
+        {
+            using var listener = new TestEventListener();
+            listener.EnableEvents(EtwEventSource.Log, EventLevel.Informational);
+            using var provider = BuildProvider();
+            var logger = provider.GetRequiredService<IA365EtwLogger<EtwLoggingBuilderTests>>();
+            var result = new ExecuteToolCallResult
+            {
+                Outcome = new ToolCallResultOutcome
+                {
+                    Status = ToolCallOutcomeStatus.Success,
+                },
+                ["provider_summary"] = "ok",
+            };
+
+            logger.LogToolCall(
+                new ToolCallDetails("tool-a", (string?)null),
+                result,
+                new AgentDetails("agent-id"),
+                "conv-tool-typed");
+
+            var evt = listener.Events.Find(e => e.EventId == 2000);
+            var payload = JsonDocument.Parse((string)evt!.Payload![0]!);
+            var attributes = payload.RootElement.GetProperty("Attributes");
+            using var resultJson = JsonDocument.Parse(
+                attributes.GetProperty(OpenTelemetryConstants.GenAiToolCallResultKey).GetString()!);
+
+            resultJson.RootElement.GetProperty("provider_summary").GetString().Should().Be("ok");
+            resultJson.RootElement.GetProperty("outcome")
+                .GetProperty("status").GetString().Should().Be("success");
         }
 
         [TestMethod]

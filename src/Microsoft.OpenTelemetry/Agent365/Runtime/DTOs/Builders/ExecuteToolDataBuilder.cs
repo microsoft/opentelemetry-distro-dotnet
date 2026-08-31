@@ -1,3 +1,4 @@
+#pragma warning disable RS0026 // Multiple overloads with optional parameters — by design for string vs structured results
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
@@ -16,6 +17,66 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
     /// </summary>
     public class ExecuteToolDataBuilder : BaseDataBuilder<ExecuteToolData>
     {
+        /// <summary>
+        /// Builds complete data for an execute_tool operation with a structured result payload.
+        /// </summary>
+        /// <param name="toolCallDetails">The details of the tool call.</param>
+        /// <param name="result">Structured result content from the tool.</param>
+        /// <param name="agentDetails">The details of the agent (includes tenant ID).</param>
+        /// <param name="conversationId">The conversation id.</param>
+        /// <param name="startTime">Optional custom start time for the operation.</param>
+        /// <param name="endTime">Optional custom end time for the operation.</param>
+        /// <param name="spanId">Optional span ID for the operation.</param>
+        /// <param name="parentSpanId">Optional parent span ID for distributed tracing.</param>
+        /// <param name="channel">Optional channel information for the operation.</param>
+        /// <param name="callerDetails">Optional details about the caller.</param>
+        /// <param name="extraAttributes">Optional dictionary of extra attributes.</param>
+        /// <param name="spanKind">Optional span kind override. Use <see cref="SpanKindConstants.Internal"/> or <see cref="SpanKindConstants.Client"/> as appropriate.</param>
+        /// <param name="traceId">Optional trace ID for distributed tracing.</param>
+        /// <param name="error">Optional exception describing a failure; sets an OTel error status and the <c>error.type</c> attribute.</param>
+        /// <returns>An ExecuteToolData object containing all telemetry data.</returns>
+        public static ExecuteToolData Build(
+            ToolCallDetails toolCallDetails,
+            ExecuteToolCallResult result,
+            AgentDetails agentDetails,
+            string conversationId,
+            DateTimeOffset? startTime = null,
+            DateTimeOffset? endTime = null,
+            string? spanId = null,
+            string? parentSpanId = null,
+            Channel? channel = null,
+            CallerDetails? callerDetails = null,
+            IDictionary<string, object?>? extraAttributes = null,
+            string? spanKind = null,
+            string? traceId = null,
+            Exception? error = null)
+        {
+            var attributes = BuildAttributes(
+                toolCallDetails,
+                agentDetails,
+                conversationId,
+                responseContent: null,
+                channel,
+                callerDetails,
+                extraAttributes);
+
+            AddIfNotNull(
+                attributes,
+                OpenTelemetryConstants.GenAiToolCallResultKey,
+                ExecuteToolPayloadSerializer.Serialize(result));
+
+            return ApplyStatus(
+                new ExecuteToolData(
+                    attributes,
+                    startTime,
+                    endTime,
+                    spanId,
+                    parentSpanId,
+                    spanKind,
+                    traceId),
+                error);
+        }
+
         /// <summary>
         /// Builds complete data for an execute_tool operation.
         /// </summary>

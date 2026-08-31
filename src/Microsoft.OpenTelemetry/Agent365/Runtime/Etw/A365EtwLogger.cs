@@ -1,7 +1,9 @@
-﻿// Copyright (c) Microsoft Corporation.
+﻿#pragma warning disable RS0026 // Multiple overloads with optional parameters — by design for string vs structured results
+// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 using Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -135,6 +137,44 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
                 agentDetails,
                 conversationId,
                 responseContent,
+                startTime,
+                endTime,
+                spanId,
+                parentSpanId,
+                channel,
+                callerDetails: callerDetails,
+                traceId: traceId,
+                error: error);
+
+            logger.Log(
+                LogLevel.Information,
+                ExecuteToolEventId,
+                data.ToDictionary(),
+                null,
+                LogFormatter
+            );
+        }
+
+        /// <inheritdoc/>
+        public void LogToolCall(
+            ToolCallDetails toolCallDetails,
+            ExecuteToolCallResult result,
+            AgentDetails agentDetails,
+            string conversationId,
+            DateTimeOffset? startTime = null,
+            DateTimeOffset? endTime = null,
+            string? spanId = null,
+            string? parentSpanId = null,
+            Channel? channel = null,
+            CallerDetails? callerDetails = null,
+            string? traceId = null,
+            Exception? error = null)
+        {
+            var data = ExecuteToolDataBuilder.Build(
+                toolCallDetails,
+                result,
+                agentDetails,
+                conversationId,
                 startTime,
                 endTime,
                 spanId,

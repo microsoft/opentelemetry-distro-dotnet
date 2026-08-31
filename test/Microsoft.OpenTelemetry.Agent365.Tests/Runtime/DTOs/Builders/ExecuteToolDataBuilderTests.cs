@@ -409,6 +409,39 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
             document.RootElement.TryGetProperty("arguments", out _).Should().BeFalse();
         }
 
+        [TestMethod]
+        public void Build_WithTypedPayloads_UsesSchemaSerializer()
+        {
+            var arguments = new ExecuteToolCallArguments
+            {
+                Action = ToolCallAction.Read,
+                Resources = new List<ToolCallResource>(),
+                Parameters = new Dictionary<string, object?>(),
+            };
+            var result = new ExecuteToolCallResult
+            {
+                Outcome = new ToolCallResultOutcome
+                {
+                    Status = ToolCallOutcomeStatus.Success,
+                },
+            };
+
+            var data = ExecuteToolDataBuilder.Build(
+                new ToolCallDetails("tool", arguments),
+                result,
+                new AgentDetails("agent"),
+                "conversation");
+
+            using var argumentsJson = JsonDocument.Parse(
+                (string)data.Attributes[OpenTelemetryConstants.GenAiToolArgumentsKey]!);
+            using var resultJson = JsonDocument.Parse(
+                (string)data.Attributes[OpenTelemetryConstants.GenAiToolCallResultKey]!);
+
+            argumentsJson.RootElement.GetProperty("action").GetString().Should().Be("read");
+            resultJson.RootElement.GetProperty("outcome")
+                .GetProperty("status").GetString().Should().Be("success");
+        }
+
         private sealed class ThrowingDictionary : IDictionary<string, object>
         {
             public object this[string key] { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
