@@ -7,15 +7,26 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text.Json.Nodes;
 using System.Text.Json;
 using FluentAssertions;
+using Microsoft.Agents.A365.Observability.Runtime.Etw;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
+using Microsoft.Extensions.DependencyInjection;
+using System.Diagnostics.Tracing;
 
 [TestClass]
 public sealed class ExecuteToolScopeTest : ActivityTest
 {
+    private sealed class TestEventListener : EventListener
+    {
+        public List<EventWrittenEventArgs> Events { get; } = new();
+
+        protected override void OnEventWritten(EventWrittenEventArgs eventData) => Events.Add(eventData);
+    }
+
     [TestMethod]
     public void Start_Arguments_Set()
     {
@@ -334,6 +345,102 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         using var document = JsonDocument.Parse(json!);
         document.RootElement.GetProperty("outcome")
             .GetProperty("status").GetString().Should().Be("success");
+    }
+
+    [TestMethod]
+    public void TypedArgumentsAndResult_MatchEtwLoggerJson()
+    {
+        var request = new Request(conversationId: "conv-tool-compare");
+        var agentDetails = Util.GetAgentDetails();
+        var arguments = new ExecuteToolCallArguments
+        {
+            Action = ToolCallAction.Read,
+            Resources = new List<ToolCallResource>
+            {
+                new()
+                {
+                    Id = "doc-1",
+                    Provider = "sharepoint",
+                    Type = "document",
+                    Identifiers = new List<ToolCallIdentifier>
+                    {
+                        new()
+                        {
+                            Type = "microsoft.graph.drive_item_id",
+                            Value = "01ABCDEF",
+                        },
+                    },
+                    Container = new ToolCallContainer
+                    {
+                        Id = "sharepoint://contoso.sharepoint.com/sites/Engineering",
+                        Uri = "https://contoso.sharepoint.com/sites/Engineering",
+                        Type = "site",
+                    },
+                },
+            },
+            Parameters = new Dictionary<string, object?>
+            {
+                ["format"] = "text",
+                ["includeMetadata"] = true,
+            },
+        };
+        var result = new ExecuteToolCallResult
+        {
+            Outcome = new ToolCallResultOutcome
+            {
+                Status = ToolCallOutcomeStatus.Success,
+            },
+            Resources = new List<ToolCallResultResource>
+            {
+                new()
+                {
+                    Id = "doc-1",
+                    Type = "document",
+                    Data = new Dictionary<string, object?>
+                    {
+                        ["title"] = "Quarterly plan",
+                    },
+                },
+            },
+            Data = new Dictionary<string, object?>
+            {
+                ["summary"] = "Document retrieved",
+            },
+            Pagination = new ToolCallResultPagination
+            {
+                HasMore = false,
+                TotalCount = 1,
+            },
+        };
+        var details = new ToolCallDetails("sharepoint_get_document", arguments);
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(request, details, agentDetails);
+            scope.RecordResponse(result);
+        });
+
+        using var listener = new TestEventListener();
+        listener.EnableEvents(EtwEventSource.Log, EventLevel.Informational);
+        using var provider = new ServiceCollection().AddLoggingWithEtw().BuildServiceProvider();
+        var logger = provider.GetRequiredService<IA365EtwLogger<ExecuteToolScopeTest>>();
+
+        logger.LogToolCall(details, result, agentDetails, request.ConversationId!);
+
+        var etwPayload = listener.Events.Single(e => e.EventId == 2000).Payload![0] as string;
+        using var etwDocument = JsonDocument.Parse(etwPayload!);
+        var etwAttributes = etwDocument.RootElement.GetProperty("Attributes");
+        var scopeArgumentsJson = activity.Tags.Single(pair => pair.Key == OpenTelemetryConstants.GenAiToolArgumentsKey).Value;
+        var scopeResultJson = activity.Tags.Single(pair => pair.Key == OpenTelemetryConstants.GenAiToolCallResultKey).Value;
+
+        JsonNode.DeepEquals(
+            JsonNode.Parse(scopeArgumentsJson!),
+            JsonNode.Parse(etwAttributes.GetProperty(OpenTelemetryConstants.GenAiToolArgumentsKey).GetString()!))
+            .Should().BeTrue();
+        JsonNode.DeepEquals(
+            JsonNode.Parse(scopeResultJson!),
+            JsonNode.Parse(etwAttributes.GetProperty(OpenTelemetryConstants.GenAiToolCallResultKey).GetString()!))
+            .Should().BeTrue();
     }
 
     [TestMethod]

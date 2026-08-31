@@ -683,7 +683,7 @@ result["provider_summary"] = "Document retrieved";
 scope.RecordResponse(result);
 ```
 
-The `gen_ai.tool.arguments` and `gen_ai.tool.call.result` span attributes contain JSON-serialized strings. Every execute-tool schema model is dictionary-backed, including nested identifiers and containers, so direct indexer writes can add provider-specific fields or replace standard fields when needed. The existing string and `IDictionary<string, object>` `ToolCallDetails` and `RecordResponse` overloads remain supported for existing integrations.
+The `gen_ai.tool.call.arguments` and `gen_ai.tool.call.result` span attributes contain JSON-serialized strings. Every execute-tool schema model is dictionary-backed, including nested identifiers and containers, so direct indexer writes can add provider-specific fields or replace standard fields when needed. The existing string and `IDictionary<string, object>` `ToolCallDetails` and `RecordResponse` overloads remain supported for existing integrations.
 
 **Available methods:**
 

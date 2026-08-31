@@ -257,15 +257,17 @@ The existing string and dictionary `RecordResponse` overloads remain unchanged.
 
 ### ETW logger and DTO builder
 
-Add typed-result overloads to:
+Add typed-result support to:
 
-- `IA365EtwLogger<T>.LogToolCall`;
-- `A365EtwLogger<T>.LogToolCall`; and
+- `A365EtwLogger<T>.LogToolCall`;
+- `A365EtwLoggerExtensions.LogToolCall<T>(this IA365EtwLogger<T>, ...)`; and
 - `ExecuteToolDataBuilder.Build`.
 
-To avoid making existing calls such as `LogToolCall(..., null)` ambiguous, the
-typed result is a required second parameter rather than replacing the existing
-optional string parameter position:
+To avoid changing the shipped `IA365EtwLogger<T>` contract while still giving
+interface-typed callers a typed path, keep the typed overload on
+`A365EtwLogger<T>` and add an extension method on `IA365EtwLogger<T>`. The
+typed result remains a required second parameter rather than replacing the
+existing optional string parameter position:
 
 ```csharp
 LogToolCall(
@@ -276,13 +278,15 @@ LogToolCall(
     ...);
 ```
 
-The typed builder overload follows the same ordering. Both preserve the
-existing optional timing, tracing, channel, caller, extra-attribute, and error
-parameters after the required parameters.
+The typed builder overload follows the same ordering. The concrete overload and
+the extension method both preserve the existing optional timing, tracing,
+channel, caller, extra-attribute, and error parameters after the required
+parameters.
 
-The typed ETW overload passes the result to the builder without converting it
-at the logger boundary. The builder uses the same serializer as
-`ExecuteToolScope`.
+The concrete typed ETW overload passes the result to the builder without
+converting it at the logger boundary. The interface extension method serializes
+with the same helper used by `ExecuteToolScope` and forwards the JSON string to
+the existing interface member.
 
 ## Serialization
 
@@ -336,18 +340,22 @@ unsupported object values.
 
 ### ETW result
 
-1. The customer passes `ExecuteToolCallResult` to the typed `LogToolCall`
-   overload.
-2. The logger forwards it to `ExecuteToolDataBuilder`.
-3. The builder serializes it with `ExecuteToolPayloadSerializer`.
-4. The resulting JSON string is stored in the execute-tool attributes.
-5. The existing ETW pipeline emits the containing telemetry DTO.
+1. The customer passes `ExecuteToolCallResult` to the typed concrete overload
+   or the public `IA365EtwLogger<T>` extension method.
+2. The concrete overload forwards it to `ExecuteToolDataBuilder`, while the
+   interface extension serializes it with `ExecuteToolPayloadSerializer` and
+   calls the existing string overload.
+3. The resulting JSON string is stored in the execute-tool attributes.
+4. The existing ETW pipeline emits the containing telemetry DTO.
 
 ## Compatibility
 
 - No existing public member is removed or changed.
 - The typed ETW and builder overloads place the result second, so existing calls
   that pass `null` in the legacy response-content position remain unambiguous.
+- `IA365EtwLogger<T>` remains source- and binary-compatible for external
+  implementers because typed usage is added as a public extension method rather
+  than a new abstract interface member.
 - Legacy string arguments still pass through when valid JSON and are otherwise
   wrapped as `{"arguments": ...}`.
 - Legacy string results still pass through when valid JSON and are otherwise

@@ -1215,12 +1215,13 @@ public static ExecuteToolData Build(
 Update `AddToolDetails` to use the same typed-arguments precedence implemented
 in `ExecuteToolScope`. Do not alter the existing response string logic.
 
-- [ ] **Step 5: Add unambiguous typed ETW overloads**
+- [ ] **Step 5: Add compatibility-safe typed ETW support**
 
-Add to `IA365EtwLogger<T>`:
+Keep `IA365EtwLogger<T>` unchanged and add a public extension method:
 
 ```csharp
-public void LogToolCall(
+public static void LogToolCall<T>(
+    this IA365EtwLogger<T> logger,
     ToolCallDetails toolCallDetails,
     ExecuteToolCallResult result,
     AgentDetails agentDetails,
@@ -1235,7 +1236,26 @@ public void LogToolCall(
     Exception? error = null);
 ```
 
-Add the same public signature to `A365EtwLogger<T>` and implement it with:
+The extension method should serialize `result` with
+`ExecuteToolPayloadSerializer` and then call the existing interface overload:
+
+```csharp
+logger.LogToolCall(
+    toolCallDetails,
+    agentDetails,
+    conversationId,
+    ExecuteToolPayloadSerializer.Serialize(result),
+    startTime,
+    endTime,
+    spanId,
+    parentSpanId,
+    channel,
+    callerDetails,
+    traceId,
+    error);
+```
+
+Keep the same public signature on `A365EtwLogger<T>` and implement it with:
 
 ```csharp
 var data = ExecuteToolDataBuilder.Build(
