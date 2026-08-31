@@ -10,8 +10,11 @@ using Microsoft.Agents.A365.Observability.Runtime.Tracing;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
 
 [TestClass]
-public sealed class ExecuteToolPayloadSerializerTests
+public sealed class MessageUtilsToolPayloadTests
 {
+    private const string ExpectedSerializationError =
+        "{\"serialization_error\":\"Failed to serialize execute tool payload.\"}";
+
     [TestMethod]
     public void Serialize_ProducesExpectedArgumentsJson()
     {
@@ -50,7 +53,7 @@ public sealed class ExecuteToolPayloadSerializerTests
             },
         };
 
-        using var document = JsonDocument.Parse(ExecuteToolPayloadSerializer.Serialize(arguments));
+        using var document = JsonDocument.Parse(MessageUtils.SerializeToolPayload(arguments));
         var root = document.RootElement;
 
         root.GetProperty("schema_version").GetString().Should().Be("1.0");
@@ -125,7 +128,7 @@ public sealed class ExecuteToolPayloadSerializerTests
             },
         };
 
-        using var document = JsonDocument.Parse(ExecuteToolPayloadSerializer.Serialize(result));
+        using var document = JsonDocument.Parse(MessageUtils.SerializeToolPayload(result));
         var resource = document.RootElement.GetProperty("resources")[0];
 
         document.RootElement.GetProperty("schema_version").GetString().Should().Be("1.0");
@@ -142,7 +145,7 @@ public sealed class ExecuteToolPayloadSerializerTests
     }
 
     [TestMethod]
-    public void Serialize_ReplacesOnlyFailingDictionaryValue()
+    public void SerializeToolPayload_WhenAnyValueFails_ReplacesEntirePayload()
     {
         var payload = new ExecuteToolCallResult
         {
@@ -150,65 +153,34 @@ public sealed class ExecuteToolPayloadSerializerTests
             ["bad"] = new ThrowingEnumerable(),
         };
 
-        using var document = JsonDocument.Parse(ExecuteToolPayloadSerializer.Serialize(payload));
-
-        document.RootElement.GetProperty("good").GetInt32().Should().Be(42);
-        document.RootElement.GetProperty("bad").GetString().Should().Be(nameof(ThrowingEnumerable));
+        MessageUtils.SerializeToolPayload(payload).Should().Be(ExpectedSerializationError);
     }
 
     [TestMethod]
-    public void Serialize_ReplacesCycleWithoutThrowing()
+    public void SerializeToolPayload_WhenPayloadContainsCycle_ReplacesEntirePayload()
     {
         var payload = new ExecuteToolCallResult();
         payload["self"] = payload;
 
-        var action = () => ExecuteToolPayloadSerializer.Serialize(payload);
-
-        action.Should().NotThrow();
-        using var document = JsonDocument.Parse(action());
-        document.RootElement.GetProperty("self").GetString()
-            .Should().Contain(nameof(ExecuteToolCallResult));
+        MessageUtils.SerializeToolPayload(payload).Should().Be(ExpectedSerializationError);
     }
 
     [TestMethod]
-    public void Serialize_ReplacesOnlyFailingCollectionElement()
+    public void SerializeToolPayload_WhenPayloadContainsNonFiniteNumber_ReplacesEntirePayload()
     {
-        var cyclic = new SelfReferencingValue();
-        cyclic.Self = cyclic;
         var payload = new ExecuteToolCallResult
         {
-            ["items"] = new object?[] { "first", cyclic, "last" },
+            ["good"] = 42,
+            ["bad"] = double.NaN,
         };
 
-        using var document = JsonDocument.Parse(ExecuteToolPayloadSerializer.Serialize(payload));
-        var items = document.RootElement.GetProperty("items");
-
-        items[0].GetString().Should().Be("first");
-        items[1].GetString().Should().Contain(nameof(SelfReferencingValue));
-        items[2].GetString().Should().Be("last");
+        MessageUtils.SerializeToolPayload(payload).Should().Be(ExpectedSerializationError);
     }
 
     [TestMethod]
-    public void Serialize_ReplacesNonFiniteFloatingPointValuesWithFallbackStrings()
+    public void SerializeToolPayload_WhenPayloadIsNull_ReturnsEmptyObject()
     {
-        IDictionary<string, object> payload = new Dictionary<string, object>
-        {
-            ["float_nan"] = float.NaN,
-            ["float_positive_infinity"] = float.PositiveInfinity,
-            ["double_negative_infinity"] = double.NegativeInfinity,
-            ["items"] = new object?[] { 12.5d, double.PositiveInfinity, float.NegativeInfinity },
-        };
-
-        using var document = JsonDocument.Parse(ExecuteToolPayloadSerializer.Serialize(payload));
-        var root = document.RootElement;
-        var items = root.GetProperty("items");
-
-        root.GetProperty("float_nan").GetString().Should().Be(float.NaN.ToString());
-        root.GetProperty("float_positive_infinity").GetString().Should().Be(float.PositiveInfinity.ToString());
-        root.GetProperty("double_negative_infinity").GetString().Should().Be(double.NegativeInfinity.ToString());
-        items[0].GetDouble().Should().Be(12.5d);
-        items[1].GetString().Should().Be(double.PositiveInfinity.ToString());
-        items[2].GetString().Should().Be(float.NegativeInfinity.ToString());
+        MessageUtils.SerializeToolPayload(null).Should().Be("{}");
     }
 
     [TestMethod]
@@ -220,7 +192,7 @@ public sealed class ExecuteToolPayloadSerializerTests
             ["bytes"] = new byte[] { 0, 1, 2, 3 },
         };
 
-        using var document = JsonDocument.Parse(ExecuteToolPayloadSerializer.Serialize(payload));
+        using var document = JsonDocument.Parse(MessageUtils.SerializeToolPayload(payload));
         var root = document.RootElement;
 
         root.GetProperty("action").GetString().Should().Be("read");
@@ -239,7 +211,7 @@ public sealed class ExecuteToolPayloadSerializerTests
             },
         };
 
-        using var document = JsonDocument.Parse(ExecuteToolPayloadSerializer.Serialize(payload));
+        using var document = JsonDocument.Parse(MessageUtils.SerializeToolPayload(payload));
         var parameters = document.RootElement.GetProperty("parameters");
 
         parameters.ValueKind.Should().Be(JsonValueKind.Object);
@@ -253,9 +225,4 @@ public sealed class ExecuteToolPayloadSerializerTests
         public override string ToString() => nameof(ThrowingEnumerable);
     }
 
-    private sealed class SelfReferencingValue
-    {
-        public SelfReferencingValue? Self { get; set; }
-        public override string ToString() => nameof(SelfReferencingValue);
-    }
 }

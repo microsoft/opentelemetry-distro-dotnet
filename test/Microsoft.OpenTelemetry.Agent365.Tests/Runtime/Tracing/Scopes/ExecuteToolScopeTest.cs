@@ -247,7 +247,8 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         var tagValue = activity.Tags.First(t => t.Key == OpenTelemetryConstants.GenAiToolArgumentsKey).Value;
         tagValue.Should().NotBeNull();
         using var document = JsonDocument.Parse(tagValue!);
-        document.RootElement.GetProperty("value").GetString().Should().Be(nameof(ThrowingDictionary));
+        document.RootElement.GetProperty("serialization_error").GetString()
+            .Should().Be("Failed to serialize execute tool payload.");
     }
 
     [TestMethod]

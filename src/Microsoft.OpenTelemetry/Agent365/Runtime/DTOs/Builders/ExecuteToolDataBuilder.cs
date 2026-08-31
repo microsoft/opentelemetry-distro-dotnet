@@ -68,7 +68,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             AddIfNotNull(
                 attributes,
                 OpenTelemetryConstants.GenAiToolCallResultKey,
-                ExecuteToolPayloadSerializer.Serialize(result));
+                MessageUtils.SerializeToolPayload(result));
 
             return ApplyStatus(
                 new ExecuteToolData(
@@ -185,14 +185,14 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
                 AddIfNotNull(
                     attributes,
                     OpenTelemetryConstants.GenAiToolArgumentsKey,
-                    ExecuteToolPayloadSerializer.Serialize(toolCallDetails.ToolCallArguments));
+                    MessageUtils.SerializeToolPayload(toolCallDetails.ToolCallArguments));
             }
             else if (toolCallDetails.ArgumentsObject != null)
             {
                 AddIfNotNull(
                     attributes,
                     OpenTelemetryConstants.GenAiToolArgumentsKey,
-                    ExecuteToolPayloadSerializer.Serialize(toolCallDetails.ArgumentsObject));
+                    MessageUtils.SerializeToolPayload(toolCallDetails.ArgumentsObject));
             }
             else if (arguments != null)
             {

@@ -60,13 +60,13 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             {
                 SetTagMaybe(
                     OpenTelemetryConstants.GenAiToolArgumentsKey,
-                    ExecuteToolPayloadSerializer.Serialize(details.ToolCallArguments));
+                    MessageUtils.SerializeToolPayload(details.ToolCallArguments));
             }
             else if (details.ArgumentsObject != null)
             {
                 SetTagMaybe(
                     OpenTelemetryConstants.GenAiToolArgumentsKey,
-                    ExecuteToolPayloadSerializer.Serialize(details.ArgumentsObject));
+                    MessageUtils.SerializeToolPayload(details.ArgumentsObject));
             }
             else if (arguments != null)
             {
@@ -133,7 +133,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         {
             SetTagMaybe(
                 OpenTelemetryConstants.GenAiToolCallResultKey,
-                ExecuteToolPayloadSerializer.Serialize(result));
+                MessageUtils.SerializeToolPayload(result));
         }
 
         /// <summary>
@@ -150,7 +150,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
 
             SetTagMaybe(
                 OpenTelemetryConstants.GenAiToolCallResultKey,
-                ExecuteToolPayloadSerializer.Serialize(result));
+                MessageUtils.SerializeToolPayload(result));
         }
 
         /// <summary>

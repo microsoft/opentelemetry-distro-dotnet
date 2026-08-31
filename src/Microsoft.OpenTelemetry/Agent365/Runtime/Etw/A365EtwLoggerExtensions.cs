@@ -54,7 +54,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
                 toolCallDetails,
                 agentDetails,
                 conversationId,
-                ExecuteToolPayloadSerializer.Serialize(result),
+                MessageUtils.SerializeToolPayload(result),
                 startTime,
                 endTime,
                 spanId,

@@ -21,6 +21,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing
         private static readonly string DiagnosticFallback =
             "[{\"role\":\"system\",\"parts\":[{\"type\":\"text\",\"content\":\"[serialization failed]\"}],\"finish_reason\":\"error\"}]";
 
+        private const string ToolPayloadDiagnosticFallback =
+            "{\"serialization_error\":\"Failed to serialize execute tool payload.\"}";
+
         private static JsonSerializerOptions CreateSerializerOptions()
         {
             var options = new JsonSerializerOptions
@@ -132,6 +135,27 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing
             catch (Exception)
             {
                 return DiagnosticFallback;
+            }
+        }
+
+        /// <summary>
+        /// Serializes an execute-tool payload to JSON using the shared snake_case options.
+        /// Non-throwing; replaces the entire payload with a diagnostic object on error.
+        /// </summary>
+        public static string SerializeToolPayload(object? value)
+        {
+            if (value == null)
+            {
+                return "{}";
+            }
+
+            try
+            {
+                return JsonSerializer.Serialize(value, value.GetType(), SerializerOptions);
+            }
+            catch (Exception)
+            {
+                return ToolPayloadDiagnosticFallback;
             }
         }
     }

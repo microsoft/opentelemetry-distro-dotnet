@@ -364,7 +364,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
             var data = ExecuteToolDataBuilder.Build(tool, agent, conversationId);
 
             using var document = JsonDocument.Parse(data.Attributes[OpenTelemetryConstants.GenAiToolArgumentsKey]!.ToString()!);
-            document.RootElement.GetProperty("value").GetString().Should().Be(nameof(ThrowingDictionary));
+            document.RootElement.GetProperty("serialization_error").GetString()
+                .Should().Be("Failed to serialize execute tool payload.");
         }
 
         [TestMethod]
