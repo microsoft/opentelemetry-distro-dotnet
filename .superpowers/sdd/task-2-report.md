@@ -43,6 +43,7 @@
 - `test/Microsoft.OpenTelemetry.Agent365.Tests/Runtime/Tracing/ExecuteToolPayloadSerializerTests.cs`
 - `test/Microsoft.OpenTelemetry.Agent365.Tests/Runtime/Tracing/Scopes/ExecuteToolScopeTest.cs`
 - `test/Microsoft.OpenTelemetry.Agent365.Tests/Runtime/DTOs/Builders/ExecuteToolDataBuilderTests.cs`
+- `.superpowers/sdd/task-2-report.md`
 
 ### Commit SHA
 - `7408cbcf91ad043cf7a70e0545e7b75d5b0638e4`
