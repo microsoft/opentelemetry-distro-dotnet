@@ -202,6 +202,8 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             o.ExporterTimeoutMilliseconds = options.Agent365.ExporterTimeoutMilliseconds;
             o.MaxExportBatchSize = options.Agent365.MaxExportBatchSize;
             o.MaxPayloadBytes = options.Agent365.MaxPayloadBytes;
+            o.DisableOfflineStorage = options.Agent365.DisableOfflineStorage;
+            o.StorageDirectory = options.Agent365.StorageDirectory;
         }, effectiveInstrumentation);
 
         // --- Microsoft Agent Framework (always: captures MAF spans + processor) ---

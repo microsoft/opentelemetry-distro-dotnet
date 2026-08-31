@@ -652,6 +652,34 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
         }
 
         [Fact]
+        public void Agent365_OfflineStorageOptions_ForwardedToExporterOptions()
+        {
+            // Regression: the offline store-and-forward options set on o.Agent365 must be forwarded
+            // through UseMicrosoftOpenTelemetry into the DI-resolved Agent365ExporterOptions singleton,
+            // exactly like the other Agent365 exporter settings. The custom-exporter marker keeps the
+            // real exporter from being built so the test only asserts the resolved options.
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddSingleton(Microsoft.OpenTelemetry.CustomAgent365ExporterMarker.Instance);
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(o =>
+                {
+                    o.Exporters = ExportTarget.Agent365;
+                    o.Agent365.TokenResolver = (agentId, tenantId) =>
+                        System.Threading.Tasks.Task.FromResult<string?>("resolved-token");
+                    o.Agent365.DisableOfflineStorage = true;
+                    o.Agent365.StorageDirectory = @"C:\custom\telemetry";
+                });
+
+            using var sp = services.BuildServiceProvider();
+            var options = sp.GetService<Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions>();
+
+            Assert.NotNull(options);
+            Assert.True(options!.DisableOfflineStorage, "DisableOfflineStorage must be forwarded to the exporter options.");
+            Assert.Equal(@"C:\custom\telemetry", options.StorageDirectory);
+        }
+
+        [Fact]
         public void CustomExporterMarker_WithSkipExporter_NoOptionsInDI()
         {
             const string envVar = "APPLICATIONINSIGHTS_CONNECTION_STRING";

@@ -10,12 +10,12 @@ using Microsoft.OpenTelemetry.AzureMonitor.Internals;
 namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 {
     /// <summary>
-    /// Owns the distro's Feature SDKStats meter and observable gauge. The Azure Monitor
+    /// Owns the distro's Feature and Instrumentation SDKStats meter and observable gauge. The Azure Monitor
     /// exporter's Statsbeat <c>MeterProvider</c> subscribes to the meter name advertised by
     /// this class (see <c>StatsbeatConstants.DistroFeatureSdkStatsMeterName</c> in the
-    /// exporter). That provider collects on the shared 15-minute reader, so this gauge
-    /// throttles to one emission per <see cref="EmissionInterval"/> (24 hr) instead of
-    /// shipping every 15 min.
+    /// exporter). That provider collects on the shared 15-minute reader, while this gauge
+    /// evaluates the latest masks and tags only once per <see cref="EmissionInterval"/>
+    /// (24 hr), matching the JavaScript distro's long-interval Feature SDKStats cadence.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -27,7 +27,8 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
     /// </para>
     /// <para>
     /// Per the SDKStats specification, the gauge returns no measurements when the
-    /// configured features bit mask is <see cref="DistroFeature.None"/>. The
+    /// current snapshot features combined with runtime-observed features and the current
+    /// instrumentation bit mask are all empty. The
     /// <see cref="Func{TResult}"/> of <see cref="IEnumerable{T}"/> overload is used (not the
     /// single-<c>Measurement</c> overload) so an empty result actually skips emission
     /// instead of publishing a phantom zero-valued data point with no tags.
@@ -64,9 +65,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 
         private DistroFeatureSnapshot _snapshot;
 
-        // Throttle so the Feature gauge emits at most once per EmissionInterval even though
-        // the shared reader collects every 15 min.
-        private long _lastEmissionTicks;
+        private long _lastCollectionTicks;
 
         private DistroFeatureSdkStats(DistroFeatureSnapshot snapshot)
         {
@@ -130,18 +129,10 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             {
                 if (s_instance is null)
                 {
-                    // First call: construct with the snapshot already set, then publish.
-                    // The ordering here matters — assigning s_instance only after the
-                    // constructor returns guarantees Instance never exposes a partially
-                    // initialized object.
                     s_instance = new DistroFeatureSdkStats(snapshot);
                 }
                 else
                 {
-                    // Subsequent call: swap snapshot under the lock so writes are ordered
-                    // with respect to instance publish. Observe() pairs this with a
-                    // Volatile.Read for cross-thread visibility on platforms with weak
-                    // memory models.
                     Volatile.Write(ref s_instance._snapshot, snapshot);
                 }
 
@@ -159,6 +150,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             {
                 s_instance?.Dispose();
                 s_instance = null;
+                DistroSdkStatsUsage.ResetForTesting();
             }
         }
 
@@ -169,18 +161,37 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 
         private IEnumerable<Measurement<long>> Observe()
         {
-            DistroFeatureSnapshot snapshot;
-            try
+            if (!TryGetEligibleCollectionWindow(out long previousTicks, out long nowTicks))
             {
-                snapshot = Volatile.Read(ref _snapshot);
-                if (snapshot.Features == DistroFeature.None)
+                return EmptyMeasurements;
+            }
+
+            var snapshot = Volatile.Read(ref _snapshot);
+            var features = snapshot.Features | DistroSdkStatsUsage.Features;
+            var instrumentations = DistroSdkStatsUsage.Instrumentations;
+            if (features == DistroFeature.None
+                && instrumentations == DistroInstrumentation.None)
+            {
+                // Empty masks still consume this shared long-interval collection slot.
+                // A type that becomes nonempty later waits for the next scheduled export.
+                if (!TryClaimCollection(previousTicks, nowTicks))
                 {
-                    // SDKStats spec: "Don't send feature/instrumentation SDKStats when the
-                    // feature/instrumentation list is empty." Returning an empty enumerable
-                    // (not a default Measurement) is required to truly skip emission for
-                    // this collection cycle.
                     return EmptyMeasurements;
                 }
+
+                return EmptyMeasurements;
+            }
+
+            string resourceProvider;
+            string attachMode;
+            string operatingSystem;
+            try
+            {
+                // The first resource-provider lookup may perform IMDS discovery. Complete that
+                // potentially blocking work before atomically claiming the collection slot.
+                resourceProvider = ResourceProviderHelper.GetResourceProvider();
+                attachMode = ResourceProviderHelper.GetAttachMode();
+                operatingSystem = ResourceProviderHelper.GetOperatingSystem();
             }
             catch (Exception ex)
             {
@@ -188,46 +199,98 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
                 return EmptyMeasurements;
             }
 
-            // Throttle to the 24 hr cadence: skip collections inside the window. Delta
-            // temporality means a skipped collection exports nothing. A negative elapsed value
-            // means the wall clock jumped backwards (e.g. NTP/VM sync); treat that as eligible
-            // so a backwards jump re-anchors the window instead of suppressing for up to 24 hr.
-            long previousTicks = Volatile.Read(ref _lastEmissionTicks);
-            long nowTicks = DateTime.UtcNow.Ticks;
-            long elapsedTicks = nowTicks - previousTicks;
-            if (previousTicks != 0 && elapsedTicks >= 0 && elapsedTicks < _emissionInterval.Ticks)
+            if (!TryGetEligibleCollectionWindow(out previousTicks, out nowTicks))
             {
                 return EmptyMeasurements;
             }
 
-            // CAS so a racing collection can't double-emit.
-            if (Interlocked.CompareExchange(ref _lastEmissionTicks, nowTicks, previousTicks) != previousTicks)
+            snapshot = Volatile.Read(ref _snapshot);
+            features = snapshot.Features | DistroSdkStatsUsage.Features;
+            instrumentations = DistroSdkStatsUsage.Instrumentations;
+
+            // A single callback claims the shared slot so concurrent readers cannot double-emit.
+            if (!TryClaimCollection(previousTicks, nowTicks))
+            {
+                return EmptyMeasurements;
+            }
+
+            if (features == DistroFeature.None
+                && instrumentations == DistroInstrumentation.None)
             {
                 return EmptyMeasurements;
             }
 
             try
             {
-                var measurement = new Measurement<long>(
-                    (long)snapshot.Features,
-                    new KeyValuePair<string, object?>("rp", ResourceProviderHelper.GetResourceProvider()),
-                    new KeyValuePair<string, object?>("attach", ResourceProviderHelper.GetAttachMode()),
-                    new KeyValuePair<string, object?>("cikey", snapshot.CustomerInstrumentationKey),
-                    new KeyValuePair<string, object?>("feature", (long)snapshot.Features),
-                    new KeyValuePair<string, object?>("type", 0),
-                    new KeyValuePair<string, object?>("os", ResourceProviderHelper.GetOperatingSystem()),
-                    new KeyValuePair<string, object?>("language", "dotnet"),
-                    new KeyValuePair<string, object?>("version", SdkVersion.GetSdkStatsVersion(snapshot.DistroVersion)));
+                var measurements = new List<Measurement<long>>(2);
+                if (instrumentations != DistroInstrumentation.None)
+                {
+                    measurements.Add(CreateMeasurement(
+                        (long)instrumentations,
+                        type: 1,
+                        snapshot,
+                        resourceProvider,
+                        attachMode,
+                        operatingSystem));
+                }
 
-                return new[] { measurement };
+                if (features != DistroFeature.None)
+                {
+                    measurements.Add(CreateMeasurement(
+                        (long)features,
+                        type: 0,
+                        snapshot,
+                        resourceProvider,
+                        attachMode,
+                        operatingSystem));
+                }
+
+                return measurements;
             }
             catch (Exception ex)
             {
                 AzureMonitorAspNetCoreEventSource.Log.DistroFeatureSdkStatsCallbackFailed(ex);
-                // Rewind so we retry on the next collection.
-                Volatile.Write(ref _lastEmissionTicks, previousTicks);
+                Interlocked.CompareExchange(ref _lastCollectionTicks, previousTicks, nowTicks);
                 return EmptyMeasurements;
             }
         }
+
+        private bool TryGetEligibleCollectionWindow(out long previousTicks, out long nowTicks)
+        {
+            // Read the slot before the clock so a concurrent claim cannot resemble a backwards
+            // clock jump. The subsequent CAS rejects any claim made after this read.
+            previousTicks = Volatile.Read(ref _lastCollectionTicks);
+            nowTicks = DateTime.UtcNow.Ticks;
+            return IsCollectionEligible(nowTicks, previousTicks);
+        }
+
+        private bool TryClaimCollection(long previousTicks, long nowTicks) =>
+            Interlocked.CompareExchange(ref _lastCollectionTicks, nowTicks, previousTicks) == previousTicks;
+
+        private bool IsCollectionEligible(long nowTicks, long previousTicks)
+        {
+            long elapsedTicks = nowTicks - previousTicks;
+            return previousTicks == 0
+                || elapsedTicks < 0
+                || elapsedTicks >= _emissionInterval.Ticks;
+        }
+
+        private static Measurement<long> CreateMeasurement(
+            long mask,
+            int type,
+            DistroFeatureSnapshot snapshot,
+            string resourceProvider,
+            string attachMode,
+            string operatingSystem) =>
+            new Measurement<long>(
+                1,
+                new KeyValuePair<string, object?>("rp", resourceProvider),
+                new KeyValuePair<string, object?>("attach", attachMode),
+                new KeyValuePair<string, object?>("cikey", snapshot.CustomerInstrumentationKey),
+                new KeyValuePair<string, object?>("feature", mask),
+                new KeyValuePair<string, object?>("type", type),
+                new KeyValuePair<string, object?>("os", operatingSystem),
+                new KeyValuePair<string, object?>("language", "dotnet"),
+                new KeyValuePair<string, object?>("version", SdkVersion.GetSdkStatsVersion(snapshot.DistroVersion)));
     }
 }

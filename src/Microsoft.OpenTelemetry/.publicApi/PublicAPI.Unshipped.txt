@@ -1,0 +1,13 @@
+#nullable enable
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.DisableOfflineStorage.get -> bool
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.DisableOfflineStorage.set -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.StorageDirectory.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.StorageDirectory.set -> void
+Microsoft.OpenTelemetry.Agent365Options.DisableOfflineStorage.get -> bool
+Microsoft.OpenTelemetry.Agent365Options.DisableOfflineStorage.set -> void
+Microsoft.OpenTelemetry.Agent365Options.StorageDirectory.get -> string?
+Microsoft.OpenTelemetry.Agent365Options.StorageDirectory.set -> void
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterAsync.Dispose() -> void
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterAsync.ShutdownAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.OnForceFlush(int timeoutMilliseconds) -> bool
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.OnShutdown(int timeoutMilliseconds) -> bool
