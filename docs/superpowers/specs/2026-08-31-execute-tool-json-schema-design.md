@@ -42,6 +42,11 @@ Each schema class is a sealed subclass of
 `Dictionary<string, object?>`. The inherited dictionary is the single source of
 truth for serialization.
 
+This applies individually to every concrete type in this design, including
+`ToolCallIdentifier` and `ToolCallContainer`; identifiers and containers can
+therefore carry arbitrary provider-specific key/value pairs in addition to
+their standard properties.
+
 Each class provides:
 
 - a parameterless constructor;
@@ -105,6 +110,9 @@ Standard properties:
 - `string? Type`; and
 - `string? Value`.
 
+`ToolCallIdentifier` also inherits `Dictionary<string, object?>`, so callers can
+add, replace, or remove identifier fields through the dictionary indexer.
+
 #### `ToolCallContainer`
 
 Standard properties:
@@ -112,6 +120,9 @@ Standard properties:
 - `string? Id`;
 - `string? Uri`; and
 - `string? Type`.
+
+`ToolCallContainer` also inherits `Dictionary<string, object?>`, so callers can
+represent provider-specific container shapes through arbitrary key/value pairs.
 
 ### Result types
 
@@ -194,6 +205,24 @@ Property setters store the lowercase schema value as a string. Getters parse
 recognized strings case-insensitively. Callers can use the dictionary indexer
 to provide future or provider-specific values without waiting for an SDK
 release.
+
+### Extensibility by type
+
+Every listed type has its own inherited dictionary:
+
+| Type | Custom key/value pairs |
+| --- | --- |
+| `ExecuteToolCallArguments` | Yes |
+| `ToolCallResource` | Yes |
+| `ToolCallIdentifier` | Yes |
+| `ToolCallContainer` | Yes |
+| `ExecuteToolCallResult` | Yes |
+| `ToolCallResultResource` | Yes |
+| `ToolCallResultOutcome` | Yes |
+| `ToolCallResultSensitivity` | Yes |
+| `ToolCallResultPolicy` | Yes |
+| `ToolCallResultSecurity` | Yes |
+| `ToolCallResultPagination` | Yes |
 
 ## API integration
 
