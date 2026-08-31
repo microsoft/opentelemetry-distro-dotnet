@@ -6,10 +6,12 @@ namespace Microsoft.Agents.A365.Observability.Tests.Tracing.Scopes;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
 
 [TestClass]
 public sealed class ExecuteToolScopeTest : ActivityTest
@@ -235,6 +237,111 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         tagValue.Should().NotBeNull();
         using var document = JsonDocument.Parse(tagValue!);
         document.RootElement.GetProperty("value").GetString().Should().Be(nameof(ThrowingDictionary));
+    }
+
+    [TestMethod]
+    public void Start_WithTypedArguments_RecordsSchemaJson()
+    {
+        var arguments = new ExecuteToolCallArguments
+        {
+            Action = ToolCallAction.Read,
+            Parameters = new Dictionary<string, object?> { ["location"] = "Seattle" },
+            Resources = new List<ToolCallResource>(),
+        };
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails(toolName: "get_weather", toolCallArguments: arguments),
+                Util.GetAgentDetails());
+        });
+
+        var json = activity.Tags.Single(
+            pair => pair.Key == OpenTelemetryConstants.GenAiToolArgumentsKey).Value;
+        using var document = JsonDocument.Parse(json!);
+        document.RootElement.GetProperty("action").GetString().Should().Be("read");
+        document.RootElement.GetProperty("schema_version").GetString().Should().Be("1.0");
+    }
+
+    [TestMethod]
+    public void ToolCallDetails_WithTypedArguments_ExposesTypedArgumentsProperty()
+    {
+        var arguments = new ExecuteToolCallArguments();
+
+        var details = new ToolCallDetails(toolName: "get_weather", toolCallArguments: arguments);
+
+        details.ToolCallArguments.Should().BeSameAs(arguments);
+    }
+
+    [TestMethod]
+    public void Start_WithTypedArgumentsAndLegacyString_PrefersTypedArguments()
+    {
+        var details = new ToolCallDetails("get_weather", "legacy");
+        typeof(ToolCallDetails)
+            .GetField("<ToolCallArguments>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(
+                details,
+                new ExecuteToolCallArguments
+                {
+                    Action = ToolCallAction.Read,
+                });
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                details,
+                Util.GetAgentDetails());
+        });
+
+        var json = activity.Tags.Single(
+            pair => pair.Key == OpenTelemetryConstants.GenAiToolArgumentsKey).Value;
+        using var document = JsonDocument.Parse(json!);
+        document.RootElement.GetProperty("action").GetString().Should().Be("read");
+        document.RootElement.TryGetProperty("arguments", out _).Should().BeFalse();
+    }
+
+    [TestMethod]
+    public void RecordResponse_WithTypedResult_RecordsSchemaJson()
+    {
+        var result = new ExecuteToolCallResult
+        {
+            Outcome = new ToolCallResultOutcome
+            {
+                Status = ToolCallOutcomeStatus.Success,
+            },
+            Data = new Dictionary<string, object?>(),
+            Resources = new List<ToolCallResultResource>(),
+            Pagination = new ToolCallResultPagination
+            {
+                HasMore = false,
+                TotalCount = 0,
+            },
+        };
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails("get_weather", (string?)null),
+                Util.GetAgentDetails());
+            scope.RecordResponse(result);
+        });
+
+        var json = activity.Tags.Single(
+            pair => pair.Key == OpenTelemetryConstants.GenAiToolCallResultKey).Value;
+        using var document = JsonDocument.Parse(json!);
+        document.RootElement.GetProperty("outcome")
+            .GetProperty("status").GetString().Should().Be("success");
+    }
+
+    [TestMethod]
+    public void RecordResponse_ExposesTypedExecuteToolResultOverload()
+    {
+        typeof(ExecuteToolScope)
+            .GetMethod(nameof(ExecuteToolScope.RecordResponse), new[] { typeof(ExecuteToolCallResult) })
+            .Should().NotBeNull();
     }
 
     [TestMethod]

@@ -3,6 +3,7 @@
 
 using Microsoft.Agents.A365.Observability.Runtime.Tracing;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using System;
 using System.Collections.Generic;
@@ -112,8 +113,15 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             var (toolName, arguments, toolCallId, description, toolType, endpoint) = toolCallDetails;
             AddIfNotNull(attributes, OpenTelemetryConstants.GenAiToolNameKey, toolName);
 
-            // Arguments — prefer structured dict, then ensure JSON string per OTEL spec
-            if (toolCallDetails.ArgumentsObject != null)
+            // Arguments — prefer typed structured arguments, then legacy structured dict, then ensure JSON string per OTEL spec
+            if (toolCallDetails.ToolCallArguments != null)
+            {
+                AddIfNotNull(
+                    attributes,
+                    OpenTelemetryConstants.GenAiToolArgumentsKey,
+                    ExecuteToolPayloadSerializer.Serialize(toolCallDetails.ToolCallArguments));
+            }
+            else if (toolCallDetails.ArgumentsObject != null)
             {
                 AddIfNotNull(
                     attributes,

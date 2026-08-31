@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
 
 using Microsoft.Agents.A365.Observability.Runtime.Tracing;
 
@@ -55,7 +56,13 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
 
             // Per OTEL spec: arguments SHOULD be recorded in structured form.
             // Prefer ArgumentsObject (dict → JSON); fall back to string with JSON check.
-            if (details.ArgumentsObject != null)
+            if (details.ToolCallArguments != null)
+            {
+                SetTagMaybe(
+                    OpenTelemetryConstants.GenAiToolArgumentsKey,
+                    ExecuteToolPayloadSerializer.Serialize(details.ToolCallArguments));
+            }
+            else if (details.ArgumentsObject != null)
             {
                 SetTagMaybe(
                     OpenTelemetryConstants.GenAiToolArgumentsKey,
@@ -124,6 +131,20 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// <param name="result">Tool call result as a structured dictionary.</param>
         public void RecordResponse(IDictionary<string, object> result)
         {
+            SetTagMaybe(
+                OpenTelemetryConstants.GenAiToolCallResultKey,
+                ExecuteToolPayloadSerializer.Serialize(result));
+        }
+
+        /// <summary>
+        /// Records a typed tool call result for telemetry tracking.
+        /// Per OTEL spec, the result SHOULD be recorded in structured form.
+        /// </summary>
+        /// <param name="result">Tool call result as a typed schema model.</param>
+        public void RecordResponse(ExecuteToolCallResult result)
+        {
+            ArgumentNullException.ThrowIfNull(result);
+
             SetTagMaybe(
                 OpenTelemetryConstants.GenAiToolCallResultKey,
                 ExecuteToolPayloadSerializer.Serialize(result));

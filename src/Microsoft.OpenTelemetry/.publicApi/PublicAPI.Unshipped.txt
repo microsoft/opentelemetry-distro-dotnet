@@ -11,6 +11,8 @@ override Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365E
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterAsync.ShutdownAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.OnForceFlush(int timeoutMilliseconds) -> bool
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.OnShutdown(int timeoutMilliseconds) -> bool
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallArguments.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallDetails(string! toolName, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments! toolCallArguments, string? toolCallId = null, string? description = null, string? toolType = null, System.Uri? endpoint = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments.Action.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallAction?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments.Action.set -> void
@@ -143,3 +145,4 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResu
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolPolicyDecision
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolPolicyDecision.Allow = 0 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolPolicyDecision
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolPolicyDecision.Deny = 1 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolPolicyDecision
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.ExecuteToolScope.RecordResponse(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult! result) -> void

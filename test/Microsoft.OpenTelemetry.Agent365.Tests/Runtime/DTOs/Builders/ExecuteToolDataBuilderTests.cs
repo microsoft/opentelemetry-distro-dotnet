@@ -2,10 +2,12 @@
 // Licensed under the MIT License.
 
 using System.Collections;
+using System.Reflection;
 using FluentAssertions;
 using Microsoft.Agents.A365.Observability.Runtime.DTOs;
 using Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using System.Text.Json;
 
@@ -363,6 +365,48 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
 
             using var document = JsonDocument.Parse(data.Attributes[OpenTelemetryConstants.GenAiToolArgumentsKey]!.ToString()!);
             document.RootElement.GetProperty("value").GetString().Should().Be(nameof(ThrowingDictionary));
+        }
+
+        [TestMethod]
+        public void Build_WithTypedArguments_UsesSchemaJson()
+        {
+            var tool = new ToolCallDetails(
+                "tool-typed",
+                new ExecuteToolCallArguments
+                {
+                    Action = ToolCallAction.Read,
+                    Parameters = new Dictionary<string, object?> { ["location"] = "Seattle" },
+                    Resources = new List<ToolCallResource>(),
+                });
+            var agent = new AgentDetails("agent-typed");
+            var conversationId = "conv-typed";
+
+            var data = ExecuteToolDataBuilder.Build(tool, agent, conversationId);
+
+            using var document = JsonDocument.Parse(data.Attributes[OpenTelemetryConstants.GenAiToolArgumentsKey]!.ToString()!);
+            document.RootElement.GetProperty("action").GetString().Should().Be("read");
+            document.RootElement.GetProperty("schema_version").GetString().Should().Be("1.0");
+        }
+
+        [TestMethod]
+        public void Build_WithTypedArgumentsAndLegacyString_PrefersTypedArguments()
+        {
+            var tool = new ToolCallDetails("tool-precedence", "legacy");
+            var typedArguments = new ExecuteToolCallArguments
+            {
+                Action = ToolCallAction.Delete,
+            };
+            typeof(ToolCallDetails)
+                .GetField("<ToolCallArguments>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(tool, typedArguments);
+            var agent = new AgentDetails("agent-precedence");
+            var conversationId = "conv-precedence";
+
+            var data = ExecuteToolDataBuilder.Build(tool, agent, conversationId);
+
+            using var document = JsonDocument.Parse(data.Attributes[OpenTelemetryConstants.GenAiToolArgumentsKey]!.ToString()!);
+            document.RootElement.GetProperty("action").GetString().Should().Be("delete");
+            document.RootElement.TryGetProperty("arguments", out _).Should().BeFalse();
         }
 
         private sealed class ThrowingDictionary : IDictionary<string, object>
