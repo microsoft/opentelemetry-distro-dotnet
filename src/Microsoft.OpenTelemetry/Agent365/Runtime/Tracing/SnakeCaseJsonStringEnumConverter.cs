@@ -4,11 +4,11 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools
+namespace Microsoft.Agents.A365.Observability.Runtime.Tracing
 {
-    internal sealed class ToolCallJsonStringEnumConverter : JsonStringEnumConverter
+    internal sealed class SnakeCaseJsonStringEnumConverter : JsonStringEnumConverter
     {
-        public ToolCallJsonStringEnumConverter()
+        public SnakeCaseJsonStringEnumConverter()
             : base(JsonNamingPolicy.SnakeCaseLower, allowIntegerValues: false)
         {
         }

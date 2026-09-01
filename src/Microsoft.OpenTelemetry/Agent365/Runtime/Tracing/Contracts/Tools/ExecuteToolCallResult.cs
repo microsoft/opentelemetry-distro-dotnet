@@ -3,11 +3,12 @@
 
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools
 {
     /// <summary>Represents the status of a tool call outcome.</summary>
-    [JsonConverter(typeof(ToolCallJsonStringEnumConverter))]
+    [JsonConverter(typeof(SnakeCaseJsonStringEnumConverter))]
     public enum ToolCallOutcomeStatus
     {
         /// <summary>The tool call completed successfully.</summary>
@@ -18,7 +19,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools
     }
 
     /// <summary>Represents a policy decision for a tool call.</summary>
-    [JsonConverter(typeof(ToolCallJsonStringEnumConverter))]
+    [JsonConverter(typeof(SnakeCaseJsonStringEnumConverter))]
     public enum ToolPolicyDecision
     {
         /// <summary>The policy allows the tool call.</summary>
