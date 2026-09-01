@@ -19,6 +19,17 @@ Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationSeverity.Er
 Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFindingStatus
 Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFindingStatus.Active = 0 -> Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFindingStatus
 Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFindingStatus.Suppressed = 1 -> Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFindingStatus
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationReport
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationReport.Spans.get -> System.Collections.Generic.IReadOnlyList<Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanValidationResult!>!
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationReport.SessionFindings.get -> System.Collections.Generic.IReadOnlyList<Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFinding!>!
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationReport.ErrorCount.get -> int
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationReport.WarningCount.get -> int
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationReport.SuppressedFindingCount.get -> int
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationReport.IsValid.get -> bool
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationReport.EnsureValid() -> void
+override Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationReport.ToString() -> string!
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationException
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationException.Report.get -> Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationReport!
 Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds
 const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.TenantIdRequired = "A365-COMMON-001" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.AgentIdentityRequired = "A365-COMMON-002" -> string!
