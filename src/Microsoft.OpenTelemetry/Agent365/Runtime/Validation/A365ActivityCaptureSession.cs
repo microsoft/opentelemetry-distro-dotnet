@@ -17,9 +17,46 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Validation;
 /// capture recognized A365 GenAI spans and waits for a quiet period before
 /// producing immutable snapshots.
 /// </summary>
+/// <remarks>
+/// <para>
+/// The session has exactly two states: <em>listening</em> and <em>closed</em>.
+/// The transition between them is the session's closure boundary, and it is
+/// performed exactly once, under <see cref="gate"/>, by whichever
+/// <see cref="CompleteAsync"/> call first decides the outcome (a full quiet
+/// period, or the completion deadline). The same gate serializes every
+/// listener-callback mutation of the session's observation state
+/// (<see cref="active"/>, <see cref="completed"/> and
+/// <see cref="eligibleChangeVersion"/>), so the boundary is atomic with
+/// respect to <see cref="OnStarted"/>/<see cref="OnStopped"/>: a callback
+/// either wins the gate and is fully applied inside the evaluation window,
+/// or loses it and is ignored as being outside the window. There is no
+/// interleaving in which a callback is partially applied across the
+/// boundary, and no unsynchronized re-read of live collections is used to
+/// decide the final result.
+/// </para>
+/// <para>
+/// Two operations are deliberately performed <em>outside</em> the gate.
+/// First, evaluating the customer-supplied span filter, which must never run
+/// while a lock is held. Second, physically detaching the
+/// <see cref="ActivityListener"/>: <c>ActivityListener.Dispose</c> takes
+/// <c>DiagnosticSource</c>'s own internal listener-list locks, which are
+/// already held while activity callbacks are dispatched, so detaching under
+/// <see cref="gate"/> would invert the lock order and could deadlock against
+/// a concurrent <c>Activity.Start</c>/<c>Stop</c>. Detaching immediately
+/// after the gate is released is safe and sufficient: the logical closure
+/// recorded under the gate already causes every in-flight or subsequent
+/// callback to be ignored.
+/// </para>
+/// </remarks>
 internal sealed class A365ActivityCaptureSession : IDisposable
 {
     private static readonly TimeSpan QuietPeriod = TimeSpan.FromMilliseconds(250);
+
+    /// <summary>
+    /// Serializes listener-callback state mutation against the single
+    /// session-closure decision. See the type-level remarks.
+    /// </summary>
+    private readonly object gate = new();
 
     private readonly ConcurrentDictionary<Activity, byte> active = new();
     private readonly ConcurrentQueue<Activity> completed = new();
@@ -27,6 +64,23 @@ internal sealed class A365ActivityCaptureSession : IDisposable
     private readonly Func<A365SpanSnapshot, bool>? spanFilter;
     private readonly ActivityListener listener;
     private long eligibleChangeVersion;
+
+    /// <summary>
+    /// Whether the session has left the listening state. Written only under
+    /// <see cref="gate"/> (where it is authoritative); read without the gate
+    /// only as a cheap advisory fast path.
+    /// </summary>
+    private volatile bool closed;
+
+    /// <summary>
+    /// The immutable state captured at the closure boundary. Guarded by
+    /// <see cref="gate"/>. Non-null exactly when the session is closed by a
+    /// completion decision, which makes closure idempotent: concurrent or
+    /// repeated <see cref="CompleteAsync"/> calls all report the same
+    /// boundary rather than deriving a second, inconsistent one.
+    /// </summary>
+    private ClosureState? closure;
+
     private bool disposed;
 
     internal A365ActivityCaptureSession(Func<A365SpanSnapshot, bool>? spanFilter)
@@ -49,20 +103,47 @@ internal sealed class A365ActivityCaptureSession : IDisposable
 
     /// <summary>
     /// Gets or sets a test-only synchronization hook. When set, it is invoked
-    /// synchronously inside <see cref="OnStopped"/> after a stopping activity
-    /// has been made durably observable (queued to the completed set when
-    /// eligible) but before it is removed from the active set. Production
-    /// code never sets this; it exists solely so regression tests can
-    /// deterministically observe the transition point instead of relying on
+    /// synchronously inside <see cref="OnStopped"/>, while the closure gate is
+    /// held, after a stopping activity has been made durably observable
+    /// (queued to the completed set when eligible) but before it is removed
+    /// from the active set. Production code never sets this; it exists solely
+    /// so regression tests can deterministically hold the gate across that
+    /// transition -- for example to force a stop callback to win the gate
+    /// against a concurrent completion boundary -- instead of relying on
     /// wall-clock timing.
     /// </summary>
     internal Action<Activity>? OnStoppedTransitionHookForTests { get; set; }
 
     /// <summary>
+    /// Gets or sets a test-only synchronization hook. When set, it is invoked
+    /// synchronously by <see cref="OnStarted"/> and <see cref="OnStopped"/>
+    /// immediately before they acquire the closure gate (and after any span
+    /// filter evaluation, which never runs under the gate). Production code
+    /// never sets this; tests use it to park a listener callback just outside
+    /// the gate so that a concurrent completion boundary provably wins the
+    /// race and the callback is then observed to fall outside the evaluation
+    /// window.
+    /// </summary>
+    internal Action<Activity>? OnBeforeCallbackGateForTests { get; set; }
+
+    /// <summary>
+    /// Gets or sets a test-only synchronization hook. When set, it is invoked
+    /// synchronously by <see cref="CompleteAsync"/> immediately before it
+    /// acquires the closure gate to make its final success or timeout
+    /// decision -- that is, after the unsynchronized candidate quiet-period
+    /// check has already passed. Production code never sets this; tests use
+    /// it to deterministically inject listener callbacks into exactly that
+    /// window, which is the race the gate exists to close.
+    /// </summary>
+    internal Action? OnBeforeClosureGateForTests { get; set; }
+
+    /// <summary>
     /// Waits for a 250-millisecond quiet period, bounded by <paramref name="timeout"/>,
     /// during which no new eligible activity starts or stops. Returns filtered
     /// snapshots for completed eligible spans and snapshots for any span that
-    /// was still active and eligible when the timeout elapsed.
+    /// was still active and eligible when the timeout elapsed. The session is
+    /// closed and its listener detached before this method returns, so the
+    /// returned result describes a boundary that no later activity can change.
     /// </summary>
     /// <param name="timeout">The maximum time to wait for span completion.</param>
     /// <param name="cancellationToken">A token used to cancel the wait.</param>
@@ -72,12 +153,20 @@ internal sealed class A365ActivityCaptureSession : IDisposable
         CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
-        var timedOut = true;
-        var quietPeriodObserved = false;
 
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            // Closure is idempotent: if this session's boundary has already
+            // been defined (by a concurrent or earlier CompleteAsync call),
+            // report that same boundary instead of deriving a second one
+            // from collections that are no longer being updated.
+            var establishedClosure = TryGetClosure();
+            if (establishedClosure != null)
+            {
+                return CreateResult(establishedClosure);
+            }
 
             var remaining = timeout - stopwatch.Elapsed;
             if (remaining <= TimeSpan.Zero)
@@ -96,14 +185,19 @@ internal sealed class A365ActivityCaptureSession : IDisposable
 
             await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
 
-            var isQuiet = version == Interlocked.Read(ref eligibleChangeVersion) &&
+            // Unsynchronized *candidate* check. It is deliberately performed
+            // without the gate because it evaluates the span filter (customer
+            // code, which must never run under a lock) and, in doing so,
+            // warms the at-most-once filter-decision cache for everything
+            // currently active. It can never decide the outcome on its own:
+            // only the gated re-check below is authoritative.
+            var isCandidateQuiet = version == Interlocked.Read(ref eligibleChangeVersion) &&
                 !active.Keys.Any(IsEligibleForWait);
 
-            if (isQuiet && isFullQuietPeriodDelay)
+            if (isCandidateQuiet && isFullQuietPeriodDelay &&
+                TryCloseOnQuietPeriod(version, out var quietResult))
             {
-                quietPeriodObserved = true;
-                timedOut = false;
-                break;
+                return quietResult!;
             }
 
             // A residual delay shorter than the full 250ms quiet period
@@ -112,23 +206,27 @@ internal sealed class A365ActivityCaptureSession : IDisposable
             // evidence than observing no change for the full window. Only a
             // delay of the full QuietPeriod length can establish that
             // guarantee, so once the remaining budget forces a shorter delay
-            // this iteration can never declare success on its own -- unless a
-            // full quiet period was already separately confirmed above (in
-            // which case the loop has already broken out).
-            if (!isFullQuietPeriodDelay && !quietPeriodObserved)
+            // this iteration can never declare success -- the loop must fall
+            // through to the deadline boundary below. (A successful full
+            // quiet period always returns directly above, so there is no
+            // "already proven quiet" case left to consider here.)
+            if (!isFullQuietPeriodDelay)
             {
                 break;
             }
         }
 
-        return CreateResult(timedOut);
+        return CloseAtDeadline();
     }
 
     /// <summary>
     /// Test-only helper: reports whether <paramref name="activity"/> is
     /// currently observable through either the active set or the completed
-    /// queue. Used to assert that an eligible stopping activity is never
-    /// visible in neither collection at the same time.
+    /// queue. Reads both collections without taking the closure gate, so it
+    /// can safely be called while a listener callback holds the gate. Used to
+    /// assert that an eligible stopping activity is never visible in neither
+    /// collection at the same time, and that a callback which lost the
+    /// closure gate was ignored entirely.
     /// </summary>
     internal bool IsObservableForTests(Activity activity)
     {
@@ -138,13 +236,186 @@ internal sealed class A365ActivityCaptureSession : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        if (disposed)
+        lock (gate)
         {
-            return;
+            if (disposed)
+            {
+                return;
+            }
+
+            disposed = true;
+
+            // Leaving the listening state under the gate is what actually
+            // stops listener callbacks from mutating session state; the
+            // physical detach below is a separate, idempotent step.
+            closed = true;
         }
 
-        disposed = true;
+        // Deliberately outside the gate (see the type-level remarks on lock
+        // ordering against DiagnosticSource's internal listener locks). Safe
+        // and idempotent even when CompleteAsync already detached.
+        DetachListener();
+    }
+
+    /// <summary>
+    /// Attempts to end the session on a fully observed quiet period.
+    /// </summary>
+    /// <param name="observedVersion">
+    /// The eligible-change version read before the completed quiet-period
+    /// delay, re-validated here under the gate.
+    /// </param>
+    /// <param name="result">The captured result, when closure succeeded.</param>
+    /// <returns>
+    /// <see langword="true"/> when the session was closed (or was already
+    /// closed) and <paramref name="result"/> describes its boundary;
+    /// <see langword="false"/> when a listener callback won the gate first
+    /// and thereby invalidated the candidate quiet period, in which case the
+    /// caller must keep waiting.
+    /// </returns>
+    private bool TryCloseOnQuietPeriod(long observedVersion, out A365CaptureResult? result)
+    {
+        OnBeforeClosureGateForTests?.Invoke();
+
+        ClosureState state;
+        lock (gate)
+        {
+            if (closure == null)
+            {
+                // Authoritative re-check: any start or stop that won the gate
+                // between the unsynchronized candidate check and this point
+                // has already been fully applied, so it is visible here and
+                // invalidates the quiet period. Conversely, once this check
+                // passes and the boundary is recorded below, every later
+                // callback is by definition outside the evaluation window.
+                if (Interlocked.Read(ref eligibleChangeVersion) != observedVersion ||
+                    HasBlockingActiveSpanUnderGate())
+                {
+                    result = null;
+                    return false;
+                }
+
+                state = CloseUnderGate(timedOut: false);
+            }
+            else
+            {
+                state = closure;
+            }
+        }
+
+        DetachListener();
+        result = CreateResult(state);
+        return true;
+    }
+
+    /// <summary>
+    /// Ends the session at the completion deadline. The gate makes the
+    /// deadline an atomic boundary: draining the completed set and snapshotting
+    /// the still-active set happen in the same critical section, so a stopping
+    /// activity is either wholly before the boundary (completed, and already
+    /// removed from the active set) or wholly after it (ignored, and therefore
+    /// still recorded as active at the deadline). Deadline state is
+    /// authoritative: an activity that completes immediately after it keeps its
+    /// per-span timeout identity, and no activity can ever be classified as
+    /// both completed and timed out.
+    /// </summary>
+    /// <returns>The captured result.</returns>
+    private A365CaptureResult CloseAtDeadline()
+    {
+        OnBeforeClosureGateForTests?.Invoke();
+
+        ClosureState state;
+        lock (gate)
+        {
+            state = closure ?? CloseUnderGate(timedOut: true);
+        }
+
+        DetachListener();
+        return CreateResult(state);
+    }
+
+    /// <summary>
+    /// Records the session's closure boundary. Must be called while holding
+    /// <see cref="gate"/> and only when <see cref="closure"/> is still
+    /// <see langword="null"/>.
+    /// </summary>
+    /// <param name="timedOut">Whether the boundary is the completion deadline.</param>
+    /// <returns>The recorded closure state.</returns>
+    private ClosureState CloseUnderGate(bool timedOut)
+    {
+        var completedAtClosure = new List<Activity>();
+        while (completed.TryDequeue(out var activity))
+        {
+            completedAtClosure.Add(activity);
+        }
+
+        var activeAtClosure = active.Keys.ToList();
+
+        closed = true;
+        closure = new ClosureState(completedAtClosure, activeAtClosure, timedOut);
+        return closure;
+    }
+
+    private ClosureState? TryGetClosure()
+    {
+        lock (gate)
+        {
+            return closure;
+        }
+    }
+
+    /// <summary>
+    /// Detaches the activity listener. Never call this while holding
+    /// <see cref="gate"/>: see the type-level remarks on lock ordering.
+    /// <see cref="ActivityListener.Dispose"/> is itself idempotent, so this
+    /// is safe both when <see cref="CompleteAsync"/> closed the session and
+    /// when <see cref="Dispose"/> runs afterwards.
+    /// </summary>
+    private void DetachListener()
+    {
         listener.Dispose();
+    }
+
+    /// <summary>
+    /// Gated counterpart of <see cref="IsEligibleForWait"/>: reports whether
+    /// any currently active activity must block closure, consulting only
+    /// already-published filter decisions. It never evaluates the span filter,
+    /// because customer predicate code must not run while
+    /// <see cref="gate"/> is held.
+    /// </summary>
+    /// <returns>
+    /// <see langword="true"/> when at least one active activity is recognized
+    /// by name and is not known to be excluded by the span filter.
+    /// </returns>
+    private bool HasBlockingActiveSpanUnderGate()
+    {
+        foreach (var activity in active.Keys)
+        {
+            if (!IsEligible(activity))
+            {
+                continue;
+            }
+
+            if (!filterDecisions.TryGetValue(activity, out var lazyDecision) ||
+                !lazyDecision.IsValueCreated)
+            {
+                // Undecided here, or an evaluation is still in flight on
+                // another thread. Treat it conservatively as blocking rather
+                // than invoking (or blocking on) the predicate under the
+                // gate. This can only postpone a successful closure by one
+                // polling iteration -- the next unsynchronized candidate
+                // check evaluates and caches the decision -- and can never
+                // declare a quiet period that did not happen.
+                return true;
+            }
+
+            var decision = lazyDecision.Value;
+            if (decision.Error != null || decision.PassesFilter)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsEligible(Activity activity)
@@ -305,68 +576,116 @@ internal sealed class A365ActivityCaptureSession : IDisposable
 
     private void OnStarted(Activity activity)
     {
-        active[activity] = 0;
+        // Advisory fast path only; the authoritative check is under the gate.
+        if (closed)
+        {
+            return;
+        }
 
+        // Evaluate (and cache) the span-filter decision BEFORE acquiring the
+        // gate: it may invoke customer-supplied predicate code, which must
+        // never run while a lock is held. Doing it here also guarantees that
+        // every activity published to `active` already carries a decided (or
+        // at least started) filter decision, so the gated closure re-check can
+        // consult the cache without ever evaluating a predicate itself.
+        //
         // Only a span that is both recognized by name AND passes the
         // configured span filter should reset the quiet-period window. A
         // span that is name-eligible but filtered out is out of scope for
         // this validation session, so its churn must never extend the wait
         // nor produce a false completion timeout.
-        if (IsEligible(activity) && TryGetFilterDecisionForVersionTracking(activity))
+        var bumpsVersion = IsEligible(activity) && TryGetFilterDecisionForVersionTracking(activity);
+
+        OnBeforeCallbackGateForTests?.Invoke(activity);
+
+        lock (gate)
         {
-            Interlocked.Increment(ref eligibleChangeVersion);
+            if (closed)
+            {
+                // The closure boundary was defined before this start could be
+                // applied, so the span starts outside the evaluation window:
+                // it must not join the active set, must not invalidate a
+                // quiet period that has already been accepted, and must not
+                // appear in the result.
+                return;
+            }
+
+            active[activity] = 0;
+
+            if (bumpsVersion)
+            {
+                Interlocked.Increment(ref eligibleChangeVersion);
+            }
         }
     }
 
     private void OnStopped(Activity activity)
     {
-        // Ordering matters: an eligible stopping activity must remain visible
-        // to CompleteAsync's completion logic (via `active` or `completed`) at
-        // every instant. Queue it as completed (and publish the version bump,
-        // when applicable) BEFORE removing it from `active`, so there is
-        // never a window where it exists in neither collection and could be
-        // silently dropped by a concurrently-running completion check.
+        // Advisory fast path only; the authoritative check is under the gate.
+        if (closed)
+        {
+            return;
+        }
+
         var isEligible = IsEligible(activity);
 
-        if (isEligible)
+        // As in OnStarted, the filter decision is computed before the gate is
+        // taken, and only a span that also passes the configured span filter
+        // bumps the quiet-period change version -- see the remarks on
+        // IsEligibleForWait and TryGetFilterDecisionForVersionTracking.
+        var bumpsVersion = isEligible && TryGetFilterDecisionForVersionTracking(activity);
+
+        OnBeforeCallbackGateForTests?.Invoke(activity);
+
+        lock (gate)
         {
-            completed.Enqueue(activity);
+            if (closed)
+            {
+                // The closure boundary was defined before this stop could be
+                // applied. The state observed at that boundary is
+                // authoritative, so the activity keeps whatever
+                // classification it had there -- notably, a span that was
+                // active at the deadline stays a per-span timeout even though
+                // it completed immediately afterwards.
+                return;
+            }
+
+            // The whole transition is atomic with respect to the closure
+            // boundary, so an eligible stopping activity can never be
+            // observed in neither collection -- nor, as it once could, in
+            // both at once (which produced a misleading completed-and-timed-out
+            // duplicate). The enqueue-before-remove ordering is retained so
+            // that lock-free diagnostics still see it continuously.
+            if (isEligible)
+            {
+                completed.Enqueue(activity);
+            }
+
+            if (bumpsVersion)
+            {
+                Interlocked.Increment(ref eligibleChangeVersion);
+            }
+
+            OnStoppedTransitionHookForTests?.Invoke(activity);
+
+            active.TryRemove(activity, out _);
         }
-
-        // As in OnStarted, only a span that also passes the configured span
-        // filter should bump the quiet-period change version -- see the
-        // remarks on IsEligibleForWait and TryGetFilterDecisionForVersionTracking.
-        if (isEligible && TryGetFilterDecisionForVersionTracking(activity))
-        {
-            Interlocked.Increment(ref eligibleChangeVersion);
-        }
-
-        OnStoppedTransitionHookForTests?.Invoke(activity);
-
-        active.TryRemove(activity, out _);
     }
 
-    private A365CaptureResult CreateResult(bool timedOut)
+    /// <summary>
+    /// Builds the result from the immutable state captured at the closure
+    /// boundary. Because the boundary is atomic, no reconciliation between
+    /// concurrently-mutating collections is needed (or possible): the
+    /// completed set and the active-at-boundary set are disjoint by
+    /// construction.
+    /// </summary>
+    /// <param name="state">The recorded closure state.</param>
+    /// <returns>The captured result.</returns>
+    private A365CaptureResult CreateResult(ClosureState state)
     {
-        // Snapshot the active set BEFORE draining the completed queue. This
-        // captures activities that were genuinely active at the deadline, so
-        // one that stops in the tiny window between this snapshot and the
-        // drain below is still correctly eligible for timed-out
-        // classification -- and, symmetrically, so it can be excluded from
-        // TimedOutSpans if that drain shows it actually completed. Re-reading
-        // `active.Keys` only *after* draining (the prior approach) could
-        // double-classify such an activity as both completed (in Spans) and
-        // timed out (in TimedOutSpans), since OnStopped makes a stopping
-        // activity briefly observable in both `active` and `completed` at
-        // once by design.
-        var activeCandidates = active.Keys.ToList();
-
         var filtered = new List<A365SpanSnapshot>();
-        var completedActivities = new HashSet<Activity>();
-        while (completed.TryDequeue(out var activity))
+        foreach (var activity in state.Completed)
         {
-            completedActivities.Add(activity);
-
             // Only eligible activities are ever enqueued (see OnStopped), so
             // no need to re-check IsEligible here.
             if (TryGetFilterDecision(activity, out var snapshot))
@@ -376,11 +695,11 @@ internal sealed class A365ActivityCaptureSession : IDisposable
         }
 
         var timedOutSpans = new List<A365SpanSnapshot>();
-        if (timedOut)
+        if (state.TimedOut)
         {
-            foreach (var activity in activeCandidates)
+            foreach (var activity in state.ActiveAtBoundary)
             {
-                if (completedActivities.Contains(activity) || !IsEligible(activity))
+                if (!IsEligible(activity))
                 {
                     continue;
                 }
@@ -392,7 +711,41 @@ internal sealed class A365ActivityCaptureSession : IDisposable
             }
         }
 
-        return new A365CaptureResult(filtered, timedOutSpans, timedOut);
+        return new A365CaptureResult(filtered, timedOutSpans, state.TimedOut);
+    }
+
+    /// <summary>
+    /// The immutable observation state captured, under the closure gate, at
+    /// the instant the session stopped listening. It is what every
+    /// <see cref="CompleteAsync"/> caller reports, which is what makes closure
+    /// idempotent and per-span classification stable.
+    /// </summary>
+    private sealed class ClosureState
+    {
+        internal ClosureState(
+            IReadOnlyList<Activity> completed,
+            IReadOnlyList<Activity> activeAtBoundary,
+            bool timedOut)
+        {
+            Completed = completed;
+            ActiveAtBoundary = activeAtBoundary;
+            TimedOut = timedOut;
+        }
+
+        /// <summary>
+        /// Gets the eligible activities that had stopped before the boundary.
+        /// </summary>
+        internal IReadOnlyList<Activity> Completed { get; }
+
+        /// <summary>
+        /// Gets the activities that were still active at the boundary.
+        /// </summary>
+        internal IReadOnlyList<Activity> ActiveAtBoundary { get; }
+
+        /// <summary>
+        /// Gets a value indicating whether the boundary is the completion deadline.
+        /// </summary>
+        internal bool TimedOut { get; }
     }
 
     /// <summary>

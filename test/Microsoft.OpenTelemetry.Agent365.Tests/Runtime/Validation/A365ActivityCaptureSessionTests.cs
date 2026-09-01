@@ -208,10 +208,11 @@ public sealed class A365ActivityCaptureSessionTests
         // Regression test for a race where OnStopped removed a stopping
         // activity from `active` before it was queued to `completed`. If a
         // completion check ran in that gap, the activity was visible in
-        // neither collection and the completed span was silently lost. This
-        // test forces that exact interleaving deterministically (via a
-        // synchronization hook instead of sleep-based probing) so it fails
-        // reliably against the old ordering and passes against the fix.
+        // neither collection and the completed span was silently lost. The
+        // whole transition now runs inside the closure gate, but the
+        // enqueue-before-remove ordering is still asserted here for
+        // lock-free readers (this test observes the session without taking
+        // the gate, exactly as such a reader would).
         using var session = new A365ActivityCaptureSession(null);
         using var source = new ActivitySource(
             nameof(OnStopped_PausedBetweenEnqueueAndActiveRemoval_ActivityRemainsObservable));
@@ -538,21 +539,20 @@ public sealed class A365ActivityCaptureSessionTests
     }
 
     [TestMethod]
-    public async Task CreateResult_ActivityPausedBetweenEnqueueAndRemoval_IsNotDuplicatedAsCompletedAndTimedOut()
+    public async Task CompleteAsync_OnStoppedWinsTimeoutBoundaryGate_ClassifiesSpanAsCompletedOnly()
     {
-        // Regression test for misleading duplicate classification at the
-        // timeout boundary: OnStopped enqueues an eligible activity to
-        // `completed` (and bumps the version) BEFORE removing it from
-        // `active`, so there is a real window where it is observable in
-        // both collections at once. If CreateResult drained `completed` and
-        // then separately re-read live `active.Keys`, it could report the
-        // very same span as both completed (in Spans) and timed out (in
-        // TimedOutSpans). This test forces that exact interleaving
-        // deterministically via the transition hook, so the deadline elapses
-        // while the activity sits in both collections.
+        // Deterministic gate-race coverage for the timeout boundary, with the
+        // listener callback winning. OnStopped applies its whole transition
+        // (enqueue to `completed`, then removal from `active`) inside the
+        // closure gate, so the deadline boundary can never observe the
+        // activity mid-transition -- which is what previously allowed the
+        // very same span to be reported as both completed (in Spans) and
+        // timed out (in TimedOutSpans). The transition hook holds the gate
+        // across that window while the deadline elapses, forcing
+        // CompleteAsync's boundary to queue behind the callback that won.
         using var session = new A365ActivityCaptureSession(null);
         using var source = new ActivitySource(
-            nameof(CreateResult_ActivityPausedBetweenEnqueueAndRemoval_IsNotDuplicatedAsCompletedAndTimedOut));
+            nameof(CompleteAsync_OnStoppedWinsTimeoutBoundaryGate_ClassifiesSpanAsCompletedOnly));
 
         using var reachedTransition = new ManualResetEventSlim(false);
         using var releaseTransition = new ManualResetEventSlim(false);
@@ -570,19 +570,276 @@ public sealed class A365ActivityCaptureSessionTests
         var stopTask = Task.Run(() => activity.Dispose());
 
         reachedTransition.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue(
-            "OnStopped should reach the transition point deterministically");
+            "OnStopped should reach the in-gate transition point deterministically");
 
-        // CompleteAsync's own loop runs independently of the paused OnStopped
-        // call and will reach its 300ms deadline while the activity remains
-        // paused mid-transition (visible in both `active` and `completed`).
-        var result = await completeTask;
+        // The 300ms deadline elapses while OnStopped still holds the gate.
+        await Task.Delay(600);
+
+        completeTask.IsCompleted.Should().BeFalse(
+            "the closure boundary must wait for the listener callback that won the gate instead " +
+            "of reading a half-applied transition out of the live collections");
 
         releaseTransition.Set();
+
+        var result = await completeTask;
         await stopTask;
 
         result.TimedOut.Should().BeTrue();
         result.Spans.Should().ContainSingle(s => s.DisplayName == "chat model");
         result.TimedOutSpans.Should().NotContain(s => s.DisplayName == "chat model");
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_TimeoutBoundaryWinsGateAgainstOnStopped_KeepsPerSpanTimeoutIdentity()
+    {
+        // Companion to the test above, with the closure boundary winning the
+        // race instead. The stop callback is parked immediately *before* it
+        // acquires the gate, so the deadline boundary defines the end of the
+        // evaluation window first: the span was active at that boundary and
+        // must keep its per-span timeout identity even though it completes
+        // microseconds later. Deadline state is authoritative, and closure is
+        // idempotent, so a subsequent CompleteAsync reports the identical
+        // classification.
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_TimeoutBoundaryWinsGateAgainstOnStopped_KeepsPerSpanTimeoutIdentity));
+
+        using var reachedCallbackGate = new ManualResetEventSlim(false);
+        using var releaseCallbackGate = new ManualResetEventSlim(false);
+
+        var activity = source.StartActivity("stuck chat");
+        activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+
+        // Installed only after the start callback has already run, so this
+        // parks the stop callback exclusively.
+        session.OnBeforeCallbackGateForTests = observed =>
+        {
+            if (!ReferenceEquals(observed, activity))
+            {
+                return;
+            }
+
+            reachedCallbackGate.Set();
+            releaseCallbackGate.Wait(TimeSpan.FromSeconds(5));
+        };
+
+        var stopTask = Task.Run(() => activity.Dispose());
+
+        reachedCallbackGate.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue(
+            "the stop callback must be parked just outside the gate before the boundary races it");
+
+        var result = await session.CompleteAsync(
+            TimeSpan.FromMilliseconds(300),
+            CancellationToken.None);
+
+        result.TimedOut.Should().BeTrue();
+        result.TimedOutSpans.Should().ContainSingle(s => s.DisplayName == "stuck chat");
+        result.Spans.Should().BeEmpty(
+            "the stop had not been applied when the deadline boundary was defined");
+        source.HasListeners().Should().BeFalse(
+            "the listener must already be detached when CompleteAsync returns");
+
+        releaseCallbackGate.Set();
+        await stopTask;
+
+        var afterStop = await session.CompleteAsync(
+            TimeSpan.FromMilliseconds(300),
+            CancellationToken.None);
+
+        afterStop.TimedOut.Should().BeTrue();
+        afterStop.TimedOutSpans.Should().ContainSingle(s => s.DisplayName == "stuck chat");
+        afterStop.Spans.Should().BeEmpty(
+            "a stop applied after the closure boundary is outside the evaluation window and must " +
+            "never re-classify a span the deadline already recorded as timed out");
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_OnStartedWinsFinalSuccessGate_InvalidatesQuietPeriod()
+    {
+        // Deterministic gate-race coverage for the final success check. The
+        // hook runs after the unsynchronized candidate check has already
+        // found the window quiet, but before CompleteAsync acquires the gate,
+        // so this start wins the gate. Because the span is still *active*
+        // (and unfinished) when the gated re-check runs, that re-check must
+        // reject the candidate quiet period and keep waiting, so the span is
+        // captured once it later completes. Without the gated re-check the
+        // session would close immediately after this hook returns, silently
+        // dropping a span that started inside the evaluation window.
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_OnStartedWinsFinalSuccessGate_InvalidatesQuietPeriod));
+
+        var tags = new[]
+        {
+            new KeyValuePair<string, object?>(OpenTelemetryConstants.GenAiOperationNameKey, "chat"),
+        };
+
+        var injected = 0;
+        Task? stopTask = null;
+
+        session.OnBeforeClosureGateForTests = () =>
+        {
+            if (Interlocked.Exchange(ref injected, 1) != 0)
+            {
+                return;
+            }
+
+            var late = source.StartActivity(
+                "late chat",
+                ActivityKind.Internal,
+                default(ActivityContext),
+                tags);
+
+            stopTask = Task.Run(async () =>
+            {
+                await Task.Delay(100).ConfigureAwait(false);
+                late?.Dispose();
+            });
+        };
+
+        var result = await session.CompleteAsync(TimeSpan.FromSeconds(3), CancellationToken.None);
+
+        Volatile.Read(ref injected).Should().Be(1, "the closure gate hook must have run");
+        stopTask.Should().NotBeNull();
+        await stopTask!;
+
+        result.TimedOut.Should().BeFalse();
+        result.Spans.Should().ContainSingle(s => s.DisplayName == "late chat",
+            "a span that won the closure gate started inside the evaluation window, so the gated " +
+            "re-check must invalidate the candidate quiet period and wait for it instead of " +
+            "closing the session and losing it");
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_OnStartedLosesFinalSuccessGate_IsOutsideEvaluationWindow()
+    {
+        // Mirror of the test above with the closure winning: the start
+        // callback is parked immediately before it acquires the gate, so the
+        // successful closure defines the end of the evaluation window first
+        // and this start falls outside it. It must not join the active set,
+        // must not invalidate the accepted quiet period, and must not appear
+        // in the result.
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_OnStartedLosesFinalSuccessGate_IsOutsideEvaluationWindow));
+
+        using var reachedCallbackGate = new ManualResetEventSlim(false);
+        using var releaseCallbackGate = new ManualResetEventSlim(false);
+
+        var parked = 0;
+        session.OnBeforeCallbackGateForTests = observed =>
+        {
+            if (observed.DisplayName != "late chat" ||
+                Interlocked.Exchange(ref parked, 1) != 0)
+            {
+                return;
+            }
+
+            reachedCallbackGate.Set();
+            releaseCallbackGate.Wait(TimeSpan.FromSeconds(5));
+        };
+
+        var tags = new[]
+        {
+            new KeyValuePair<string, object?>(OpenTelemetryConstants.GenAiOperationNameKey, "chat"),
+        };
+
+        Activity? late = null;
+        var startTask = Task.Run(() =>
+        {
+            late = source.StartActivity(
+                "late chat",
+                ActivityKind.Internal,
+                default(ActivityContext),
+                tags);
+        });
+
+        reachedCallbackGate.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue(
+            "the start callback must be parked just outside the gate before the closure races it");
+
+        var result = await session.CompleteAsync(TimeSpan.FromSeconds(2), CancellationToken.None);
+
+        result.TimedOut.Should().BeFalse();
+        result.Spans.Should().BeEmpty();
+        result.TimedOutSpans.Should().BeEmpty();
+        source.HasListeners().Should().BeFalse(
+            "the listener must already be detached when CompleteAsync returns");
+
+        releaseCallbackGate.Set();
+        await startTask;
+
+        late.Should().NotBeNull();
+        session.IsObservableForTests(late!).Should().BeFalse(
+            "a start that lost the closure gate is outside the evaluation window and must be " +
+            "ignored entirely");
+
+        late!.Dispose();
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_QuietPeriodReached_DetachesListenerBeforeReturning()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_QuietPeriodReached_DetachesListenerBeforeReturning));
+
+        source.HasListeners().Should().BeTrue();
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        result.TimedOut.Should().BeFalse();
+        source.HasListeners().Should().BeFalse(
+            "closing the session on a quiet period must detach the listener before CompleteAsync " +
+            "returns, so nothing started afterwards can be observed");
+        source.StartActivity("after closure").Should().BeNull();
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_TimedOut_DetachesListenerBeforeReturning()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_TimedOut_DetachesListenerBeforeReturning));
+
+        var activity = source.StartActivity("stuck chat");
+        activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+
+        try
+        {
+            var result = await session.CompleteAsync(
+                TimeSpan.FromMilliseconds(300),
+                CancellationToken.None);
+
+            result.TimedOut.Should().BeTrue();
+            source.HasListeners().Should().BeFalse(
+                "closing the session at the deadline must detach the listener before " +
+                "CompleteAsync returns");
+            source.StartActivity("after closure").Should().BeNull();
+        }
+        finally
+        {
+            activity.Dispose();
+        }
+    }
+
+    [TestMethod]
+    public async Task Dispose_AfterCompleteAsyncAlreadyDetached_IsStillSafeAndIdempotent()
+    {
+        var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(Dispose_AfterCompleteAsyncAlreadyDetached_IsStillSafeAndIdempotent));
+
+        await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+        source.HasListeners().Should().BeFalse();
+
+        Action act = () =>
+        {
+            session.Dispose();
+            session.Dispose();
+        };
+
+        act.Should().NotThrow();
+        source.HasListeners().Should().BeFalse();
     }
 
     [TestMethod]
