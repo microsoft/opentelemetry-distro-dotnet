@@ -208,6 +208,22 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
         }
 
         [TestMethod]
+        public void ConcreteLogger_DoesNotExposeTypedToolResultMember()
+        {
+            var typedOverload = typeof(A365EtwLogger<EtwLoggerTests>)
+                .GetMethods()
+                .SingleOrDefault(method =>
+                {
+                    var parameters = method.GetParameters();
+                    return method.Name == nameof(A365EtwLogger<EtwLoggerTests>.LogToolCall) &&
+                        parameters.Length > 1 &&
+                        parameters[1].ParameterType == typeof(ExecuteToolCallResult);
+                });
+
+            typedOverload.Should().BeNull();
+        }
+
+        [TestMethod]
         public void LegacyInterfaceImplementation_UsesTypedResultExtension()
         {
             var legacyLogger = new LegacyCompatibleEtwLogger<EtwLoggerTests>();
