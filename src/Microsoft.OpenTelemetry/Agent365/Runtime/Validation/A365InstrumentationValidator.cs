@@ -74,7 +74,12 @@ public static class A365InstrumentationValidator
     {
         var sessionFindings = new List<A365ValidationFinding>();
 
-        if (captured.Spans.Count == 0)
+        // A recognized span that timed out while still active was captured
+        // (it just never completed): reporting it via the SpanCompletionTimeout
+        // finding below already conveys that. Only claim that no span was
+        // captured at all when there are neither completed spans nor timed-out
+        // eligible spans to report.
+        if (captured.Spans.Count == 0 && captured.TimedOutSpans.Count == 0)
         {
             sessionFindings.Add(new A365ValidationFinding(
                 A365ValidationRuleIds.NoSpansCaptured,

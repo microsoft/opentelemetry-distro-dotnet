@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -268,6 +269,35 @@ public sealed class A365InstrumentationValidatorTests
             f.Severity == A365ValidationSeverity.Error &&
             f.Status == A365ValidationFindingStatus.Active &&
             f.SpanId == null);
+    }
+
+    [TestMethod]
+    public void BuildReport_TimedOutSpanWithNoCompletedSpans_DoesNotAddNoSpansCapturedFinding()
+    {
+        // A recognized span that timed out while still active was in fact
+        // captured -- it just never completed. BuildReport must report that
+        // via SpanCompletionTimeout only, and must not additionally claim
+        // (falsely) that no span was captured at all.
+        var options = new A365ValidationOptions();
+        var timedOutSpan = new A365SpanSnapshot(
+            "0123456789abcdef0123456789abcdef",
+            "0123456789abcdef",
+            "stuck chat",
+            "Customer.Agent",
+            "chat",
+            new Dictionary<string, object?>());
+        var captured = new A365CaptureResult(
+            spans: Array.Empty<A365SpanSnapshot>(),
+            timedOutSpans: new[] { timedOutSpan },
+            timedOut: true);
+
+        var report = A365InstrumentationValidator.BuildReport(captured, options);
+
+        report.SessionFindings.Should().NotContain(f =>
+            f.RuleId == A365ValidationRuleIds.NoSpansCaptured);
+        report.SessionFindings.Should().ContainSingle(f =>
+            f.RuleId == A365ValidationRuleIds.SpanCompletionTimeout &&
+            f.SpanId == timedOutSpan.SpanId);
     }
 
     private static void SetValidChatAttributes(Activity activity)

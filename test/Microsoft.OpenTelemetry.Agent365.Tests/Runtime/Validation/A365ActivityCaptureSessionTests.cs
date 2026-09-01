@@ -281,6 +281,112 @@ public sealed class A365ActivityCaptureSessionTests
     }
 
     [TestMethod]
+    public async Task CompleteAsync_FilteredOutStartChurn_DoesNotExtendQuietWaitOrTimeout()
+    {
+        // Regression test: eligibleChangeVersion must track the same cached
+        // span-filter decision used for active waiting/completed capture,
+        // not raw operation-name recognition. Here the operation-name tag is
+        // supplied at Activity creation time, so OnStarted itself observes
+        // each churned activity as eligible-by-name immediately. If
+        // OnStarted bumped the version for every such start regardless of
+        // the filter's exclusion, this continuous churn would perpetually
+        // reset the quiet-period window and produce a false timeout.
+        using var session = new A365ActivityCaptureSession(
+            span => span.DisplayName != "churn");
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_FilteredOutStartChurn_DoesNotExtendQuietWaitOrTimeout));
+        using var churnStop = new CancellationTokenSource();
+
+        var tags = new[]
+        {
+            new KeyValuePair<string, object?>(OpenTelemetryConstants.GenAiOperationNameKey, "chat"),
+        };
+
+        var churnTask = Task.Run(async () =>
+        {
+            while (!churnStop.IsCancellationRequested)
+            {
+                using var churn = source.StartActivity(
+                    "churn",
+                    ActivityKind.Internal,
+                    default(ActivityContext),
+                    tags);
+                await Task.Delay(20, CancellationToken.None).ConfigureAwait(false);
+            }
+        });
+
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var result = await session.CompleteAsync(
+                TimeSpan.FromSeconds(2),
+                CancellationToken.None);
+            stopwatch.Stop();
+
+            result.TimedOut.Should().BeFalse(
+                "a filtered-out span's start churn must not reset the quiet-period window");
+            result.Spans.Should().BeEmpty();
+            result.TimedOutSpans.Should().BeEmpty();
+            stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1),
+                "filtered-out start churn must not block the quiet period from being reached");
+        }
+        finally
+        {
+            churnStop.Cancel();
+            await churnTask;
+        }
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_FilteredOutStopChurn_DoesNotExtendQuietWaitOrTimeout()
+    {
+        // Companion regression test to the start-churn case above, for
+        // OnStopped: here the operation-name tag is only applied after the
+        // activity has already started (as in most of this file's tests),
+        // so only OnStopped -- not OnStarted -- ever observes each churned
+        // activity as eligible-by-name. If OnStopped bumped the version for
+        // every such stop regardless of the filter's exclusion, this
+        // continuous churn would perpetually reset the quiet-period window
+        // and produce a false timeout.
+        using var session = new A365ActivityCaptureSession(
+            span => span.DisplayName != "churn");
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_FilteredOutStopChurn_DoesNotExtendQuietWaitOrTimeout));
+        using var churnStop = new CancellationTokenSource();
+
+        var churnTask = Task.Run(async () =>
+        {
+            while (!churnStop.IsCancellationRequested)
+            {
+                using var churn = source.StartActivity("churn");
+                churn?.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+                await Task.Delay(20, CancellationToken.None).ConfigureAwait(false);
+            }
+        });
+
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var result = await session.CompleteAsync(
+                TimeSpan.FromSeconds(2),
+                CancellationToken.None);
+            stopwatch.Stop();
+
+            result.TimedOut.Should().BeFalse(
+                "a filtered-out span's stop churn must not reset the quiet-period window");
+            result.Spans.Should().BeEmpty();
+            result.TimedOutSpans.Should().BeEmpty();
+            stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1),
+                "filtered-out stop churn must not block the quiet period from being reached");
+        }
+        finally
+        {
+            churnStop.Cancel();
+            await churnTask;
+        }
+    }
+
+    [TestMethod]
     public async Task CompleteAsync_TimesOut_DoesNotSleepPastConfiguredTimeout()
     {
         using var session = new A365ActivityCaptureSession(null);

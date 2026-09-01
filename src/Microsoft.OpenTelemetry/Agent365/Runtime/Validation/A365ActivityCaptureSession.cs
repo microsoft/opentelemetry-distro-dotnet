@@ -23,7 +23,7 @@ internal sealed class A365ActivityCaptureSession : IDisposable
 
     private readonly ConcurrentDictionary<Activity, byte> active = new();
     private readonly ConcurrentQueue<Activity> completed = new();
-    private readonly ConcurrentDictionary<Activity, bool> filterDecisions = new();
+    private readonly ConcurrentDictionary<Activity, FilterDecision> filterDecisions = new();
     private readonly Func<A365SpanSnapshot, bool>? spanFilter;
     private readonly ActivityListener listener;
     private long eligibleChangeVersion;
@@ -189,30 +189,64 @@ internal sealed class A365ActivityCaptureSession : IDisposable
     /// </param>
     private bool TryGetFilterDecision(Activity activity, out A365SpanSnapshot? snapshotUsedForDecision)
     {
-        if (filterDecisions.TryGetValue(activity, out var cachedDecision))
+        A365SpanSnapshot? computedSnapshot = null;
+
+        // GetOrAdd guarantees the predicate's outcome -- success, exclusion,
+        // or failure -- is computed and cached at most once per activity and
+        // reused by every subsequent caller (listener callbacks, the
+        // quiet-period wait loop, and CreateResult), regardless of which one
+        // happens to observe the activity first.
+        var decision = filterDecisions.GetOrAdd(activity, _ =>
+        {
+            computedSnapshot = CreateSnapshot(activity);
+            try
+            {
+                var passesFilter = spanFilter == null || spanFilter(computedSnapshot);
+                return FilterDecision.Success(passesFilter);
+            }
+            catch (Exception ex)
+            {
+                return FilterDecision.Failure(new InvalidOperationException(
+                    $"Span filter failed for span '{computedSnapshot.SpanId}'.",
+                    ex));
+            }
+        });
+
+        if (decision.Error != null)
         {
             snapshotUsedForDecision = null;
-            return cachedDecision;
+            throw decision.Error;
         }
 
-        var snapshot = CreateSnapshot(activity);
-        var passesFilter = PassesFilter(snapshot);
-        filterDecisions[activity] = passesFilter;
-        snapshotUsedForDecision = passesFilter ? snapshot : null;
-        return passesFilter;
+        snapshotUsedForDecision = decision.PassesFilter ? computedSnapshot : null;
+        return decision.PassesFilter;
     }
 
-    private bool PassesFilter(A365SpanSnapshot snapshot)
+    /// <summary>
+    /// Evaluates whether <paramref name="activity"/> passes the configured
+    /// span filter for the sole purpose of deciding whether a listener
+    /// callback (<see cref="OnStarted"/>/<see cref="OnStopped"/>) should bump
+    /// <see cref="eligibleChangeVersion"/>. Unlike <see cref="TryGetFilterDecision"/>,
+    /// a failing predicate must never propagate from here: this method runs
+    /// synchronously on whatever thread called <c>Activity.Start</c>/<c>Stop</c>
+    /// (typically the instrumented application's own thread), and letting an
+    /// exception escape there would skip the listener-state cleanup that
+    /// follows (e.g. removing the activity from <see cref="active"/>),
+    /// stranding it. The failure is already durably cached by
+    /// <see cref="TryGetFilterDecision"/> -- the predicate is not re-invoked --
+    /// and surfaces explicitly the next time it is retrieved from an
+    /// authoritative context: the quiet-period wait loop or
+    /// <see cref="CreateResult"/>.
+    /// </summary>
+    private bool TryGetFilterDecisionForVersionTracking(Activity activity)
     {
         try
         {
-            return spanFilter == null || spanFilter(snapshot);
+            return TryGetFilterDecision(activity, out _);
         }
-        catch (Exception ex)
+        catch (InvalidOperationException)
         {
-            throw new InvalidOperationException(
-                $"Span filter failed for span '{snapshot.SpanId}'.",
-                ex);
+            return false;
         }
     }
 
@@ -241,7 +275,12 @@ internal sealed class A365ActivityCaptureSession : IDisposable
     {
         active[activity] = 0;
 
-        if (IsEligible(activity))
+        // Only a span that is both recognized by name AND passes the
+        // configured span filter should reset the quiet-period window. A
+        // span that is name-eligible but filtered out is out of scope for
+        // this validation session, so its churn must never extend the wait
+        // nor produce a false completion timeout.
+        if (IsEligible(activity) && TryGetFilterDecisionForVersionTracking(activity))
         {
             Interlocked.Increment(ref eligibleChangeVersion);
         }
@@ -251,13 +290,22 @@ internal sealed class A365ActivityCaptureSession : IDisposable
     {
         // Ordering matters: an eligible stopping activity must remain visible
         // to CompleteAsync's completion logic (via `active` or `completed`) at
-        // every instant. Queue it as completed (and publish the version bump)
-        // BEFORE removing it from `active`, so there is never a window where
-        // it exists in neither collection and could be silently dropped by a
-        // concurrently-running completion check.
-        if (IsEligible(activity))
+        // every instant. Queue it as completed (and publish the version bump,
+        // when applicable) BEFORE removing it from `active`, so there is
+        // never a window where it exists in neither collection and could be
+        // silently dropped by a concurrently-running completion check.
+        var isEligible = IsEligible(activity);
+
+        if (isEligible)
         {
             completed.Enqueue(activity);
+        }
+
+        // As in OnStarted, only a span that also passes the configured span
+        // filter should bump the quiet-period change version -- see the
+        // remarks on IsEligibleForWait and TryGetFilterDecisionForVersionTracking.
+        if (isEligible && TryGetFilterDecisionForVersionTracking(activity))
+        {
             Interlocked.Increment(ref eligibleChangeVersion);
         }
 
@@ -313,6 +361,34 @@ internal sealed class A365ActivityCaptureSession : IDisposable
         }
 
         return new A365CaptureResult(filtered, timedOutSpans, timedOut);
+    }
+
+    /// <summary>
+    /// The cached, at-most-once outcome of evaluating the configured span
+    /// filter for one activity: either the resulting decision, or the
+    /// (wrapped) exception the predicate threw. Caching the failure -- not
+    /// just the success/exclusion result -- is what lets the predicate be
+    /// invoked exactly once per activity even when it throws, since a
+    /// listener callback (which must not propagate the failure; see
+    /// <see cref="TryGetFilterDecisionForVersionTracking"/>) may observe the
+    /// activity before an authoritative caller (<see cref="CreateResult"/> or
+    /// the quiet-period wait loop) does.
+    /// </summary>
+    private readonly struct FilterDecision
+    {
+        private FilterDecision(bool passesFilter, Exception? error)
+        {
+            PassesFilter = passesFilter;
+            Error = error;
+        }
+
+        internal bool PassesFilter { get; }
+
+        internal Exception? Error { get; }
+
+        internal static FilterDecision Success(bool passesFilter) => new(passesFilter, null);
+
+        internal static FilterDecision Failure(Exception error) => new(false, error);
     }
 }
 
