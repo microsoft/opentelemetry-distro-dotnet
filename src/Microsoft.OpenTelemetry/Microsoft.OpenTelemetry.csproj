@@ -56,6 +56,7 @@
     <!-- Microsoft.Agents.Builder (PrivateAssets=all) compiles against 10.x Microsoft.Extensions.*
          but suppresses transitive flow. On net8.0, the shared framework only has 8.x assemblies.
          These explicit dependencies ensure the 10.x assemblies are available at runtime. -->
+    <PackageReference Include="Microsoft.Bcl.Memory" />
     <PackageReference Include="Microsoft.Extensions.Logging" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
   </ItemGroup>
