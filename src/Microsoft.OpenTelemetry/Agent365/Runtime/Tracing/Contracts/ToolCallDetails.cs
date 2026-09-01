@@ -5,6 +5,7 @@
 
 using System;
 using System.Collections.Generic;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
 {
@@ -66,6 +67,31 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         }
 
         /// <summary>
+        /// Initializes a new instance of the <see cref="ToolCallDetails"/> class with typed structured arguments.
+        /// </summary>
+        /// <param name="toolName">Name of the tool being invoked.</param>
+        /// <param name="toolCallArguments">Typed structured arguments passed to the tool.</param>
+        /// <param name="toolCallId">Optional identifier for the tool invocation.</param>
+        /// <param name="description">Optional description of the tool call.</param>
+        /// <param name="toolType">Optional type classification for the tool.</param>
+        /// <param name="endpoint">Optional endpoint for remote tool execution.</param>
+        public ToolCallDetails(
+            string toolName,
+            ExecuteToolCallArguments toolCallArguments,
+            string? toolCallId = null,
+            string? description = null,
+            string? toolType = null,
+            Uri? endpoint = null)
+        {
+            ToolName = toolName;
+            ToolCallArguments = toolCallArguments ?? throw new ArgumentNullException(nameof(toolCallArguments));
+            ToolCallId = toolCallId;
+            Description = description;
+            ToolType = toolType;
+            Endpoint = endpoint;
+        }
+
+        /// <summary>
         /// Gets the tool name.
         /// </summary>
         public string ToolName { get; }
@@ -80,6 +106,12 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// Takes precedence over <see cref="Arguments"/> for telemetry recording.
         /// </summary>
         public IDictionary<string, object>? ArgumentsObject { get; }
+
+        /// <summary>
+        /// Gets the typed structured arguments supplied to the tool, when any.
+        /// Takes precedence over legacy argument payloads for telemetry recording.
+        /// </summary>
+        public ExecuteToolCallArguments? ToolCallArguments { get; }
 
         /// <summary>
         /// Gets the identifier for the tool call, when provided.
@@ -131,6 +163,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
             return string.Equals(ToolName, other.ToolName, StringComparison.Ordinal) &&
                    string.Equals(Arguments, other.Arguments, StringComparison.Ordinal) &&
                    ReferenceEquals(ArgumentsObject, other.ArgumentsObject) &&
+                   ReferenceEquals(ToolCallArguments, other.ToolCallArguments) &&
                    string.Equals(ToolCallId, other.ToolCallId, StringComparison.Ordinal) &&
                    string.Equals(Description, other.Description, StringComparison.Ordinal) &&
                    string.Equals(ToolType, other.ToolType, StringComparison.Ordinal) &&
@@ -152,6 +185,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
                 hash = (hash * 31) + (ToolName != null ? StringComparer.Ordinal.GetHashCode(ToolName) : 0);
                 hash = (hash * 31) + (Arguments != null ? StringComparer.Ordinal.GetHashCode(Arguments) : 0);
                 hash = (hash * 31) + (ArgumentsObject != null ? System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(ArgumentsObject) : 0);
+                hash = (hash * 31) + (ToolCallArguments != null ? System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(ToolCallArguments) : 0);
                 hash = (hash * 31) + (ToolCallId != null ? StringComparer.Ordinal.GetHashCode(ToolCallId) : 0);
                 hash = (hash * 31) + (Description != null ? StringComparer.Ordinal.GetHashCode(Description) : 0);
                 hash = (hash * 31) + (ToolType != null ? StringComparer.Ordinal.GetHashCode(ToolType) : 0);

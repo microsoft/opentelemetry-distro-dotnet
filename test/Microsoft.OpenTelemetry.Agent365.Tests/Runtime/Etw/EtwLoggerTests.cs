@@ -1,11 +1,15 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
+using FluentAssertions;
 using Microsoft.Agents.A365.Observability.Runtime.Etw;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics.Tracing;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
 {
@@ -16,6 +20,130 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
         {
             public List<EventWrittenEventArgs> Events { get; } = new List<EventWrittenEventArgs>();
             protected override void OnEventWritten(EventWrittenEventArgs eventData) => Events.Add(eventData);
+        }
+
+        private sealed class LegacyCompatibleEtwLogger<T> : IA365EtwLogger<T>
+        {
+            public ToolCallDetails? LoggedToolCallDetails { get; private set; }
+
+            public AgentDetails? LoggedAgentDetails { get; private set; }
+
+            public string? LoggedConversationId { get; private set; }
+
+            public string? LoggedResponseContent { get; private set; }
+
+            public void LogInferenceCall(
+                InferenceCallDetails inferenceCallDetails,
+                AgentDetails agentDetails,
+                string conversationId,
+                string[]? inputMessages = null,
+                string[]? outputMessages = null,
+                DateTimeOffset? startTime = null,
+                DateTimeOffset? endTime = null,
+                string? spanId = null,
+                string? parentSpanId = null,
+                Channel? channel = null,
+                CallerDetails? callerDetails = null,
+                string? traceId = null,
+                Exception? error = null)
+            {
+            }
+
+            public void LogInvokeAgent(
+                InvokeAgentScopeDetails invokeAgentScopeDetails,
+                AgentDetails agentDetails,
+                string conversationId,
+                Request? request = null,
+                CallerDetails? callerDetails = null,
+                string[]? inputMessages = null,
+                string[]? outputMessages = null,
+                DateTimeOffset? startTime = null,
+                DateTimeOffset? endTime = null,
+                string? spanId = null,
+                string? parentSpanId = null,
+                string? traceId = null,
+                Exception? error = null)
+            {
+            }
+
+            public void LogToolCall(
+                ToolCallDetails toolCallDetails,
+                AgentDetails agentDetails,
+                string conversationId,
+                string? responseContent = null,
+                DateTimeOffset? startTime = null,
+                DateTimeOffset? endTime = null,
+                string? spanId = null,
+                string? parentSpanId = null,
+                Channel? channel = null,
+                CallerDetails? callerDetails = null,
+                string? traceId = null,
+                Exception? error = null)
+            {
+                LoggedToolCallDetails = toolCallDetails;
+                LoggedAgentDetails = agentDetails;
+                LoggedConversationId = conversationId;
+                LoggedResponseContent = responseContent;
+            }
+
+            public void LogToolCall(
+                ToolCallDetails toolCallDetails,
+                ExecuteToolCallResult? result,
+                AgentDetails agentDetails,
+                string conversationId,
+                DateTimeOffset? startTime = null,
+                DateTimeOffset? endTime = null,
+                string? spanId = null,
+                string? parentSpanId = null,
+                Channel? channel = null,
+                CallerDetails? callerDetails = null,
+                string? traceId = null,
+                Exception? error = null)
+            {
+                LogToolCall(
+                    toolCallDetails,
+                    agentDetails,
+                    conversationId,
+                    MessageUtils.SerializeToolPayload(result),
+                    startTime,
+                    endTime,
+                    spanId,
+                    parentSpanId,
+                    channel,
+                    callerDetails,
+                    traceId,
+                    error);
+            }
+
+            public void LogOutput(
+                AgentDetails agentDetails,
+                Response response,
+                string? conversationId = null,
+                Channel? channel = null,
+                CallerDetails? callerDetails = null,
+                DateTimeOffset? startTime = null,
+                DateTimeOffset? endTime = null,
+                string? spanId = null,
+                string? parentSpanId = null,
+                string? traceId = null,
+                Exception? error = null)
+            {
+            }
+
+            public void LogApplyGuardrail(
+                GuardrailDetails guardrailDetails,
+                AgentDetails agentDetails,
+                string conversationId,
+                string parentSpanId,
+                DateTimeOffset? startTime = null,
+                DateTimeOffset? endTime = null,
+                string? spanId = null,
+                Channel? channel = null,
+                CallerDetails? callerDetails = null,
+                string? traceId = null,
+                Exception? error = null)
+            {
+            }
         }
 
         private ServiceProvider BuildProvider() => new ServiceCollection().AddLoggingWithEtw().BuildServiceProvider();
@@ -91,6 +219,85 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
             Assert.IsNotNull(payloadStr);
             var root = JsonDocument.Parse(payloadStr!).RootElement;
             Assert.AreEqual(OpenTelemetryConstants.OperationNames.ExecuteTool.ToString(), root.GetProperty("Name").GetString());
+        }
+
+        [TestMethod]
+        public void Interface_ExposesTypedToolResultMember()
+        {
+            var typedOverload = typeof(IA365EtwLogger<EtwLoggerTests>)
+                .GetMethods()
+                .SingleOrDefault(method =>
+                {
+                    var parameters = method.GetParameters();
+                    return method.Name == nameof(IA365EtwLogger<EtwLoggerTests>.LogToolCall) &&
+                        parameters.Length > 1 &&
+                        parameters[1].ParameterType == typeof(ExecuteToolCallResult);
+                });
+
+            typedOverload.Should().NotBeNull();
+        }
+
+        [TestMethod]
+        public void ConcreteLogger_ExposesTypedToolResultMember()
+        {
+            var typedOverload = typeof(A365EtwLogger<EtwLoggerTests>)
+                .GetMethods()
+                .SingleOrDefault(method =>
+                {
+                    var parameters = method.GetParameters();
+                    return method.Name == nameof(A365EtwLogger<EtwLoggerTests>.LogToolCall) &&
+                        parameters.Length > 1 &&
+                        parameters[1].ParameterType == typeof(ExecuteToolCallResult);
+                });
+
+            typedOverload.Should().NotBeNull();
+        }
+
+        [TestMethod]
+        public void InterfaceImplementation_UsesTypedResultOverload()
+        {
+            var legacyLogger = new LegacyCompatibleEtwLogger<EtwLoggerTests>();
+            IA365EtwLogger<EtwLoggerTests> logger = legacyLogger;
+            var toolDetails = new ToolCallDetails("tool-a", (string?)null);
+            var agentDetails = new AgentDetails("agent-id", agentName: "agent-name");
+            var result = new ExecuteToolCallResult
+            {
+                Outcome = new ToolCallResultOutcome
+                {
+                    Status = ToolCallOutcomeStatus.Success,
+                },
+                AdditionalProperties =
+                {
+                    ["provider_summary"] = "ok",
+                },
+            };
+
+            logger.LogToolCall(toolDetails, result, agentDetails, "conv-tool-legacy");
+
+            legacyLogger.LoggedToolCallDetails.Should().BeSameAs(toolDetails);
+            legacyLogger.LoggedAgentDetails.Should().BeSameAs(agentDetails);
+            legacyLogger.LoggedConversationId.Should().Be("conv-tool-legacy");
+            JsonNode.DeepEquals(
+                JsonNode.Parse(legacyLogger.LoggedResponseContent!),
+                JsonNode.Parse("{\"schema_version\":\"1.0\",\"outcome\":{\"status\":\"success\"},\"provider_summary\":\"ok\"}"))
+                .Should().BeTrue();
+        }
+
+        [TestMethod]
+        public void Logs_ToolCall_NullTypedResult_PassesNullResponseContent()
+        {
+            var legacyLogger = new LegacyCompatibleEtwLogger<EtwLoggerTests>();
+            IA365EtwLogger<EtwLoggerTests> etwLogger = legacyLogger;
+            var agentDetails = new AgentDetails("agent-id", agentName: "agent-name");
+            var toolDetails = new ToolCallDetails("tool-a", arguments: @"{ ""arg"": 1 }", toolCallId: "tool-call-1", description: "desc", toolType: "function");
+
+            etwLogger.LogToolCall(
+                toolDetails,
+                (ExecuteToolCallResult)null!,
+                agentDetails,
+                "conv-tool-null");
+
+            legacyLogger.LoggedResponseContent.Should().BeNull();
         }
 
         [TestMethod]

@@ -1,8 +1,10 @@
+#pragma warning disable RS0026 // Multiple overloads with optional parameters — by design for string vs structured results
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using Microsoft.Agents.A365.Observability.Runtime.Tracing;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using System;
 using System.Collections.Generic;
@@ -15,6 +17,66 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
     /// </summary>
     public class ExecuteToolDataBuilder : BaseDataBuilder<ExecuteToolData>
     {
+        /// <summary>
+        /// Builds complete data for an execute_tool operation with a structured result payload.
+        /// </summary>
+        /// <param name="toolCallDetails">The details of the tool call.</param>
+        /// <param name="result">Optional structured result content from the tool.</param>
+        /// <param name="agentDetails">The details of the agent (includes tenant ID).</param>
+        /// <param name="conversationId">The conversation id.</param>
+        /// <param name="startTime">Optional custom start time for the operation.</param>
+        /// <param name="endTime">Optional custom end time for the operation.</param>
+        /// <param name="spanId">Optional span ID for the operation.</param>
+        /// <param name="parentSpanId">Optional parent span ID for distributed tracing.</param>
+        /// <param name="channel">Optional channel information for the operation.</param>
+        /// <param name="callerDetails">Optional details about the caller.</param>
+        /// <param name="extraAttributes">Optional dictionary of extra attributes.</param>
+        /// <param name="spanKind">Optional span kind override. Use <see cref="SpanKindConstants.Internal"/> or <see cref="SpanKindConstants.Client"/> as appropriate.</param>
+        /// <param name="traceId">Optional trace ID for distributed tracing.</param>
+        /// <param name="error">Optional exception describing a failure; sets an OTel error status and the <c>error.type</c> attribute.</param>
+        /// <returns>An ExecuteToolData object containing all telemetry data.</returns>
+        public static ExecuteToolData Build(
+            ToolCallDetails toolCallDetails,
+            ExecuteToolCallResult? result,
+            AgentDetails agentDetails,
+            string conversationId,
+            DateTimeOffset? startTime = null,
+            DateTimeOffset? endTime = null,
+            string? spanId = null,
+            string? parentSpanId = null,
+            Channel? channel = null,
+            CallerDetails? callerDetails = null,
+            IDictionary<string, object?>? extraAttributes = null,
+            string? spanKind = null,
+            string? traceId = null,
+            Exception? error = null)
+        {
+            var attributes = BuildAttributes(
+                toolCallDetails,
+                agentDetails,
+                conversationId,
+                responseContent: null,
+                channel,
+                callerDetails,
+                extraAttributes);
+
+            AddIfNotNull(
+                attributes,
+                OpenTelemetryConstants.GenAiToolCallResultKey,
+                MessageUtils.SerializeToolPayload(result));
+
+            return ApplyStatus(
+                new ExecuteToolData(
+                    attributes,
+                    startTime,
+                    endTime,
+                    spanId,
+                    parentSpanId,
+                    spanKind,
+                    traceId),
+                error);
+        }
+
         /// <summary>
         /// Builds complete data for an execute_tool operation.
         /// </summary>
@@ -112,10 +174,20 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             var (toolName, arguments, toolCallId, description, toolType, endpoint) = toolCallDetails;
             AddIfNotNull(attributes, OpenTelemetryConstants.GenAiToolNameKey, toolName);
 
-            // Arguments — prefer structured dict, then ensure JSON string per OTEL spec
-            if (toolCallDetails.ArgumentsObject != null)
+            // Arguments — prefer typed structured arguments, then legacy structured dict, then ensure JSON string per OTEL spec
+            if (toolCallDetails.ToolCallArguments != null)
             {
-                AddIfNotNull(attributes, OpenTelemetryConstants.GenAiToolArgumentsKey, MessageUtils.Serialize(toolCallDetails.ArgumentsObject));
+                AddIfNotNull(
+                    attributes,
+                    OpenTelemetryConstants.GenAiToolArgumentsKey,
+                    MessageUtils.SerializeToolPayload(toolCallDetails.ToolCallArguments));
+            }
+            else if (toolCallDetails.ArgumentsObject != null)
+            {
+                AddIfNotNull(
+                    attributes,
+                    OpenTelemetryConstants.GenAiToolArgumentsKey,
+                    MessageUtils.SerializeToolPayload(toolCallDetails.ArgumentsObject));
             }
             else if (arguments != null)
             {

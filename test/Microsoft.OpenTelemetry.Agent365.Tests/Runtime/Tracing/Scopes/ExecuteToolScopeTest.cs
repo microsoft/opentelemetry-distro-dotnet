@@ -4,13 +4,29 @@
 namespace Microsoft.Agents.A365.Observability.Tests.Tracing.Scopes;
 
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Text.Json.Nodes;
+using System.Text.Json;
 using FluentAssertions;
+using Microsoft.Agents.A365.Observability.Runtime.Etw;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
+using Microsoft.Extensions.DependencyInjection;
+using System.Diagnostics.Tracing;
 
 [TestClass]
 public sealed class ExecuteToolScopeTest : ActivityTest
 {
+    private sealed class TestEventListener : EventListener
+    {
+        public List<EventWrittenEventArgs> Events { get; } = new();
+
+        protected override void OnEventWritten(EventWrittenEventArgs eventData) => Events.Add(eventData);
+    }
+
     [TestMethod]
     public void Start_Arguments_Set()
     {
@@ -218,6 +234,242 @@ public sealed class ExecuteToolScopeTest : ActivityTest
     }
 
     [TestMethod]
+    public void Start_WithThrowingArgumentsDictionary_UsesFallbackJson()
+    {
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails("TestTool", new ThrowingDictionary()),
+                Util.GetAgentDetails());
+        });
+
+        var tagValue = activity.Tags.First(t => t.Key == OpenTelemetryConstants.GenAiToolArgumentsKey).Value;
+        tagValue.Should().NotBeNull();
+        using var document = JsonDocument.Parse(tagValue!);
+        document.RootElement.GetProperty("serialization_error").GetString()
+            .Should().Be("Failed to serialize execute tool payload.");
+    }
+
+    [TestMethod]
+    public void Start_WithTypedArguments_RecordsSchemaJson()
+    {
+        var arguments = new ExecuteToolCallArguments
+        {
+            Action = ToolCallAction.Read,
+            Parameters = new Dictionary<string, object?> { ["location"] = "Seattle" },
+            Resources = new List<ToolCallResource>(),
+        };
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails(toolName: "get_weather", toolCallArguments: arguments),
+                Util.GetAgentDetails());
+        });
+
+        var json = activity.Tags.Single(
+            pair => pair.Key == OpenTelemetryConstants.GenAiToolArgumentsKey).Value;
+        using var document = JsonDocument.Parse(json!);
+        document.RootElement.GetProperty("action").GetString().Should().Be("read");
+        document.RootElement.GetProperty("schema_version").GetString().Should().Be("1.0");
+    }
+
+    [TestMethod]
+    public void ToolCallDetails_WithTypedArguments_ExposesTypedArgumentsProperty()
+    {
+        var arguments = new ExecuteToolCallArguments();
+
+        var details = new ToolCallDetails(toolName: "get_weather", toolCallArguments: arguments);
+
+        details.ToolCallArguments.Should().BeSameAs(arguments);
+    }
+
+    [TestMethod]
+    public void Start_WithTypedArgumentsAndLegacyString_PrefersTypedArguments()
+    {
+        var details = new ToolCallDetails("get_weather", "legacy");
+        typeof(ToolCallDetails)
+            .GetField("<ToolCallArguments>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(
+                details,
+                new ExecuteToolCallArguments
+                {
+                    Action = ToolCallAction.Read,
+                });
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                details,
+                Util.GetAgentDetails());
+        });
+
+        var json = activity.Tags.Single(
+            pair => pair.Key == OpenTelemetryConstants.GenAiToolArgumentsKey).Value;
+        using var document = JsonDocument.Parse(json!);
+        document.RootElement.GetProperty("action").GetString().Should().Be("read");
+        document.RootElement.TryGetProperty("arguments", out _).Should().BeFalse();
+    }
+
+    [TestMethod]
+    public void RecordResponse_WithTypedResult_RecordsSchemaJson()
+    {
+        var result = new ExecuteToolCallResult
+        {
+            Outcome = new ToolCallResultOutcome
+            {
+                Status = ToolCallOutcomeStatus.Success,
+            },
+            Data = new Dictionary<string, object?>(),
+            Resources = new List<ToolCallResultResource>(),
+            Pagination = new ToolCallResultPagination
+            {
+                HasMore = false,
+                TotalCount = 0,
+            },
+        };
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails("get_weather", (string?)null),
+                Util.GetAgentDetails());
+            scope.RecordResponse(result);
+        });
+
+        var json = activity.Tags.Single(
+            pair => pair.Key == OpenTelemetryConstants.GenAiToolCallResultKey).Value;
+        using var document = JsonDocument.Parse(json!);
+        document.RootElement.GetProperty("schema_version").GetString().Should().Be("1.0");
+        document.RootElement.GetProperty("outcome")
+            .GetProperty("status").GetString().Should().Be("success");
+    }
+
+    [TestMethod]
+    public void RecordResponse_WithNullTypedResult_OmitsResultTag()
+    {
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails("get_weather", (string?)null),
+                Util.GetAgentDetails());
+            scope.RecordResponse((ExecuteToolCallResult)null!);
+        });
+
+        activity.Tags.Should().NotContain(
+            pair => pair.Key == OpenTelemetryConstants.GenAiToolCallResultKey);
+    }
+
+    [TestMethod]
+    public void TypedArgumentsAndResult_MatchEtwLoggerJson()
+    {
+        var request = new Request(conversationId: "conv-tool-compare");
+        var agentDetails = Util.GetAgentDetails();
+        var arguments = new ExecuteToolCallArguments
+        {
+            Action = ToolCallAction.Read,
+            Resources = new List<ToolCallResource>
+            {
+                new()
+                {
+                    Id = "doc-1",
+                    Provider = "sharepoint",
+                    Type = "document",
+                    Identifiers = new List<ToolCallIdentifier>
+                    {
+                        new()
+                        {
+                            Type = "microsoft.graph.drive_item_id",
+                            Value = "01ABCDEF",
+                        },
+                    },
+                    Container = new ToolCallContainer
+                    {
+                        Id = "sharepoint://contoso.sharepoint.com/sites/Engineering",
+                        Uri = "https://contoso.sharepoint.com/sites/Engineering",
+                        Type = "site",
+                    },
+                },
+            },
+            Parameters = new Dictionary<string, object?>
+            {
+                ["format"] = "text",
+                ["includeMetadata"] = true,
+            },
+        };
+        var result = new ExecuteToolCallResult
+        {
+            Outcome = new ToolCallResultOutcome
+            {
+                Status = ToolCallOutcomeStatus.Success,
+            },
+            Resources = new List<ToolCallResultResource>
+            {
+                new()
+                {
+                    Id = "doc-1",
+                    Type = "document",
+                    Data = new Dictionary<string, object?>
+                    {
+                        ["title"] = "Quarterly plan",
+                    },
+                },
+            },
+            Data = new Dictionary<string, object?>
+            {
+                ["summary"] = "Document retrieved",
+            },
+            Pagination = new ToolCallResultPagination
+            {
+                HasMore = false,
+                TotalCount = 1,
+            },
+        };
+        var details = new ToolCallDetails("sharepoint_get_document", arguments);
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(request, details, agentDetails);
+            scope.RecordResponse(result);
+        });
+
+        using var listener = new TestEventListener();
+        listener.EnableEvents(EtwEventSource.Log, EventLevel.Informational);
+        using var provider = new ServiceCollection().AddLoggingWithEtw().BuildServiceProvider();
+        var logger = provider.GetRequiredService<IA365EtwLogger<ExecuteToolScopeTest>>();
+
+        logger.LogToolCall(details, result, agentDetails, request.ConversationId!);
+
+        var etwPayload = listener.Events.Single(e => e.EventId == 2000).Payload![0] as string;
+        using var etwDocument = JsonDocument.Parse(etwPayload!);
+        var etwAttributes = etwDocument.RootElement.GetProperty("Attributes");
+        var scopeArgumentsJson = activity.Tags.Single(pair => pair.Key == OpenTelemetryConstants.GenAiToolArgumentsKey).Value;
+        var scopeResultJson = activity.Tags.Single(pair => pair.Key == OpenTelemetryConstants.GenAiToolCallResultKey).Value;
+
+        JsonNode.DeepEquals(
+            JsonNode.Parse(scopeArgumentsJson!),
+            JsonNode.Parse(etwAttributes.GetProperty(OpenTelemetryConstants.GenAiToolArgumentsKey).GetString()!))
+            .Should().BeTrue();
+        JsonNode.DeepEquals(
+            JsonNode.Parse(scopeResultJson!),
+            JsonNode.Parse(etwAttributes.GetProperty(OpenTelemetryConstants.GenAiToolCallResultKey).GetString()!))
+            .Should().BeTrue();
+    }
+
+    [TestMethod]
+    public void RecordResponse_ExposesTypedExecuteToolResultOverload()
+    {
+        typeof(ExecuteToolScope)
+            .GetMethod(nameof(ExecuteToolScope.RecordResponse), new[] { typeof(ExecuteToolCallResult) })
+            .Should().NotBeNull();
+    }
+
+    [TestMethod]
     public void Start_WithCustomStartTime_SetsActivityStartTime()
     {
         // Arrange
@@ -315,5 +567,33 @@ public sealed class ExecuteToolScopeTest : ActivityTest
 
         // Assert
         activity.Kind.Should().Be(System.Diagnostics.ActivityKind.Client);
+    }
+
+    private sealed class ThrowingDictionary : IDictionary<string, object>
+    {
+        public object this[string key] { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public ICollection<string> Keys => Array.Empty<string>();
+        public ICollection<object> Values => Array.Empty<object>();
+        public int Count => 1;
+        public bool IsReadOnly => true;
+
+        public void Add(string key, object value) => throw new NotSupportedException();
+        public void Add(KeyValuePair<string, object> item) => throw new NotSupportedException();
+        public void Clear() => throw new NotSupportedException();
+        public bool Contains(KeyValuePair<string, object> item) => false;
+        public bool ContainsKey(string key) => false;
+        public void CopyTo(KeyValuePair<string, object>[] array, int arrayIndex) => throw new NotSupportedException();
+        public IEnumerator<KeyValuePair<string, object>> GetEnumerator() => throw new InvalidOperationException("test");
+        public bool Remove(string key) => throw new NotSupportedException();
+        public bool Remove(KeyValuePair<string, object> item) => throw new NotSupportedException();
+        public bool TryGetValue(string key, out object value)
+        {
+            value = null!;
+            return false;
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+        public override string ToString() => nameof(ThrowingDictionary);
     }
 }
