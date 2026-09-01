@@ -11,3 +11,62 @@ override Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365E
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterAsync.ShutdownAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.OnForceFlush(int timeoutMilliseconds) -> bool
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.OnShutdown(int timeoutMilliseconds) -> bool
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationProfile
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationProfile.Certification = 0 -> Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationProfile
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationSeverity
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationSeverity.Warning = 0 -> Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationSeverity
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationSeverity.Error = 1 -> Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationSeverity
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFindingStatus
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFindingStatus.Active = 0 -> Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFindingStatus
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFindingStatus.Suppressed = 1 -> Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFindingStatus
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.TenantIdRequired = "A365-COMMON-001" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.AgentIdentityRequired = "A365-COMMON-002" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.AgentNameRequired = "A365-COMMON-003" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.AgentDescriptionRequired = "A365-COMMON-004" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.AgentUserIdRequired = "A365-COMMON-005" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.AgentUserEmailRequired = "A365-COMMON-006" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.AgentBlueprintIdRequired = "A365-COMMON-007" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.InvokeUserIdRequired = "A365-INVOKE-001" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.InvokeUserNameRequired = "A365-INVOKE-002" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.InvokeUserEmailRequired = "A365-INVOKE-003" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.InferenceModelRequired = "A365-INFERENCE-001" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.InferenceProviderRequired = "A365-INFERENCE-002" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.ToolNameRequired = "A365-TOOL-001" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.GuardrailDecisionRequired = "A365-GUARDRAIL-001" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.GuardrailTargetRequired = "A365-GUARDRAIL-002" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.NoSpansCaptured = "A365-SESSION-001" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.SpanCompletionTimeout = "A365-SESSION-002" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.UnusedSuppression = "A365-SESSION-003" -> string!
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanSnapshot
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanSnapshot.TraceId.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanSnapshot.SpanId.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanSnapshot.DisplayName.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanSnapshot.SourceName.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanSnapshot.OperationName.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanSnapshot.Attributes.get -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFinding
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFinding.RuleId.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFinding.Severity.get -> Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationSeverity
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFinding.Status.get -> Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFindingStatus
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFinding.OperationName.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFinding.AttributeName.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFinding.Message.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFinding.Remediation.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFinding.SuppressionReason.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFinding.TraceId.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFinding.SpanId.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanValidationResult
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanValidationResult.Span.get -> Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanSnapshot!
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanValidationResult.Findings.get -> System.Collections.ObjectModel.ReadOnlyCollection<Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFinding!>!
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions.A365ValidationOptions() -> void
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions.Profile.get -> Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationProfile
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions.Profile.set -> void
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions.SpanCompletionTimeout.get -> System.TimeSpan
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions.SpanCompletionTimeout.set -> void
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions.SpanFilter.get -> System.Func<Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanSnapshot!, bool>?
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions.SpanFilter.set -> void
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions.Suppress(string! ruleId, string! reason) -> void
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions.Suppress(string! ruleId, string! operationName, string! reason) -> void
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions.Suppress(string! ruleId, string! operationName, System.Func<Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanSnapshot!, bool>! predicate, string! reason) -> void
