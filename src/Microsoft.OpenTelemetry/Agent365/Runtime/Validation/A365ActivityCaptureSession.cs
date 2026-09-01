@@ -23,6 +23,7 @@ internal sealed class A365ActivityCaptureSession : IDisposable
 
     private readonly ConcurrentDictionary<Activity, byte> active = new();
     private readonly ConcurrentQueue<Activity> completed = new();
+    private readonly ConcurrentDictionary<Activity, bool> filterDecisions = new();
     private readonly Func<A365SpanSnapshot, bool>? spanFilter;
     private readonly ActivityListener listener;
     private long eligibleChangeVersion;
@@ -72,6 +73,7 @@ internal sealed class A365ActivityCaptureSession : IDisposable
     {
         var stopwatch = Stopwatch.StartNew();
         var timedOut = true;
+        var quietPeriodObserved = false;
 
         while (true)
         {
@@ -83,19 +85,38 @@ internal sealed class A365ActivityCaptureSession : IDisposable
                 break;
             }
 
-            var version = Interlocked.Read(ref eligibleChangeVersion);
-
             // Never sleep past the remaining timeout budget: cap the delay to
             // whatever time is left instead of always waiting the full quiet
             // period, so CompleteAsync returns promptly once the deadline is
             // reached instead of intentionally oversleeping by up to QuietPeriod.
-            var delay = remaining < QuietPeriod ? remaining : QuietPeriod;
+            var isFullQuietPeriodDelay = remaining >= QuietPeriod;
+            var delay = isFullQuietPeriodDelay ? QuietPeriod : remaining;
+
+            var version = Interlocked.Read(ref eligibleChangeVersion);
+
             await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
 
-            if (version == Interlocked.Read(ref eligibleChangeVersion) &&
-                !active.Keys.Any(IsEligibleForWait))
+            var isQuiet = version == Interlocked.Read(ref eligibleChangeVersion) &&
+                !active.Keys.Any(IsEligibleForWait);
+
+            if (isQuiet && isFullQuietPeriodDelay)
             {
+                quietPeriodObserved = true;
                 timedOut = false;
+                break;
+            }
+
+            // A residual delay shorter than the full 250ms quiet period
+            // cannot, by itself, prove that a genuine quiet period occurred:
+            // observing no change for a few milliseconds is much weaker
+            // evidence than observing no change for the full window. Only a
+            // delay of the full QuietPeriod length can establish that
+            // guarantee, so once the remaining budget forces a shorter delay
+            // this iteration can never declare success on its own -- unless a
+            // full quiet period was already separately confirmed above (in
+            // which case the loop has already broken out).
+            if (!isFullQuietPeriodDelay && !quietPeriodObserved)
+            {
                 break;
             }
         }
@@ -144,7 +165,41 @@ internal sealed class A365ActivityCaptureSession : IDisposable
     /// </summary>
     private bool IsEligibleForWait(Activity activity)
     {
-        return IsEligible(activity) && PassesFilter(CreateSnapshot(activity));
+        return IsEligible(activity) && TryGetFilterDecision(activity, out _);
+    }
+
+    /// <summary>
+    /// Returns whether <paramref name="activity"/> passes the configured span
+    /// filter, computing and caching that decision the first time the
+    /// activity is observed rather than re-invoking the predicate (and
+    /// re-allocating a snapshot) on every subsequent check. This is valid
+    /// because the documented <see cref="A365ValidationOptions.SpanFilter"/>
+    /// contract requires the predicate to depend only on metadata that is
+    /// stable for the lifetime of the span, so its result cannot legitimately
+    /// change between calls for the same activity.
+    /// </summary>
+    /// <param name="activity">The activity to evaluate. Assumed already eligible by name.</param>
+    /// <param name="snapshotUsedForDecision">
+    /// The snapshot created to compute the decision, when this call actually
+    /// invoked the predicate (cache miss); callers may reuse it instead of
+    /// creating another snapshot for the same purpose. <see langword="null"/>
+    /// when the decision was served from the cache, since a fresh snapshot
+    /// may be needed to reflect attributes observed after the decision was
+    /// first cached.
+    /// </param>
+    private bool TryGetFilterDecision(Activity activity, out A365SpanSnapshot? snapshotUsedForDecision)
+    {
+        if (filterDecisions.TryGetValue(activity, out var cachedDecision))
+        {
+            snapshotUsedForDecision = null;
+            return cachedDecision;
+        }
+
+        var snapshot = CreateSnapshot(activity);
+        var passesFilter = PassesFilter(snapshot);
+        filterDecisions[activity] = passesFilter;
+        snapshotUsedForDecision = passesFilter ? snapshot : null;
+        return passesFilter;
     }
 
     private bool PassesFilter(A365SpanSnapshot snapshot)
@@ -213,29 +268,46 @@ internal sealed class A365ActivityCaptureSession : IDisposable
 
     private A365CaptureResult CreateResult(bool timedOut)
     {
-        var snapshots = new List<A365SpanSnapshot>();
-        while (completed.TryDequeue(out var activity))
-        {
-            snapshots.Add(CreateSnapshot(activity));
-        }
+        // Snapshot the active set BEFORE draining the completed queue. This
+        // captures activities that were genuinely active at the deadline, so
+        // one that stops in the tiny window between this snapshot and the
+        // drain below is still correctly eligible for timed-out
+        // classification -- and, symmetrically, so it can be excluded from
+        // TimedOutSpans if that drain shows it actually completed. Re-reading
+        // `active.Keys` only *after* draining (the prior approach) could
+        // double-classify such an activity as both completed (in Spans) and
+        // timed out (in TimedOutSpans), since OnStopped makes a stopping
+        // activity briefly observable in both `active` and `completed` at
+        // once by design.
+        var activeCandidates = active.Keys.ToList();
 
         var filtered = new List<A365SpanSnapshot>();
-        foreach (var snapshot in snapshots)
+        var completedActivities = new HashSet<Activity>();
+        while (completed.TryDequeue(out var activity))
         {
-            if (PassesFilter(snapshot))
+            completedActivities.Add(activity);
+
+            // Only eligible activities are ever enqueued (see OnStopped), so
+            // no need to re-check IsEligible here.
+            if (TryGetFilterDecision(activity, out var snapshot))
             {
-                filtered.Add(snapshot);
+                filtered.Add(snapshot ?? CreateSnapshot(activity));
             }
         }
 
         var timedOutSpans = new List<A365SpanSnapshot>();
         if (timedOut)
         {
-            foreach (var activity in active.Keys)
+            foreach (var activity in activeCandidates)
             {
-                if (IsEligibleForWait(activity))
+                if (completedActivities.Contains(activity) || !IsEligible(activity))
                 {
-                    timedOutSpans.Add(CreateSnapshot(activity));
+                    continue;
+                }
+
+                if (TryGetFilterDecision(activity, out var snapshot))
+                {
+                    timedOutSpans.Add(snapshot ?? CreateSnapshot(activity));
                 }
             }
         }

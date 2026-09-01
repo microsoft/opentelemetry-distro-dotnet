@@ -33,8 +33,35 @@ public sealed class A365ValidationOptions
         TimeSpan.FromSeconds(10);
 
     /// <summary>
-    /// Gets or sets the optional span filter.
+    /// Gets or sets an optional predicate used to exclude unrelated
+    /// telemetry (e.g. spans from other libraries or components sharing the
+    /// process) from validation. A span that is otherwise recognized but for
+    /// which this predicate returns <see langword="false"/> is excluded from
+    /// the validation report and does not extend the wait for span
+    /// completion, nor is it reported as a completion timeout.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The predicate may be evaluated while the span is still in flight
+    /// (started but not yet stopped) — including to decide, before the span
+    /// completes, whether it should keep the capture session waiting. It
+    /// must therefore depend only on metadata that is stable at span start:
+    /// <see cref="A365SpanSnapshot.TraceId"/>, <see cref="A365SpanSnapshot.SpanId"/>,
+    /// <see cref="A365SpanSnapshot.DisplayName"/>, <see cref="A365SpanSnapshot.SourceName"/>,
+    /// <see cref="A365SpanSnapshot.OperationName"/>, and attributes known to
+    /// be set at span start. Do not depend on attributes or status that are
+    /// only set when the span ends (e.g. response payloads, error status),
+    /// since the predicate's decision is cached the first time the span
+    /// becomes eligible and is never re-evaluated against later attribute
+    /// changes.
+    /// </para>
+    /// <para>
+    /// The predicate may be invoked from <see cref="System.Diagnostics.ActivityListener"/>
+    /// callbacks and background threads rather than the thread that started
+    /// the validated action; it must be thread-safe and must not assume it
+    /// runs on any particular thread.
+    /// </para>
+    /// </remarks>
     public Func<A365SpanSnapshot, bool>? SpanFilter { get; set; }
 
     /// <summary>
