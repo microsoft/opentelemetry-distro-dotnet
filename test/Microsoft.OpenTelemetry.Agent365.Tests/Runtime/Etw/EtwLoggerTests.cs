@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 using FluentAssertions;
 using Microsoft.Agents.A365.Observability.Runtime.Etw;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
@@ -83,6 +84,35 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
                 LoggedAgentDetails = agentDetails;
                 LoggedConversationId = conversationId;
                 LoggedResponseContent = responseContent;
+            }
+
+            public void LogToolCall(
+                ToolCallDetails toolCallDetails,
+                ExecuteToolCallResult? result,
+                AgentDetails agentDetails,
+                string conversationId,
+                DateTimeOffset? startTime = null,
+                DateTimeOffset? endTime = null,
+                string? spanId = null,
+                string? parentSpanId = null,
+                Channel? channel = null,
+                CallerDetails? callerDetails = null,
+                string? traceId = null,
+                Exception? error = null)
+            {
+                LogToolCall(
+                    toolCallDetails,
+                    agentDetails,
+                    conversationId,
+                    MessageUtils.SerializeToolPayload(result),
+                    startTime,
+                    endTime,
+                    spanId,
+                    parentSpanId,
+                    channel,
+                    callerDetails,
+                    traceId,
+                    error);
             }
 
             public void LogOutput(
@@ -192,7 +222,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
         }
 
         [TestMethod]
-        public void Interface_DoesNotExposeTypedToolResultMember()
+        public void Interface_ExposesTypedToolResultMember()
         {
             var typedOverload = typeof(IA365EtwLogger<EtwLoggerTests>)
                 .GetMethods()
@@ -204,11 +234,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
                         parameters[1].ParameterType == typeof(ExecuteToolCallResult);
                 });
 
-            typedOverload.Should().BeNull();
+            typedOverload.Should().NotBeNull();
         }
 
         [TestMethod]
-        public void ConcreteLogger_DoesNotExposeTypedToolResultMember()
+        public void ConcreteLogger_ExposesTypedToolResultMember()
         {
             var typedOverload = typeof(A365EtwLogger<EtwLoggerTests>)
                 .GetMethods()
@@ -220,11 +250,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
                         parameters[1].ParameterType == typeof(ExecuteToolCallResult);
                 });
 
-            typedOverload.Should().BeNull();
+            typedOverload.Should().NotBeNull();
         }
 
         [TestMethod]
-        public void LegacyInterfaceImplementation_UsesTypedResultExtension()
+        public void InterfaceImplementation_UsesTypedResultOverload()
         {
             var legacyLogger = new LegacyCompatibleEtwLogger<EtwLoggerTests>();
             IA365EtwLogger<EtwLoggerTests> logger = legacyLogger;
