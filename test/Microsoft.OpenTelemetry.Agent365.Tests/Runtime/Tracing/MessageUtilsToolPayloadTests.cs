@@ -53,7 +53,7 @@ public sealed class MessageUtilsToolPayloadTests
             },
         };
 
-        using var document = JsonDocument.Parse(MessageUtils.SerializeToolPayload(arguments));
+        using var document = JsonDocument.Parse(MessageUtils.SerializeToolPayload(arguments)!);
         var root = document.RootElement;
 
         root.GetProperty("schema_version").GetString().Should().Be("1.0");
@@ -128,7 +128,7 @@ public sealed class MessageUtilsToolPayloadTests
             },
         };
 
-        using var document = JsonDocument.Parse(MessageUtils.SerializeToolPayload(result));
+        using var document = JsonDocument.Parse(MessageUtils.SerializeToolPayload(result)!);
         var resource = document.RootElement.GetProperty("resources")[0];
 
         document.RootElement.GetProperty("schema_version").GetString().Should().Be("1.0");
@@ -178,9 +178,9 @@ public sealed class MessageUtilsToolPayloadTests
     }
 
     [TestMethod]
-    public void SerializeToolPayload_WhenPayloadIsNull_ReturnsEmptyObject()
+    public void SerializeToolPayload_WhenPayloadIsNull_ReturnsNull()
     {
-        MessageUtils.SerializeToolPayload(null).Should().Be("{}");
+        MessageUtils.SerializeToolPayload(null).Should().BeNull();
     }
 
     [TestMethod]
@@ -192,7 +192,7 @@ public sealed class MessageUtilsToolPayloadTests
             ["bytes"] = new byte[] { 0, 1, 2, 3 },
         };
 
-        using var document = JsonDocument.Parse(MessageUtils.SerializeToolPayload(payload));
+        using var document = JsonDocument.Parse(MessageUtils.SerializeToolPayload(payload)!);
         var root = document.RootElement;
 
         root.GetProperty("action").GetString().Should().Be("read");
@@ -211,7 +211,7 @@ public sealed class MessageUtilsToolPayloadTests
             },
         };
 
-        using var document = JsonDocument.Parse(MessageUtils.SerializeToolPayload(payload));
+        using var document = JsonDocument.Parse(MessageUtils.SerializeToolPayload(payload)!);
         var parameters = document.RootElement.GetProperty("parameters");
 
         parameters.ValueKind.Should().Be(JsonValueKind.Object);

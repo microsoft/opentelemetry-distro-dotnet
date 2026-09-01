@@ -19,7 +19,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
         /// <typeparam name="T">The logger category type.</typeparam>
         /// <param name="logger">The ETW logger.</param>
         /// <param name="toolCallDetails">The details of the tool call.</param>
-        /// <param name="result">Structured result content to include in the log.</param>
+        /// <param name="result">Optional structured result content to include in the log.</param>
         /// <param name="agentDetails">The details of the agent (includes tenant ID).</param>
         /// <param name="conversationId">The required conversation ID.</param>
         /// <param name="startTime">Optional start time of the tool execution.</param>
@@ -33,7 +33,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
         public static void LogToolCall<T>(
             this IA365EtwLogger<T> logger,
             ToolCallDetails toolCallDetails,
-            ExecuteToolCallResult result,
+            ExecuteToolCallResult? result,
             AgentDetails agentDetails,
             string conversationId,
             DateTimeOffset? startTime = null,
@@ -45,11 +45,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
             string? traceId = null,
             Exception? error = null)
         {
-            if (result == null)
-            {
-                throw new ArgumentNullException(nameof(result));
-            }
-
             logger.LogToolCall(
                 toolCallDetails,
                 agentDetails,

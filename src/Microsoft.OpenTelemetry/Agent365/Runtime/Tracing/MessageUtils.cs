@@ -142,11 +142,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing
         /// Serializes an execute-tool payload to JSON using the shared snake_case options.
         /// Non-throwing; replaces the entire payload with a diagnostic object on error.
         /// </summary>
-        public static string SerializeToolPayload(object? value)
+        public static string? SerializeToolPayload(object? value)
         {
             if (value == null)
             {
-                return "{}";
+                return null;
             }
 
             try

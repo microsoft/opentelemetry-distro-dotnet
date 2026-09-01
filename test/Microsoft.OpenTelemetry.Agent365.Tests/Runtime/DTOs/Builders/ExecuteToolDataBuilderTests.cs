@@ -471,19 +471,18 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
         }
 
         [TestMethod]
-        public void Build_WithNullTypedResult_ThrowsArgumentNullException()
+        public void Build_WithNullTypedResult_OmitsResultAttribute()
         {
             var tool = new ToolCallDetails("tool-null-result", (string?)null);
             var agent = new AgentDetails("agent-null-result");
 
-            Action act = () => ExecuteToolDataBuilder.Build(
+            var data = ExecuteToolDataBuilder.Build(
                 tool,
                 (ExecuteToolCallResult)null!,
                 agent,
                 "conversation-null-result");
 
-            act.Should().Throw<ArgumentNullException>()
-                .WithParameterName("result");
+            data.Attributes.Should().NotContainKey(OpenTelemetryConstants.GenAiToolCallResultKey);
         }
 
         private sealed class ThrowingDictionary : IDictionary<string, object>

@@ -235,21 +235,20 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
         }
 
         [TestMethod]
-        public void Logs_ToolCall_NullTypedResult_ThrowsArgumentNullException()
+        public void Logs_ToolCall_NullTypedResult_PassesNullResponseContent()
         {
-            using var provider = BuildProvider();
-            var etwLogger = provider.GetRequiredService<IA365EtwLogger<EtwLoggingBuilderTests>>();
+            var legacyLogger = new LegacyCompatibleEtwLogger<EtwLoggerTests>();
+            IA365EtwLogger<EtwLoggerTests> etwLogger = legacyLogger;
             var agentDetails = new AgentDetails("agent-id", agentName: "agent-name");
             var toolDetails = new ToolCallDetails("tool-a", arguments: @"{ ""arg"": 1 }", toolCallId: "tool-call-1", description: "desc", toolType: "function");
 
-            Action act = () => etwLogger.LogToolCall(
+            etwLogger.LogToolCall(
                 toolDetails,
                 (ExecuteToolCallResult)null!,
                 agentDetails,
                 "conv-tool-null");
 
-            act.Should().Throw<ArgumentNullException>()
-                .WithParameterName("result");
+            legacyLogger.LoggedResponseContent.Should().BeNull();
         }
 
         [TestMethod]

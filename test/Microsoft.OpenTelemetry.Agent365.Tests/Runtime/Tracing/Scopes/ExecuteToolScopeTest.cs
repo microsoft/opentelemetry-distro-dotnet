@@ -350,6 +350,22 @@ public sealed class ExecuteToolScopeTest : ActivityTest
     }
 
     [TestMethod]
+    public void RecordResponse_WithNullTypedResult_OmitsResultTag()
+    {
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails("get_weather", (string?)null),
+                Util.GetAgentDetails());
+            scope.RecordResponse((ExecuteToolCallResult)null!);
+        });
+
+        activity.Tags.Should().NotContain(
+            pair => pair.Key == OpenTelemetryConstants.GenAiToolCallResultKey);
+    }
+
+    [TestMethod]
     public void TypedArgumentsAndResult_MatchEtwLoggerJson()
     {
         var request = new Request(conversationId: "conv-tool-compare");

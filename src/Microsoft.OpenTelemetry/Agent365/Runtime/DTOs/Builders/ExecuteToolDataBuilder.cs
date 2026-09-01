@@ -21,7 +21,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
         /// Builds complete data for an execute_tool operation with a structured result payload.
         /// </summary>
         /// <param name="toolCallDetails">The details of the tool call.</param>
-        /// <param name="result">Structured result content from the tool.</param>
+        /// <param name="result">Optional structured result content from the tool.</param>
         /// <param name="agentDetails">The details of the agent (includes tenant ID).</param>
         /// <param name="conversationId">The conversation id.</param>
         /// <param name="startTime">Optional custom start time for the operation.</param>
@@ -37,7 +37,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
         /// <returns>An ExecuteToolData object containing all telemetry data.</returns>
         public static ExecuteToolData Build(
             ToolCallDetails toolCallDetails,
-            ExecuteToolCallResult result,
+            ExecuteToolCallResult? result,
             AgentDetails agentDetails,
             string conversationId,
             DateTimeOffset? startTime = null,
@@ -51,11 +51,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             string? traceId = null,
             Exception? error = null)
         {
-            if (result == null)
-            {
-                throw new ArgumentNullException(nameof(result));
-            }
-
             var attributes = BuildAttributes(
                 toolCallDetails,
                 agentDetails,

@@ -140,14 +140,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// Records a typed tool call result for telemetry tracking.
         /// Per OTEL spec, the result SHOULD be recorded in structured form.
         /// </summary>
-        /// <param name="result">Tool call result as a typed schema model.</param>
-        public void RecordResponse(ExecuteToolCallResult result)
+        /// <param name="result">Optional tool call result as a typed schema model.</param>
+        public void RecordResponse(ExecuteToolCallResult? result)
         {
-            if (result == null)
-            {
-                throw new ArgumentNullException(nameof(result));
-            }
-
             SetTagMaybe(
                 OpenTelemetryConstants.GenAiToolCallResultKey,
                 MessageUtils.SerializeToolPayload(result));
