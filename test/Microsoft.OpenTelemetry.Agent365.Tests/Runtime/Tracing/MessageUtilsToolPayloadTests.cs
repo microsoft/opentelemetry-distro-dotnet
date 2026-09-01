@@ -149,8 +149,11 @@ public sealed class MessageUtilsToolPayloadTests
     {
         var payload = new ExecuteToolCallResult
         {
-            ["good"] = 42,
-            ["bad"] = new ThrowingEnumerable(),
+            AdditionalProperties =
+            {
+                ["good"] = 42,
+                ["bad"] = new ThrowingEnumerable(),
+            },
         };
 
         MessageUtils.SerializeToolPayload(payload).Should().Be(ExpectedSerializationError);
@@ -160,7 +163,7 @@ public sealed class MessageUtilsToolPayloadTests
     public void SerializeToolPayload_WhenPayloadContainsCycle_ReplacesEntirePayload()
     {
         var payload = new ExecuteToolCallResult();
-        payload["self"] = payload;
+        payload.AdditionalProperties["self"] = payload;
 
         MessageUtils.SerializeToolPayload(payload).Should().Be(ExpectedSerializationError);
     }
@@ -170,8 +173,11 @@ public sealed class MessageUtilsToolPayloadTests
     {
         var payload = new ExecuteToolCallResult
         {
-            ["good"] = 42,
-            ["bad"] = double.NaN,
+            AdditionalProperties =
+            {
+                ["good"] = 42,
+                ["bad"] = double.NaN,
+            },
         };
 
         MessageUtils.SerializeToolPayload(payload).Should().Be(ExpectedSerializationError);

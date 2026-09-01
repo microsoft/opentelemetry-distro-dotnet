@@ -181,7 +181,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
                 {
                     Status = ToolCallOutcomeStatus.Success,
                 },
-                ["provider_summary"] = "ok",
+                AdditionalProperties =
+                {
+                    ["provider_summary"] = "ok",
+                },
             };
 
             logger.LogToolCall(

@@ -2,7 +2,9 @@
 // Licensed under the MIT License.
 
 using System.Collections.Generic;
+using System.Text.Json;
 using FluentAssertions;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Tracing.Contracts;
@@ -20,8 +22,7 @@ public sealed class ExecuteToolJsonModelsTests
             Resources = new List<ToolCallResource>(),
         };
 
-        arguments["schema_version"].Should().Be("1.0");
-        arguments["action"].Should().Be("read");
+        arguments.SchemaVersion.Should().Be("1.0");
         arguments.Action.Should().Be(ToolCallAction.Read);
         arguments.Parameters!["format"].Should().Be("text");
     }
@@ -29,105 +30,132 @@ public sealed class ExecuteToolJsonModelsTests
     [TestMethod]
     public void Result_DefaultsSchemaVersion()
     {
-        var result = new ExecuteToolCallResult();
-
-        result.SchemaVersion.Should().Be("1.0");
-        result["schema_version"].Should().Be("1.0");
+        new ExecuteToolCallResult().SchemaVersion.Should().Be("1.0");
     }
 
     [TestMethod]
-    public void CopyConstructors_DefaultSchemaVersionWhenMissing()
+    public void ExtensionData_SerializesAtContainingObjectLevel()
     {
-        var arguments = new ExecuteToolCallArguments(new Dictionary<string, object?>());
-        var result = new ExecuteToolCallResult(new Dictionary<string, object?>());
-
-        arguments.SchemaVersion.Should().Be("1.0");
-        result.SchemaVersion.Should().Be("1.0");
-    }
-
-    [TestMethod]
-    public void StandardAndIndexerWritesUseLastWriteWins()
-    {
-        var policy = new ToolCallResultPolicy
+        var result = new ExecuteToolCallResult
         {
-            Decision = ToolPolicyDecision.Allow,
+            Outcome = new ToolCallResultOutcome
+            {
+                Status = ToolCallOutcomeStatus.Success,
+                AdditionalProperties =
+                {
+                    ["provider_outcome"] = "accepted",
+                },
+            },
+            AdditionalProperties =
+            {
+                ["provider_result"] = 42,
+            },
         };
 
-        policy["decision"] = "provider_conditional_allow";
+        using var document = JsonDocument.Parse(MessageUtils.SerializeToolPayload(result)!);
+        var root = document.RootElement;
 
-        policy["decision"].Should().Be("provider_conditional_allow");
-        policy.Decision.Should().BeNull();
-
-        policy.Decision = ToolPolicyDecision.Deny;
-
-        policy["decision"].Should().Be("deny");
-        policy.Decision.Should().Be(ToolPolicyDecision.Deny);
+        root.GetProperty("provider_result").GetInt32().Should().Be(42);
+        root.GetProperty("outcome").GetProperty("provider_outcome").GetString()
+            .Should().Be("accepted");
+        root.TryGetProperty("additional_properties", out _).Should().BeFalse();
+        root.GetProperty("outcome").TryGetProperty("additional_properties", out _).Should().BeFalse();
     }
 
     [TestMethod]
-    public void NullPropertyRemovesStandardKey()
+    public void IdentifierAndContainerAcceptExtensionData()
     {
         var identifier = new ToolCallIdentifier
         {
-            Type = "microsoft.graph.drive_item_id",
-            Value = "01ABCDEF",
-        };
-
-        identifier.Type = null;
-
-        identifier.Should().NotContainKey("type");
-        identifier.Should().ContainKey("value");
-    }
-
-    [TestMethod]
-    public void IdentifierAndContainerAcceptCustomProperties()
-    {
-        var identifier = new ToolCallIdentifier
-        {
-            ["provider_scope"] = "tenant",
+            AdditionalProperties =
+            {
+                ["provider_scope"] = "tenant",
+            },
         };
         var container = new ToolCallContainer
         {
-            ["provider_path"] = "/sites/Engineering",
+            AdditionalProperties =
+            {
+                ["provider_path"] = "/sites/Engineering",
+            },
         };
 
-        identifier["provider_scope"].Should().Be("tenant");
-        container["provider_path"].Should().Be("/sites/Engineering");
+        identifier.AdditionalProperties["provider_scope"].Should().Be("tenant");
+        container.AdditionalProperties["provider_path"].Should().Be("/sites/Engineering");
     }
 
     [TestMethod]
-    public void CopyConstructorPreservesCustomValues()
+    public void DefaultJsonSerializer_UsesSchemaNamesAndStringEnums()
     {
-        var result = new ExecuteToolCallResult(
-            new Dictionary<string, object?>
+        var arguments = new ExecuteToolCallArguments
+        {
+            Action = ToolCallAction.Read,
+            AdditionalProperties =
             {
-                ["provider_result"] = 42,
-            });
+                ["provider_option"] = true,
+            },
+        };
 
-        result["provider_result"].Should().Be(42);
+        var json = JsonSerializer.Serialize(arguments);
+        using var document = JsonDocument.Parse(json);
+
+        document.RootElement.GetProperty("schema_version").GetString().Should().Be("1.0");
+        document.RootElement.GetProperty("action").GetString().Should().Be("read");
+        document.RootElement.GetProperty("provider_option").GetBoolean().Should().BeTrue();
+        document.RootElement.TryGetProperty("SchemaVersion", out _).Should().BeFalse();
     }
 
     [TestMethod]
-    public void EnumProperties_RejectUndefinedNumericStrings()
+    public void DefaultJsonSerializer_DeserializesSchemaNamesAndStringEnums()
     {
-        var arguments = new ExecuteToolCallArguments(
-            new Dictionary<string, object?>
-            {
-                ["action"] = "999",
-            });
+        var arguments = JsonSerializer.Deserialize<ExecuteToolCallArguments>(
+            """{"schema_version":"2.0","action":"read","provider_option":true}""");
 
-        arguments.Action.Should().BeNull();
-    }
-
-    [TestMethod]
-    public void EnumProperties_ParseCaseInsensitiveStrings()
-    {
-        var arguments = new ExecuteToolCallArguments(
-            new Dictionary<string, object?>
-            {
-                ["action"] = "ReAd",
-            });
-
+        arguments.Should().NotBeNull();
+        arguments!.SchemaVersion.Should().Be("2.0");
         arguments.Action.Should().Be(ToolCallAction.Read);
+        arguments.AdditionalProperties.Should().ContainKey("provider_option");
+        arguments.AdditionalProperties.Should().NotContainKey("schema_version");
+        arguments.AdditionalProperties.Should().NotContainKey("action");
+    }
+
+    [TestMethod]
+    public void DefaultJsonSerializer_RejectsUndefinedEnumValues()
+    {
+        var arguments = new ExecuteToolCallArguments
+        {
+            Action = (ToolCallAction)999,
+        };
+
+        var act = () => JsonSerializer.Serialize(arguments);
+
+        act.Should().Throw<JsonException>();
+    }
+
+    [TestMethod]
+    public void DefaultJsonSerializer_RejectsNumericAction()
+    {
+        var act = () => JsonSerializer.Deserialize<ExecuteToolCallArguments>(
+            """{"action":1}""");
+
+        act.Should().Throw<JsonException>();
+    }
+
+    [TestMethod]
+    public void DefaultJsonSerializer_RejectsNumericOutcomeStatus()
+    {
+        var act = () => JsonSerializer.Deserialize<ToolCallResultOutcome>(
+            """{"status":0}""");
+
+        act.Should().Throw<JsonException>();
+    }
+
+    [TestMethod]
+    public void DefaultJsonSerializer_RejectsNumericPolicyDecision()
+    {
+        var act = () => JsonSerializer.Deserialize<ToolCallResultPolicy>(
+            """{"decision":0}""");
+
+        act.Should().Throw<JsonException>();
     }
 }

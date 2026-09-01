@@ -14,10 +14,11 @@ override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchAct
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallArguments.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallDetails(string! toolName, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments! toolCallArguments, string? toolCallId = null, string? description = null, string? toolType = null, System.Uri? endpoint = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments.AdditionalProperties.get -> System.Collections.Generic.IDictionary<string!, object?>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments.AdditionalProperties.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments.Action.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallAction?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments.Action.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments.ExecuteToolCallArguments() -> void
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments.ExecuteToolCallArguments(System.Collections.Generic.IDictionary<string!, object?>! values) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments.Parameters.get -> System.Collections.Generic.IDictionary<string!, object?>?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments.Parameters.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments.Resources.get -> System.Collections.Generic.IList<Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResource!>?
@@ -25,10 +26,11 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolC
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments.SchemaVersion.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments.SchemaVersion.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult.AdditionalProperties.get -> System.Collections.Generic.IDictionary<string!, object?>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult.AdditionalProperties.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult.Data.get -> System.Collections.Generic.IDictionary<string!, object?>?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult.Data.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult.ExecuteToolCallResult() -> void
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult.ExecuteToolCallResult(System.Collections.Generic.IDictionary<string!, object?>! values) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult.Outcome.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultOutcome?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult.Outcome.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult.Pagination.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPagination?
@@ -43,25 +45,29 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallActi
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallAction.Read = 1 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallAction
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallAction.Update = 2 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallAction
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallContainer
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallContainer.AdditionalProperties.get -> System.Collections.Generic.IDictionary<string!, object?>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallContainer.AdditionalProperties.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallContainer.Id.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallContainer.Id.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallContainer.Type.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallContainer.Type.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallContainer.ToolCallContainer() -> void
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallContainer.ToolCallContainer(System.Collections.Generic.IDictionary<string!, object?>! values) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallContainer.Uri.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallContainer.Uri.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallIdentifier
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallIdentifier.AdditionalProperties.get -> System.Collections.Generic.IDictionary<string!, object?>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallIdentifier.AdditionalProperties.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallIdentifier.Type.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallIdentifier.Type.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallIdentifier.ToolCallIdentifier() -> void
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallIdentifier.ToolCallIdentifier(System.Collections.Generic.IDictionary<string!, object?>! values) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallIdentifier.Value.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallIdentifier.Value.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallOutcomeStatus
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallOutcomeStatus.Failure = 1 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallOutcomeStatus
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallOutcomeStatus.Success = 0 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallOutcomeStatus
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResource
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResource.AdditionalProperties.get -> System.Collections.Generic.IDictionary<string!, object?>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResource.AdditionalProperties.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResource.Container.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallContainer?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResource.Container.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResource.Identifiers.get -> System.Collections.Generic.IList<Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallIdentifier!>?
@@ -73,12 +79,13 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallReso
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResource.Provider.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResource.Provider.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResource.ToolCallResource() -> void
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResource.ToolCallResource(System.Collections.Generic.IDictionary<string!, object?>! values) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResource.Type.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResource.Type.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResource.Uri.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResource.Uri.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultOutcome
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultOutcome.AdditionalProperties.get -> System.Collections.Generic.IDictionary<string!, object?>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultOutcome.AdditionalProperties.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultOutcome.Code.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultOutcome.Code.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultOutcome.Message.get -> string?
@@ -88,17 +95,19 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResu
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultOutcome.Status.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallOutcomeStatus?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultOutcome.Status.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultOutcome.ToolCallResultOutcome() -> void
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultOutcome.ToolCallResultOutcome(System.Collections.Generic.IDictionary<string!, object?>! values) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPagination
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPagination.AdditionalProperties.get -> System.Collections.Generic.IDictionary<string!, object?>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPagination.AdditionalProperties.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPagination.HasMore.get -> bool?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPagination.HasMore.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPagination.NextCursor.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPagination.NextCursor.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPagination.ToolCallResultPagination() -> void
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPagination.ToolCallResultPagination(System.Collections.Generic.IDictionary<string!, object?>! values) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPagination.TotalCount.get -> long?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPagination.TotalCount.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPolicy
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPolicy.AdditionalProperties.get -> System.Collections.Generic.IDictionary<string!, object?>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPolicy.AdditionalProperties.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPolicy.Decision.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolPolicyDecision?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPolicy.Decision.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPolicy.Id.get -> string?
@@ -106,8 +115,9 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResu
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPolicy.Name.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPolicy.Name.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPolicy.ToolCallResultPolicy() -> void
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultPolicy.ToolCallResultPolicy(System.Collections.Generic.IDictionary<string!, object?>! values) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultResource
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultResource.AdditionalProperties.get -> System.Collections.Generic.IDictionary<string!, object?>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultResource.AdditionalProperties.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultResource.Container.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallContainer?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultResource.Container.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultResource.Data.get -> System.Collections.Generic.IDictionary<string!, object?>?
@@ -129,21 +139,22 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResu
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultResource.Security.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultSecurity?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultResource.Security.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultResource.ToolCallResultResource() -> void
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultResource.ToolCallResultResource(System.Collections.Generic.IDictionary<string!, object?>! values) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultResource.Type.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultResource.Type.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultResource.Uri.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultResource.Uri.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultSecurity
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultSecurity.AdditionalProperties.get -> System.Collections.Generic.IDictionary<string!, object?>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultSecurity.AdditionalProperties.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultSecurity.ToolCallResultSecurity() -> void
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultSecurity.ToolCallResultSecurity(System.Collections.Generic.IDictionary<string!, object?>! values) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultSecurity.XpiaDetected.get -> bool?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultSecurity.XpiaDetected.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultSensitivity
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultSensitivity.AdditionalProperties.get -> System.Collections.Generic.IDictionary<string!, object?>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultSensitivity.AdditionalProperties.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultSensitivity.LabelId.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultSensitivity.LabelId.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultSensitivity.ToolCallResultSensitivity() -> void
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResultSensitivity.ToolCallResultSensitivity(System.Collections.Generic.IDictionary<string!, object?>! values) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolPolicyDecision
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolPolicyDecision.Allow = 0 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolPolicyDecision
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolPolicyDecision.Deny = 1 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolPolicyDecision
