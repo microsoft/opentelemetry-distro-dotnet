@@ -23,7 +23,7 @@ internal sealed class A365ActivityCaptureSession : IDisposable
 
     private readonly ConcurrentDictionary<Activity, byte> active = new();
     private readonly ConcurrentQueue<Activity> completed = new();
-    private readonly ConcurrentDictionary<Activity, FilterDecision> filterDecisions = new();
+    private readonly ConcurrentDictionary<Activity, Lazy<FilterDecision>> filterDecisions = new();
     private readonly Func<A365SpanSnapshot, bool>? spanFilter;
     private readonly ActivityListener listener;
     private long eligibleChangeVersion;
@@ -191,26 +191,50 @@ internal sealed class A365ActivityCaptureSession : IDisposable
     {
         A365SpanSnapshot? computedSnapshot = null;
 
-        // GetOrAdd guarantees the predicate's outcome -- success, exclusion,
-        // or failure -- is computed and cached at most once per activity and
-        // reused by every subsequent caller (listener callbacks, the
-        // quiet-period wait loop, and CreateResult), regardless of which one
-        // happens to observe the activity first.
-        var decision = filterDecisions.GetOrAdd(activity, _ =>
-        {
-            computedSnapshot = CreateSnapshot(activity);
-            try
-            {
-                var passesFilter = spanFilter == null || spanFilter(computedSnapshot);
-                return FilterDecision.Success(passesFilter);
-            }
-            catch (Exception ex)
-            {
-                return FilterDecision.Failure(new InvalidOperationException(
-                    $"Span filter failed for span '{computedSnapshot.SpanId}'.",
-                    ex));
-            }
-        });
+        // GetOrAdd's value factory is NOT guaranteed to run at most once
+        // under contention: the documented ConcurrentDictionary contract
+        // allows multiple threads racing on the same missing key to each
+        // invoke the factory concurrently, with only one of the resulting
+        // values actually stored (and returned to every caller). If the
+        // factory itself evaluated the span filter directly, a customer
+        // predicate could therefore run more than once per activity -- and,
+        // if it has side effects, run them more than once too. Instead, the
+        // factory here only allocates a Lazy<FilterDecision>: allocating an
+        // unstarted Lazy is cheap and side-effect-free, so it is harmless if
+        // several threads each build one and lose the race to store theirs.
+        // Whichever Lazy instance GetOrAdd ultimately returns is the same
+        // object for every caller (winner and losers alike), and
+        // LazyThreadSafetyMode.ExecutionAndPublication guarantees that only
+        // one thread ever executes *that* Lazy's factory delegate -- callers
+        // that lose the internal Lazy race block until the winner publishes
+        // its result and then observe the identical cached value. This
+        // guarantees the span filter predicate is evaluated at most once per
+        // activity, and that success, exclusion, and a wrapped predicate
+        // exception are all cached and reused identically by every
+        // subsequent caller (listener callbacks, the quiet-period wait loop,
+        // and CreateResult), regardless of which one happens to observe the
+        // activity first.
+        var lazyDecision = filterDecisions.GetOrAdd(
+            activity,
+            _ => new Lazy<FilterDecision>(
+                () =>
+                {
+                    computedSnapshot = CreateSnapshot(activity);
+                    try
+                    {
+                        var passesFilter = spanFilter == null || spanFilter(computedSnapshot);
+                        return FilterDecision.Success(passesFilter);
+                    }
+                    catch (Exception ex)
+                    {
+                        return FilterDecision.Failure(new InvalidOperationException(
+                            $"Span filter failed for span '{computedSnapshot.SpanId}'.",
+                            ex));
+                    }
+                },
+                LazyThreadSafetyMode.ExecutionAndPublication));
+
+        var decision = lazyDecision.Value;
 
         if (decision.Error != null)
         {
@@ -218,6 +242,14 @@ internal sealed class A365ActivityCaptureSession : IDisposable
             throw decision.Error;
         }
 
+        // computedSnapshot is only non-null on this call's own stack frame
+        // when this call is the one whose closure actually executed the
+        // Lazy's factory delegate (i.e. the very first evaluation for this
+        // activity, across all callers). Every other caller -- whether
+        // served from an already-cached decision or blocked behind another
+        // thread's in-flight first evaluation -- correctly reports null here
+        // per the documented contract below, since callers already fall back
+        // to CreateSnapshot(activity) when they need one.
         snapshotUsedForDecision = decision.PassesFilter ? computedSnapshot : null;
         return decision.PassesFilter;
     }

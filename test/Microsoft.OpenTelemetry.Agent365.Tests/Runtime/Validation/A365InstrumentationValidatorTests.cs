@@ -247,14 +247,16 @@ public sealed class A365InstrumentationValidatorTests
     }
 
     [TestMethod]
-    public void BuildReport_ChurnTimeoutWithNoActiveSpanAtDeadline_AddsGenericTimeoutFinding()
+    public void BuildReport_TimedOutWithNoActiveSpanAtDeadline_AddsGenericTimeoutFinding()
     {
         // Deterministic coverage for the case where CompleteAsync reaches its
-        // deadline because of continuous eligible activity churn, but no
-        // activity happens to be active at the exact final instant. The
-        // capture result still reports TimedOut = true with an empty
-        // TimedOutSpans list; BuildReport must not silently treat that as a
-        // clean report.
+        // deadline without ever observing a full quiet period (this can
+        // happen because of continuous eligible activity churn, but equally
+        // because of a short configured SpanCompletionTimeout or a residual
+        // window too short to qualify -- see BuildReport), but no activity
+        // happens to be active at the exact final instant. The capture
+        // result still reports TimedOut = true with an empty TimedOutSpans
+        // list; BuildReport must not silently treat that as a clean report.
         var options = new A365ValidationOptions();
         var captured = new A365CaptureResult(
             spans: Array.Empty<A365SpanSnapshot>(),
@@ -268,7 +270,9 @@ public sealed class A365InstrumentationValidatorTests
             f.RuleId == A365ValidationRuleIds.SpanCompletionTimeout &&
             f.Severity == A365ValidationSeverity.Error &&
             f.Status == A365ValidationFindingStatus.Active &&
-            f.SpanId == null);
+            f.SpanId == null &&
+            f.Message.Contains("250ms quiet period") &&
+            !f.Message.Contains("continuous"));
     }
 
     [TestMethod]

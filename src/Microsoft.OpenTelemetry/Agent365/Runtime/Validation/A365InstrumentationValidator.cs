@@ -112,20 +112,28 @@ public static class A365InstrumentationValidator
         if (captured.TimedOut && captured.TimedOutSpans.Count == 0)
         {
             // The completion deadline was reached without ever observing a
-            // quiet period (e.g. continuous eligible activity churn kept
-            // resetting the wait), but no eligible activity happened to be
+            // full quiet period, but no eligible activity happened to be
             // active at the exact instant the deadline elapsed. Without this,
             // BuildReport would silently return a clean report even though
             // completion never actually settled. Preserve an explicit,
             // non-span-specific timeout finding instead.
+            //
+            // The message deliberately does not name a cause: reaching the
+            // deadline without a quiet period can happen for reasons besides
+            // continuous eligible activity churn -- e.g. a SpanCompletionTimeout
+            // configured shorter than the 250ms quiet period itself, or a
+            // residual window (the time left before the deadline) that is
+            // too short to qualify as a full quiet period even though no
+            // churn occurred during it. Claiming "continuous ... activity"
+            // would be misleading in those cases.
             sessionFindings.Add(new A365ValidationFinding(
                 A365ValidationRuleIds.SpanCompletionTimeout,
                 A365ValidationSeverity.Error,
                 A365ValidationFindingStatus.Active,
                 operationName: null,
                 attributeName: null,
-                message: $"The validation session did not reach a quiet period within {options.SpanCompletionTimeout} because of continuous eligible span activity.",
-                remediation: "Reduce concurrent/overlapping span activity during validation, or increase A365ValidationOptions.SpanCompletionTimeout.",
+                message: $"The validation session did not reach a full 250ms quiet period before the {options.SpanCompletionTimeout} SpanCompletionTimeout elapsed.",
+                remediation: "Increase A365ValidationOptions.SpanCompletionTimeout to allow a full 250ms quiet period to be observed, or reduce concurrent/overlapping span activity during validation.",
                 suppressionReason: null,
                 traceId: null,
                 spanId: null));

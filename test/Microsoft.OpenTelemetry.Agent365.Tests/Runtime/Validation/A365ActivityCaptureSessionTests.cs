@@ -632,4 +632,79 @@ public sealed class A365ActivityCaptureSessionTests
             "only ~100ms of quiescence remained before the deadline, short of the required " +
             "250ms quiet period");
     }
+
+    [TestMethod]
+    public async Task TryGetFilterDecision_CallbackAndWaitPathsRaceUnderContention_InvokesPredicateExactlyOnce()
+    {
+        // Deterministic regression coverage for at-most-once predicate
+        // evaluation under genuine contention. ConcurrentDictionary.GetOrAdd
+        // does NOT guarantee its value factory runs only once when multiple
+        // threads race on a missing key -- if the factory evaluated the span
+        // filter directly, several threads could each invoke the customer
+        // predicate concurrently. This test forces exactly that race between
+        // the two real call sites -- the ActivityListener callback path
+        // (OnStopped, via TryGetFilterDecisionForVersionTracking) and the
+        // quiet-period wait-loop path (CompleteAsync's
+        // active.Keys.Any(IsEligibleForWait) check) -- against the very same
+        // activity, and asserts the predicate is invoked exactly once.
+        var invocationCount = 0;
+        using var enteredPredicate = new ManualResetEventSlim(false);
+        using var releasePredicate = new ManualResetEventSlim(false);
+
+        using var session = new A365ActivityCaptureSession(_ =>
+        {
+            Interlocked.Increment(ref invocationCount);
+
+            // Block the *first* (winning) evaluation here so every other
+            // concurrent caller racing for the same activity is provably
+            // still contending -- blocked inside Lazy<FilterDecision>.Value
+            // -- for the whole window below, rather than merely observing an
+            // already-published result.
+            enteredPredicate.Set();
+            releasePredicate.Wait(TimeSpan.FromSeconds(5));
+            return true;
+        });
+        using var source = new ActivitySource(
+            nameof(TryGetFilterDecision_CallbackAndWaitPathsRaceUnderContention_InvokesPredicateExactlyOnce));
+
+        var activity = source.StartActivity("chat model");
+        activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+
+        // "Callback path": OnStopped enqueues the activity as completed
+        // (still leaving it in `active` until after the filter is
+        // evaluated -- see OnStopped) and then evaluates the filter. Run on
+        // a background thread since it blocks inside the predicate above.
+        var stopTask = Task.Run(() => activity.Dispose());
+
+        enteredPredicate.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue(
+            "the callback path must reach the predicate deterministically before racing it " +
+            "against the wait path");
+
+        // "Wait path": while the callback path is still blocked *inside* the
+        // predicate, race several concurrent CompleteAsync quiet-period
+        // pollers against it. The activity remains visible in `active` at
+        // this point, so each poller's active.Keys.Any(IsEligibleForWait)
+        // reaches the very same cached Lazy<FilterDecision> the callback
+        // path is currently executing, and must block rather than
+        // re-evaluate the predicate.
+        var waitTasks = Enumerable.Range(0, 4)
+            .Select(_ => session.CompleteAsync(TimeSpan.FromMilliseconds(900), CancellationToken.None))
+            .ToArray();
+
+        // Generous margin over the 250ms quiet-period poll interval so at
+        // least one wait-path poller has genuinely reached (and blocked on)
+        // the in-flight predicate execution before it is released.
+        await Task.Delay(500);
+
+        releasePredicate.Set();
+
+        await stopTask;
+        await Task.WhenAll(waitTasks);
+
+        Volatile.Read(ref invocationCount).Should().Be(
+            1,
+            "the Lazy<FilterDecision>-backed cache must guarantee the span filter predicate runs " +
+            "at most once per activity even when the listener callback path and the quiet-period " +
+            "wait-loop path race to evaluate the same activity concurrently");
+    }
 }
