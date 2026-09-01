@@ -16,10 +16,21 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing
     /// </summary>
     internal static class MessageUtils
     {
-        private static readonly JsonSerializerOptions SerializerOptions = CreateSerializerOptions();
+        internal sealed class SnakeCaseJsonStringEnumConverter : JsonStringEnumConverter
+        {
+            public SnakeCaseJsonStringEnumConverter()
+                : base(JsonNamingPolicy.SnakeCaseLower, allowIntegerValues: false)
+            {
+            }
+        }
+
+        internal static readonly JsonSerializerOptions SerializerOptions = CreateSerializerOptions();
 
         private static readonly string DiagnosticFallback =
             "[{\"role\":\"system\",\"parts\":[{\"type\":\"text\",\"content\":\"[serialization failed]\"}],\"finish_reason\":\"error\"}]";
+
+        private const string ToolPayloadDiagnosticFallback =
+            "{\"serialization_error\":\"Failed to serialize execute tool payload.\"}";
 
         private static JsonSerializerOptions CreateSerializerOptions()
         {
@@ -132,6 +143,27 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing
             catch (Exception)
             {
                 return DiagnosticFallback;
+            }
+        }
+
+        /// <summary>
+        /// Serializes an execute-tool payload to JSON using the shared snake_case options.
+        /// Non-throwing; replaces the entire payload with a diagnostic object on error.
+        /// </summary>
+        public static string? SerializeToolPayload(object? value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                return JsonSerializer.Serialize(value, value.GetType(), SerializerOptions);
+            }
+            catch (Exception)
+            {
+                return ToolPayloadDiagnosticFallback;
             }
         }
     }

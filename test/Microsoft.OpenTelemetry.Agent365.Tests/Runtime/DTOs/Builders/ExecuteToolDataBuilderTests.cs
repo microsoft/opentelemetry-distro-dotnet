@@ -1,11 +1,15 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System.Collections;
+using System.Reflection;
 using FluentAssertions;
 using Microsoft.Agents.A365.Observability.Runtime.DTOs;
 using Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
+using System.Text.Json;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
 {
@@ -348,6 +352,165 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
 
             // Assert
             data.SpanKind.Should().Be(SpanKindConstants.Client);
+        }
+
+        [TestMethod]
+        public void Build_WithThrowingArgumentsDictionary_UsesFallbackJson()
+        {
+            var tool = new ToolCallDetails("tool-throwing", new ThrowingDictionary());
+            var agent = new AgentDetails("agent-throwing");
+            var conversationId = "conv-throwing";
+
+            var data = ExecuteToolDataBuilder.Build(tool, agent, conversationId);
+
+            using var document = JsonDocument.Parse(data.Attributes[OpenTelemetryConstants.GenAiToolArgumentsKey]!.ToString()!);
+            document.RootElement.GetProperty("serialization_error").GetString()
+                .Should().Be("Failed to serialize execute tool payload.");
+        }
+
+        [TestMethod]
+        public void Build_WithTypedArguments_UsesSchemaJson()
+        {
+            var tool = new ToolCallDetails(
+                "tool-typed",
+                new ExecuteToolCallArguments
+                {
+                    Action = ToolCallAction.Read,
+                    Parameters = new Dictionary<string, object?> { ["location"] = "Seattle" },
+                    Resources = new List<ToolCallResource>(),
+                });
+            var agent = new AgentDetails("agent-typed");
+            var conversationId = "conv-typed";
+
+            var data = ExecuteToolDataBuilder.Build(tool, agent, conversationId);
+
+            using var document = JsonDocument.Parse(data.Attributes[OpenTelemetryConstants.GenAiToolArgumentsKey]!.ToString()!);
+            document.RootElement.GetProperty("action").GetString().Should().Be("read");
+            document.RootElement.GetProperty("schema_version").GetString().Should().Be("1.0");
+        }
+
+        [TestMethod]
+        public void Build_WithNestedTypedDictionaryArguments_PreservesObjectShape()
+        {
+            var tool = new ToolCallDetails(
+                "tool-nested-dictionary",
+                new Dictionary<string, object>
+                {
+                    ["parameters"] = new Dictionary<string, int>
+                    {
+                        ["maxResults"] = 5,
+                        ["offset"] = 2,
+                    },
+                });
+            var agent = new AgentDetails("agent-nested-dictionary");
+            var conversationId = "conv-nested-dictionary";
+
+            var data = ExecuteToolDataBuilder.Build(tool, agent, conversationId);
+
+            using var document = JsonDocument.Parse(data.Attributes[OpenTelemetryConstants.GenAiToolArgumentsKey]!.ToString()!);
+            var parameters = document.RootElement.GetProperty("parameters");
+
+            parameters.ValueKind.Should().Be(JsonValueKind.Object);
+            parameters.GetProperty("maxResults").GetInt32().Should().Be(5);
+            parameters.GetProperty("offset").GetInt32().Should().Be(2);
+        }
+
+        [TestMethod]
+        public void Build_WithTypedArgumentsAndLegacyString_PrefersTypedArguments()
+        {
+            var tool = new ToolCallDetails("tool-precedence", "legacy");
+            var typedArguments = new ExecuteToolCallArguments
+            {
+                Action = ToolCallAction.Delete,
+            };
+            typeof(ToolCallDetails)
+                .GetField("<ToolCallArguments>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(tool, typedArguments);
+            var agent = new AgentDetails("agent-precedence");
+            var conversationId = "conv-precedence";
+
+            var data = ExecuteToolDataBuilder.Build(tool, agent, conversationId);
+
+            using var document = JsonDocument.Parse(data.Attributes[OpenTelemetryConstants.GenAiToolArgumentsKey]!.ToString()!);
+            document.RootElement.GetProperty("action").GetString().Should().Be("delete");
+            document.RootElement.TryGetProperty("arguments", out _).Should().BeFalse();
+        }
+
+        [TestMethod]
+        public void Build_WithTypedPayloads_UsesSchemaSerializer()
+        {
+            var arguments = new ExecuteToolCallArguments
+            {
+                Action = ToolCallAction.Read,
+                Resources = new List<ToolCallResource>(),
+                Parameters = new Dictionary<string, object?>(),
+            };
+            var result = new ExecuteToolCallResult
+            {
+                Outcome = new ToolCallResultOutcome
+                {
+                    Status = ToolCallOutcomeStatus.Success,
+                },
+            };
+
+            var data = ExecuteToolDataBuilder.Build(
+                new ToolCallDetails("tool", arguments),
+                result,
+                new AgentDetails("agent"),
+                "conversation");
+
+            using var argumentsJson = JsonDocument.Parse(
+                (string)data.Attributes[OpenTelemetryConstants.GenAiToolArgumentsKey]!);
+            using var resultJson = JsonDocument.Parse(
+                (string)data.Attributes[OpenTelemetryConstants.GenAiToolCallResultKey]!);
+
+            argumentsJson.RootElement.GetProperty("action").GetString().Should().Be("read");
+            resultJson.RootElement.GetProperty("schema_version").GetString().Should().Be("1.0");
+            resultJson.RootElement.GetProperty("outcome")
+                .GetProperty("status").GetString().Should().Be("success");
+        }
+
+        [TestMethod]
+        public void Build_WithNullTypedResult_OmitsResultAttribute()
+        {
+            var tool = new ToolCallDetails("tool-null-result", (string?)null);
+            var agent = new AgentDetails("agent-null-result");
+
+            var data = ExecuteToolDataBuilder.Build(
+                tool,
+                (ExecuteToolCallResult)null!,
+                agent,
+                "conversation-null-result");
+
+            data.Attributes.Should().NotContainKey(OpenTelemetryConstants.GenAiToolCallResultKey);
+        }
+
+        private sealed class ThrowingDictionary : IDictionary<string, object>
+        {
+            public object this[string key] { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+            public ICollection<string> Keys => Array.Empty<string>();
+            public ICollection<object> Values => Array.Empty<object>();
+            public int Count => 1;
+            public bool IsReadOnly => true;
+
+            public void Add(string key, object value) => throw new NotSupportedException();
+            public void Add(KeyValuePair<string, object> item) => throw new NotSupportedException();
+            public void Clear() => throw new NotSupportedException();
+            public bool Contains(KeyValuePair<string, object> item) => false;
+            public bool ContainsKey(string key) => false;
+            public void CopyTo(KeyValuePair<string, object>[] array, int arrayIndex) => throw new NotSupportedException();
+            public IEnumerator<KeyValuePair<string, object>> GetEnumerator() => throw new InvalidOperationException("test");
+            public bool Remove(string key) => throw new NotSupportedException();
+            public bool Remove(KeyValuePair<string, object> item) => throw new NotSupportedException();
+            public bool TryGetValue(string key, out object value)
+            {
+                value = null!;
+                return false;
+            }
+
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+            public override string ToString() => nameof(ThrowingDictionary);
         }
     }
 }
