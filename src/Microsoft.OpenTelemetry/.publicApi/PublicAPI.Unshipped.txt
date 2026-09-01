@@ -81,3 +81,5 @@ Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions.Spa
 Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions.Suppress(string! ruleId, string! reason) -> void
 Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions.Suppress(string! ruleId, string! operationName, string! reason) -> void
 Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions.Suppress(string! ruleId, string! operationName, System.Func<Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanSnapshot!, bool>! predicate, string! reason) -> void
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365InstrumentationValidator
+static Microsoft.Agents.A365.Observability.Runtime.Validation.A365InstrumentationValidator.EvaluateAsync(System.Func<System.Threading.Tasks.Task!>! action, System.Action<Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions!>? configure = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationReport!>!

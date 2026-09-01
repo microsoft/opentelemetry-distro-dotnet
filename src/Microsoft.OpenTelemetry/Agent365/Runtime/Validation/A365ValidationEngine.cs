@@ -146,7 +146,7 @@ internal static class A365ValidationEngine
         return operationSuppression ?? globalSuppression;
     }
 
-    private static void ValidateOptions(A365ValidationOptions options)
+    internal static void ValidateOptions(A365ValidationOptions options)
     {
         if (options.Profile != A365ValidationProfile.Certification)
         {

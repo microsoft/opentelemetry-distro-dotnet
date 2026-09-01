@@ -1,0 +1,125 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace Microsoft.Agents.A365.Observability.Runtime.Validation;
+
+/// <summary>
+/// Public orchestration entry point for in-process A365 instrumentation
+/// validation. Attaches a temporary process-wide <see cref="System.Diagnostics.ActivityListener"/>
+/// while the supplied action runs, then evaluates the captured spans against
+/// the A365 certification rule catalog.
+/// </summary>
+public static class A365InstrumentationValidator
+{
+    private static readonly SemaphoreSlim SessionLock = new(1, 1);
+
+    /// <summary>
+    /// Runs <paramref name="action"/> while capturing recognized A365 GenAI
+    /// spans, then returns a validation report for the captured spans.
+    /// Validation sessions are serialized process-wide; only one evaluation
+    /// runs at a time.
+    /// </summary>
+    /// <param name="action">The action under test.</param>
+    /// <param name="configure">An optional callback used to configure validation options.</param>
+    /// <param name="cancellationToken">A token used to cancel the wait for span completion.</param>
+    /// <returns>The validation report.</returns>
+    public static async Task<A365ValidationReport> EvaluateAsync(
+        Func<Task> action,
+        Action<A365ValidationOptions>? configure = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (action == null)
+        {
+            throw new ArgumentNullException(nameof(action));
+        }
+
+        var options = new A365ValidationOptions();
+        configure?.Invoke(options);
+        A365ValidationEngine.ValidateOptions(options);
+
+        await SessionLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            A365CaptureResult captured;
+            using (var capture = new A365ActivityCaptureSession(options.SpanFilter))
+            {
+                await action().ConfigureAwait(false);
+                captured = await capture.CompleteAsync(
+                    options.SpanCompletionTimeout,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            return BuildReport(captured, options);
+        }
+        finally
+        {
+            SessionLock.Release();
+        }
+    }
+
+    private static A365ValidationReport BuildReport(
+        A365CaptureResult captured,
+        A365ValidationOptions options)
+    {
+        var sessionFindings = new List<A365ValidationFinding>();
+
+        if (captured.Spans.Count == 0)
+        {
+            sessionFindings.Add(new A365ValidationFinding(
+                A365ValidationRuleIds.NoSpansCaptured,
+                A365ValidationSeverity.Error,
+                A365ValidationFindingStatus.Active,
+                operationName: null,
+                attributeName: null,
+                message: "No recognized A365 spans were captured during the validation session.",
+                remediation: "Create a manual scope, use supported auto-instrumentation, or emit a custom ActivitySource span with a recognized gen_ai.operation.name.",
+                suppressionReason: null,
+                traceId: null,
+                spanId: null));
+        }
+
+        foreach (var timedOutSpan in captured.TimedOutSpans)
+        {
+            sessionFindings.Add(new A365ValidationFinding(
+                A365ValidationRuleIds.SpanCompletionTimeout,
+                A365ValidationSeverity.Error,
+                A365ValidationFindingStatus.Active,
+                timedOutSpan.OperationName,
+                attributeName: null,
+                message: $"Span '{timedOutSpan.DisplayName}' did not complete within {options.SpanCompletionTimeout}.",
+                remediation: "Ensure the span is stopped before the validated action returns, or increase A365ValidationOptions.SpanCompletionTimeout.",
+                suppressionReason: null,
+                timedOutSpan.TraceId,
+                timedOutSpan.SpanId));
+        }
+
+        var spanResults = A365ValidationEngine.Validate(captured.Spans, options);
+
+        foreach (var suppression in options.Suppressions)
+        {
+            if (suppression.WasUsed)
+            {
+                continue;
+            }
+
+            sessionFindings.Add(new A365ValidationFinding(
+                A365ValidationRuleIds.UnusedSuppression,
+                A365ValidationSeverity.Warning,
+                A365ValidationFindingStatus.Active,
+                suppression.OperationName,
+                attributeName: null,
+                message: $"Suppression {suppression.RuleId} did not match any finding.",
+                remediation: "Remove the stale suppression or correct its targeting.",
+                suppressionReason: null,
+                traceId: null,
+                spanId: null));
+        }
+
+        return new A365ValidationReport(spanResults, sessionFindings);
+    }
+}
