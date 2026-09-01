@@ -1,11 +1,19 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Microsoft.Agents.A365.Observability.Runtime.Common;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Agents.A365.Observability.Runtime.Validation;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.OpenTelemetry.AgentFramework;
+using OpenTelemetry;
+using OpenTelemetry.Trace;
 
 namespace Microsoft.OpenTelemetry.Agent365.Tests.Runtime.Validation;
 
@@ -302,6 +310,197 @@ public sealed class A365InstrumentationValidatorTests
         report.SessionFindings.Should().ContainSingle(f =>
             f.RuleId == A365ValidationRuleIds.SpanCompletionTimeout &&
             f.SpanId == timedOutSpan.SpanId);
+    }
+
+    [TestMethod]
+    public async Task EvaluateAsync_ValidManualScopes_PassCertification()
+    {
+        using var provider = Sdk.CreateTracerProviderBuilder()
+            .AddSource(OpenTelemetryConstants.SourceName)
+            .AddProcessor(new ActivityProcessor())
+            .Build();
+
+        var report = await A365InstrumentationValidator.EvaluateAsync(() =>
+        {
+            var agent = CreateCertificationAgentDetails();
+            var user = new UserDetails(
+                "user-id",
+                "user@example.com",
+                "User Name");
+            var request = new Request(
+                "hello",
+                sessionId: "session",
+                conversationId: "conversation");
+
+            using (InvokeAgentScope.Start(
+                request,
+                new InvokeAgentScopeDetails(new Uri("https://example.com")),
+                agent,
+                new CallerDetails(user)))
+            {
+            }
+
+            using (InferenceScope.Start(
+                request,
+                new InferenceCallDetails(
+                    InferenceOperationType.Chat,
+                    "gpt-4.1",
+                    "openai"),
+                agent,
+                user))
+            {
+            }
+
+            using (ExecuteToolScope.Start(
+                request,
+                new ToolCallDetails("weather", "{}"),
+                agent,
+                user))
+            {
+            }
+
+            using (OutputScope.Start(
+                request,
+                new Response(new[] { "sunny" }),
+                agent,
+                user))
+            {
+            }
+
+            using (ApplyGuardrailScope.Start(
+                new GuardrailDetails(
+                    GuardrailTargetType.LlmInput,
+                    GuardrailDecisionType.Allow),
+                agent,
+                request,
+                user))
+            {
+            }
+
+            return Task.CompletedTask;
+        });
+
+        report.EnsureValid();
+        report.Spans.Should().HaveCount(5);
+    }
+
+    [TestMethod]
+    public async Task EvaluateAsync_AgentFrameworkAutoInstrumentation_EnrichesAndPassesCertification()
+    {
+        var services = new ServiceCollection();
+        services.AddOpenTelemetry()
+            .UseAgentFramework()
+            .WithTracing(tracing => tracing
+                .AddSource(AgentFrameworkConstants.DefaultSource)
+                .AddProcessor(new ActivityProcessor()));
+
+        using var serviceProvider = services.BuildServiceProvider();
+        serviceProvider.GetService<TracerProvider>();
+
+        var report = await A365InstrumentationValidator.EvaluateAsync(() =>
+        {
+            using var source = new ActivitySource(AgentFrameworkConstants.DefaultSource);
+
+            using (new BaggageBuilder()
+                .TenantId("tenant")
+                .AgentId("agent")
+                .AgentName("Weather agent")
+                .AgentDescription("Answers weather questions")
+                .AgenticUserId("agent-user")
+                .AgenticUserEmail("agent@example.com")
+                .AgentBlueprintId("blueprint")
+                .Build())
+            {
+                var tags = new ActivityTagsCollection
+                {
+                    {
+                        OpenTelemetryConstants.GenAiOperationNameKey,
+                        OpenTelemetryConstants.InvokeAgentOperationName
+                    },
+                    { OpenTelemetryConstants.UserIdKey, "user-id" },
+                    { OpenTelemetryConstants.UserNameKey, "User Name" },
+                    { OpenTelemetryConstants.UserEmailKey, "user@example.com" },
+                };
+
+                using var activity = source.StartActivity(
+                    "invoke_agent WeatherAgent",
+                    ActivityKind.Internal,
+                    default(ActivityContext),
+                    tags);
+                activity.Should().NotBeNull();
+            }
+
+            return Task.CompletedTask;
+        });
+
+        // The synthetic activity is tagged with gen_ai.operation.name = invoke_agent
+        // (the operation actually recognized by the capture session for this span),
+        // not gen_ai.operation.name = chat.
+        report.Spans.Should().ContainSingle(span =>
+            string.Equals(
+                span.Span.OperationName,
+                OpenTelemetryConstants.InvokeAgentOperationName,
+                StringComparison.OrdinalIgnoreCase));
+        report.EnsureValid();
+    }
+
+    [TestMethod]
+    public async Task EvaluateAsync_AnonymousInvokeAgent_SuppressesInvokeUserRules()
+    {
+        const string suppressionReason =
+            "Anonymous entry point - this endpoint intentionally accepts unauthenticated callers.";
+
+        var report = await A365InstrumentationValidator.EvaluateAsync(
+            () =>
+            {
+                var agent = CreateCertificationAgentDetails();
+                var request = new Request(
+                    "hello",
+                    sessionId: "session",
+                    conversationId: "conversation");
+
+                using (InvokeAgentScope.Start(
+                    request,
+                    new InvokeAgentScopeDetails(new Uri("https://example.com")),
+                    agent))
+                {
+                }
+
+                return Task.CompletedTask;
+            },
+            options =>
+            {
+                options.Suppress(
+                    A365ValidationRuleIds.InvokeUserIdRequired,
+                    OpenTelemetryConstants.InvokeAgentOperationName,
+                    suppressionReason);
+                options.Suppress(
+                    A365ValidationRuleIds.InvokeUserNameRequired,
+                    OpenTelemetryConstants.InvokeAgentOperationName,
+                    suppressionReason);
+                options.Suppress(
+                    A365ValidationRuleIds.InvokeUserEmailRequired,
+                    OpenTelemetryConstants.InvokeAgentOperationName,
+                    suppressionReason);
+            });
+
+        report.IsValid.Should().BeTrue();
+        report.SuppressedFindingCount.Should().Be(3);
+        report.Spans.Single().Findings.Should().OnlyContain(
+            finding => finding.Status == A365ValidationFindingStatus.Suppressed);
+        report.ToString().Should().Contain("Anonymous entry point");
+    }
+
+    private static AgentDetails CreateCertificationAgentDetails()
+    {
+        return new AgentDetails(
+            agentId: "agent",
+            agentName: "Weather agent",
+            agentDescription: "Answers weather questions",
+            agenticUserId: "agent-user",
+            agenticUserEmail: "agent@example.com",
+            agentBlueprintId: "blueprint",
+            tenantId: "tenant");
     }
 
     private static void SetValidChatAttributes(Activity activity)
