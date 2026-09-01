@@ -168,16 +168,16 @@ internal static class A365ValidationEngine
         {
             suppression.WasUsed = false;
 
-            if (!A365CertificationRuleCatalog.TryGetRule(
+            if (!A365ValidationRuleRegistry.TryGetRule(
                 suppression.RuleId,
-                out var rule))
+                out var suppressible))
             {
                 throw new ArgumentException(
                     $"Unknown rule id '{suppression.RuleId}'.",
                     nameof(options));
             }
 
-            if (!rule.Suppressible)
+            if (!suppressible)
             {
                 throw new ArgumentException(
                     $"Rule id '{suppression.RuleId}' is non-suppressible.",

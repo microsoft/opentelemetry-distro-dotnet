@@ -52,6 +52,24 @@ public sealed class A365ValidationEngineTests
             .WithMessage("*non-suppressible*");
     }
 
+    [DataTestMethod]
+    [DataRow(A365ValidationRuleIds.NoSpansCaptured)]
+    [DataRow(A365ValidationRuleIds.SpanCompletionTimeout)]
+    [DataRow(A365ValidationRuleIds.UnusedSuppression)]
+    public void Validate_SessionRuleSuppression_IsRejectedAsNonSuppressible(
+        string ruleId)
+    {
+        var options = new A365ValidationOptions();
+        options.Suppress(ruleId, "Session rule suppression");
+
+        Action act = () => A365ValidationEngine.Validate(
+            new[] { CreateValidCommonSpan("chat") },
+            options);
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*non-suppressible*");
+    }
+
     [TestMethod]
     public void Validate_OperationSuppression_LeavesVisibleSuppressedFinding()
     {
