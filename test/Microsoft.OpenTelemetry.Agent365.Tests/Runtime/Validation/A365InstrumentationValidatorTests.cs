@@ -214,6 +214,62 @@ public sealed class A365InstrumentationValidatorTests
         maxObservedConcurrency.Should().Be(1);
     }
 
+    [TestMethod]
+    public async Task EvaluateAsync_LongLivedFilteredOutActiveSpan_DoesNotReportTimeout()
+    {
+        Activity? foreign = null;
+
+        var report = await A365InstrumentationValidator.EvaluateAsync(
+            () =>
+            {
+                using var source = new ActivitySource(
+                    nameof(EvaluateAsync_LongLivedFilteredOutActiveSpan_DoesNotReportTimeout));
+                foreign = source.StartActivity("foreign long-lived");
+                foreign!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+                return Task.CompletedTask;
+            },
+            options =>
+            {
+                options.SpanCompletionTimeout = TimeSpan.FromSeconds(2);
+                options.SpanFilter = span => span.DisplayName != "foreign long-lived";
+            });
+
+        try
+        {
+            report.SessionFindings.Should().NotContain(f =>
+                f.RuleId == A365ValidationRuleIds.SpanCompletionTimeout);
+        }
+        finally
+        {
+            foreign?.Dispose();
+        }
+    }
+
+    [TestMethod]
+    public void BuildReport_ChurnTimeoutWithNoActiveSpanAtDeadline_AddsGenericTimeoutFinding()
+    {
+        // Deterministic coverage for the case where CompleteAsync reaches its
+        // deadline because of continuous eligible activity churn, but no
+        // activity happens to be active at the exact final instant. The
+        // capture result still reports TimedOut = true with an empty
+        // TimedOutSpans list; BuildReport must not silently treat that as a
+        // clean report.
+        var options = new A365ValidationOptions();
+        var captured = new A365CaptureResult(
+            spans: Array.Empty<A365SpanSnapshot>(),
+            timedOutSpans: Array.Empty<A365SpanSnapshot>(),
+            timedOut: true);
+
+        var report = A365InstrumentationValidator.BuildReport(captured, options);
+
+        report.IsValid.Should().BeFalse();
+        report.SessionFindings.Should().Contain(f =>
+            f.RuleId == A365ValidationRuleIds.SpanCompletionTimeout &&
+            f.Severity == A365ValidationSeverity.Error &&
+            f.Status == A365ValidationFindingStatus.Active &&
+            f.SpanId == null);
+    }
+
     private static void SetValidChatAttributes(Activity activity)
     {
         activity.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");

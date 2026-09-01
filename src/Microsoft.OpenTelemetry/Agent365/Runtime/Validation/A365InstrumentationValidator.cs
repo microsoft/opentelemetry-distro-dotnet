@@ -62,7 +62,13 @@ public static class A365InstrumentationValidator
         }
     }
 
-    private static A365ValidationReport BuildReport(
+    /// <summary>
+    /// Builds the validation report from a completed capture. Internal (rather
+    /// than private) so tests can deterministically exercise the session
+    /// finding logic - including the churn/timeout branch below - without
+    /// depending on wall-clock timing.
+    /// </summary>
+    internal static A365ValidationReport BuildReport(
         A365CaptureResult captured,
         A365ValidationOptions options)
     {
@@ -96,6 +102,28 @@ public static class A365InstrumentationValidator
                 suppressionReason: null,
                 timedOutSpan.TraceId,
                 timedOutSpan.SpanId));
+        }
+
+        if (captured.TimedOut && captured.TimedOutSpans.Count == 0)
+        {
+            // The completion deadline was reached without ever observing a
+            // quiet period (e.g. continuous eligible activity churn kept
+            // resetting the wait), but no eligible activity happened to be
+            // active at the exact instant the deadline elapsed. Without this,
+            // BuildReport would silently return a clean report even though
+            // completion never actually settled. Preserve an explicit,
+            // non-span-specific timeout finding instead.
+            sessionFindings.Add(new A365ValidationFinding(
+                A365ValidationRuleIds.SpanCompletionTimeout,
+                A365ValidationSeverity.Error,
+                A365ValidationFindingStatus.Active,
+                operationName: null,
+                attributeName: null,
+                message: $"The validation session did not reach a quiet period within {options.SpanCompletionTimeout} because of continuous eligible span activity.",
+                remediation: "Reduce concurrent/overlapping span activity during validation, or increase A365ValidationOptions.SpanCompletionTimeout.",
+                suppressionReason: null,
+                traceId: null,
+                spanId: null));
         }
 
         var spanResults = A365ValidationEngine.Validate(captured.Spans, options);

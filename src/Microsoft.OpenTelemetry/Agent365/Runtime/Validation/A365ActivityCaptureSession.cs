@@ -47,6 +47,17 @@ internal sealed class A365ActivityCaptureSession : IDisposable
     }
 
     /// <summary>
+    /// Gets or sets a test-only synchronization hook. When set, it is invoked
+    /// synchronously inside <see cref="OnStopped"/> after a stopping activity
+    /// has been made durably observable (queued to the completed set when
+    /// eligible) but before it is removed from the active set. Production
+    /// code never sets this; it exists solely so regression tests can
+    /// deterministically observe the transition point instead of relying on
+    /// wall-clock timing.
+    /// </summary>
+    internal Action<Activity>? OnStoppedTransitionHookForTests { get; set; }
+
+    /// <summary>
     /// Waits for a 250-millisecond quiet period, bounded by <paramref name="timeout"/>,
     /// during which no new eligible activity starts or stops. Returns filtered
     /// snapshots for completed eligible spans and snapshots for any span that
@@ -62,15 +73,27 @@ internal sealed class A365ActivityCaptureSession : IDisposable
         var stopwatch = Stopwatch.StartNew();
         var timedOut = true;
 
-        while (stopwatch.Elapsed < timeout)
+        while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            var remaining = timeout - stopwatch.Elapsed;
+            if (remaining <= TimeSpan.Zero)
+            {
+                break;
+            }
+
             var version = Interlocked.Read(ref eligibleChangeVersion);
 
-            await Task.Delay(QuietPeriod, cancellationToken).ConfigureAwait(false);
+            // Never sleep past the remaining timeout budget: cap the delay to
+            // whatever time is left instead of always waiting the full quiet
+            // period, so CompleteAsync returns promptly once the deadline is
+            // reached instead of intentionally oversleeping by up to QuietPeriod.
+            var delay = remaining < QuietPeriod ? remaining : QuietPeriod;
+            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
 
             if (version == Interlocked.Read(ref eligibleChangeVersion) &&
-                !active.Keys.Any(IsEligible))
+                !active.Keys.Any(IsEligibleForWait))
             {
                 timedOut = false;
                 break;
@@ -78,6 +101,17 @@ internal sealed class A365ActivityCaptureSession : IDisposable
         }
 
         return CreateResult(timedOut);
+    }
+
+    /// <summary>
+    /// Test-only helper: reports whether <paramref name="activity"/> is
+    /// currently observable through either the active set or the completed
+    /// queue. Used to assert that an eligible stopping activity is never
+    /// visible in neither collection at the same time.
+    /// </summary>
+    internal bool IsObservableForTests(Activity activity)
+    {
+        return active.ContainsKey(activity) || completed.Contains(activity);
     }
 
     /// <inheritdoc />
@@ -99,6 +133,32 @@ internal sealed class A365ActivityCaptureSession : IDisposable
 
         return !string.IsNullOrEmpty(operationName) &&
             OpenTelemetryConstants.GenAiOperationNames.Contains(operationName!);
+    }
+
+    /// <summary>
+    /// Determines whether <paramref name="activity"/> is both recognized (by
+    /// operation name) and, when a <see cref="spanFilter"/> is configured,
+    /// passes it. A span that is eligible by name but excluded by the span
+    /// filter must not extend the quiet-period wait, nor be reported as a
+    /// completion timeout, since the caller has declared it out of scope.
+    /// </summary>
+    private bool IsEligibleForWait(Activity activity)
+    {
+        return IsEligible(activity) && PassesFilter(CreateSnapshot(activity));
+    }
+
+    private bool PassesFilter(A365SpanSnapshot snapshot)
+    {
+        try
+        {
+            return spanFilter == null || spanFilter(snapshot);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Span filter failed for span '{snapshot.SpanId}'.",
+                ex);
+        }
     }
 
     private static A365SpanSnapshot CreateSnapshot(Activity activity)
@@ -134,13 +194,21 @@ internal sealed class A365ActivityCaptureSession : IDisposable
 
     private void OnStopped(Activity activity)
     {
-        active.TryRemove(activity, out _);
-
+        // Ordering matters: an eligible stopping activity must remain visible
+        // to CompleteAsync's completion logic (via `active` or `completed`) at
+        // every instant. Queue it as completed (and publish the version bump)
+        // BEFORE removing it from `active`, so there is never a window where
+        // it exists in neither collection and could be silently dropped by a
+        // concurrently-running completion check.
         if (IsEligible(activity))
         {
             completed.Enqueue(activity);
             Interlocked.Increment(ref eligibleChangeVersion);
         }
+
+        OnStoppedTransitionHookForTests?.Invoke(activity);
+
+        active.TryRemove(activity, out _);
     }
 
     private A365CaptureResult CreateResult(bool timedOut)
@@ -154,19 +222,7 @@ internal sealed class A365ActivityCaptureSession : IDisposable
         var filtered = new List<A365SpanSnapshot>();
         foreach (var snapshot in snapshots)
         {
-            bool include;
-            try
-            {
-                include = spanFilter == null || spanFilter(snapshot);
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException(
-                    $"Span filter failed for span '{snapshot.SpanId}'.",
-                    ex);
-            }
-
-            if (include)
+            if (PassesFilter(snapshot))
             {
                 filtered.Add(snapshot);
             }
@@ -177,14 +233,14 @@ internal sealed class A365ActivityCaptureSession : IDisposable
         {
             foreach (var activity in active.Keys)
             {
-                if (IsEligible(activity))
+                if (IsEligibleForWait(activity))
                 {
                     timedOutSpans.Add(CreateSnapshot(activity));
                 }
             }
         }
 
-        return new A365CaptureResult(filtered, timedOutSpans);
+        return new A365CaptureResult(filtered, timedOutSpans, timedOut);
     }
 }
 
@@ -195,10 +251,12 @@ internal sealed class A365CaptureResult
 {
     internal A365CaptureResult(
         IReadOnlyList<A365SpanSnapshot> spans,
-        IReadOnlyList<A365SpanSnapshot> timedOutSpans)
+        IReadOnlyList<A365SpanSnapshot> timedOutSpans,
+        bool timedOut)
     {
         Spans = spans;
         TimedOutSpans = timedOutSpans;
+        TimedOut = timedOut;
     }
 
     /// <summary>
@@ -211,4 +269,14 @@ internal sealed class A365CaptureResult
     /// timeout elapsed.
     /// </summary>
     internal IReadOnlyList<A365SpanSnapshot> TimedOutSpans { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether the completion deadline was reached
+    /// without observing a quiet period. This can be <see langword="true"/>
+    /// even when <see cref="TimedOutSpans"/> is empty, e.g. when continuous
+    /// eligible activity churn kept resetting the quiet-period window but no
+    /// activity happened to be active at the exact instant the deadline was
+    /// reached.
+    /// </summary>
+    internal bool TimedOut { get; }
 }
