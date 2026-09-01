@@ -10,7 +10,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools
     /// <summary>
     /// Represents the action taken by an execute tool call.
     /// </summary>
-    [JsonConverter(typeof(SnakeCaseJsonStringEnumConverter))]
+    [JsonConverter(typeof(MessageUtils.SnakeCaseJsonStringEnumConverter))]
     public enum ToolCallAction
     {
         /// <summary>Creates a resource.</summary>

@@ -16,6 +16,14 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing
     /// </summary>
     internal static class MessageUtils
     {
+        internal sealed class SnakeCaseJsonStringEnumConverter : JsonStringEnumConverter
+        {
+            public SnakeCaseJsonStringEnumConverter()
+                : base(JsonNamingPolicy.SnakeCaseLower, allowIntegerValues: false)
+            {
+            }
+        }
+
         internal static readonly JsonSerializerOptions SerializerOptions = CreateSerializerOptions();
 
         private static readonly string DiagnosticFallback =
