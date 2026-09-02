@@ -38,6 +38,63 @@ public sealed class A365InstrumentationValidatorTests
     }
 
     [TestMethod]
+    public async Task EvaluateAsync_ExportIdentityOnlyInActivityBaggage_SatisfiesNonSuppressibleRules()
+    {
+        var report = await A365InstrumentationValidator.EvaluateAsync(() =>
+        {
+            using var source = new ActivitySource("Customer.Agent.Baggage");
+            using var activity = source.StartActivity("chat model");
+            activity.Should().NotBeNull();
+
+            SetValidChatAttributes(activity!, includeExportIdentity: false);
+
+            // Tenant and agent identity are carried only in Activity baggage --
+            // exactly what Agent365ExporterCore reads through
+            // GetAttributeOrBaggage when it partitions spans for export. The
+            // two non-suppressible identity rules must therefore pass.
+            activity!.AddBaggage(OpenTelemetryConstants.TenantIdKey, "tenant");
+            activity.AddBaggage(OpenTelemetryConstants.GenAiAgentIdKey, "agent");
+            activity.GetTagItem(OpenTelemetryConstants.TenantIdKey).Should().BeNull();
+            activity.GetTagItem(OpenTelemetryConstants.GenAiAgentIdKey).Should().BeNull();
+
+            return Task.CompletedTask;
+        });
+
+        var spanResult = report.Spans.Should().ContainSingle().Which;
+        spanResult.Findings.Should().NotContain(f =>
+            f.RuleId == A365ValidationRuleIds.TenantIdRequired ||
+            f.RuleId == A365ValidationRuleIds.AgentIdentityRequired);
+        spanResult.Span.Attributes[OpenTelemetryConstants.TenantIdKey]
+            .Should().Be("tenant");
+        spanResult.Span.Attributes[OpenTelemetryConstants.GenAiAgentIdKey]
+            .Should().Be("agent");
+        report.EnsureValid();
+    }
+
+    [TestMethod]
+    public async Task EvaluateAsync_OperationNameOnlyInActivityBaggage_IsValidated()
+    {
+        var report = await A365InstrumentationValidator.EvaluateAsync(() =>
+        {
+            using var source = new ActivitySource("Customer.Agent.BaggageOperation");
+            using var activity = source.StartActivity("chat model");
+            activity.Should().NotBeNull();
+
+            SetValidChatAttributes(activity!);
+            activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, null);
+            activity.AddBaggage(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+            activity.GetTagItem(OpenTelemetryConstants.GenAiOperationNameKey)
+                .Should().BeNull();
+
+            return Task.CompletedTask;
+        });
+
+        var spanResult = report.Spans.Should().ContainSingle().Which;
+        spanResult.Span.OperationName.Should().Be("chat");
+        report.EnsureValid();
+    }
+
+    [TestMethod]
     public async Task EvaluateAsync_IgnoresUnsupportedActivities()
     {
         var report = await A365InstrumentationValidator.EvaluateAsync(() =>
@@ -152,7 +209,7 @@ public sealed class A365InstrumentationValidatorTests
     }
 
     [TestMethod]
-    public async Task EvaluateAsync_SpanFilterThrows_PropagatesInvalidOperationException()
+    public async Task EvaluateAsync_SpanFilterThrows_ThrowsA365ValidationExecutionException()
     {
         Func<Task> act = () => A365InstrumentationValidator.EvaluateAsync(
             () =>
@@ -164,12 +221,12 @@ public sealed class A365InstrumentationValidatorTests
             },
             options => options.SpanFilter = _ => throw new InvalidOperationException("filter boom"));
 
-        var exception = await act.Should().ThrowAsync<InvalidOperationException>();
+        var exception = await act.Should().ThrowAsync<A365ValidationExecutionException>();
         exception.Which.InnerException.Should().BeOfType<InvalidOperationException>()
             .Which.Message.Should().Be("filter boom");
 
         using var probe = new ActivitySource(
-            nameof(EvaluateAsync_SpanFilterThrows_PropagatesInvalidOperationException) + ".Probe");
+            nameof(EvaluateAsync_SpanFilterThrows_ThrowsA365ValidationExecutionException) + ".Probe");
         probe.HasListeners().Should().BeFalse();
     }
 
@@ -596,9 +653,21 @@ public sealed class A365InstrumentationValidatorTests
 
     private static void SetValidChatAttributes(Activity activity)
     {
+        SetValidChatAttributes(activity, includeExportIdentity: true);
+    }
+
+    private static void SetValidChatAttributes(
+        Activity activity,
+        bool includeExportIdentity)
+    {
         activity.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
-        activity.SetTag(OpenTelemetryConstants.TenantIdKey, "tenant");
-        activity.SetTag(OpenTelemetryConstants.GenAiAgentIdKey, "agent");
+
+        if (includeExportIdentity)
+        {
+            activity.SetTag(OpenTelemetryConstants.TenantIdKey, "tenant");
+            activity.SetTag(OpenTelemetryConstants.GenAiAgentIdKey, "agent");
+        }
+
         activity.SetTag(OpenTelemetryConstants.GenAiAgentNameKey, "Weather agent");
         activity.SetTag(
             OpenTelemetryConstants.GenAiAgentDescriptionKey,

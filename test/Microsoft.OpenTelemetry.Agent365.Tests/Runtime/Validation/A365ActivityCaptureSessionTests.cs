@@ -97,12 +97,87 @@ public sealed class A365ActivityCaptureSessionTests
     }
 
     [TestMethod]
-    public async Task CompleteAsync_SpanFilterThrows_WrapsInvalidOperationException()
+    public async Task CompleteAsync_OperationNameOnlyInActivityBaggage_IsCaptured()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_OperationNameOnlyInActivityBaggage_IsCaptured));
+
+        using (var activity = source.StartActivity("chat model"))
+        {
+            activity.Should().NotBeNull();
+
+            // Eligibility must use the same tag-or-baggage lookup the exporter
+            // uses, so a span whose operation name is only in Activity baggage
+            // is still recognized.
+            activity!.AddBaggage(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+            activity.GetTagItem(OpenTelemetryConstants.GenAiOperationNameKey)
+                .Should().BeNull();
+        }
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        var snapshot = result.Spans.Should().ContainSingle().Which;
+        snapshot.OperationName.Should().Be("chat");
+        snapshot.Attributes[OpenTelemetryConstants.GenAiOperationNameKey]
+            .Should().Be("chat");
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_RequiredAttributeOnlyInActivityBaggage_IsSnapshotted()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_RequiredAttributeOnlyInActivityBaggage_IsSnapshotted));
+
+        using (var activity = source.StartActivity("chat model"))
+        {
+            activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+            activity.AddBaggage(OpenTelemetryConstants.TenantIdKey, "baggage-tenant");
+            activity.AddBaggage(OpenTelemetryConstants.GenAiAgentIdKey, "baggage-agent");
+        }
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        var snapshot = result.Spans.Should().ContainSingle().Which;
+        snapshot.Attributes[OpenTelemetryConstants.TenantIdKey]
+            .Should().Be("baggage-tenant");
+        snapshot.Attributes[OpenTelemetryConstants.GenAiAgentIdKey]
+            .Should().Be("baggage-agent");
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_TagTakesPrecedenceOverSameKeyBaggage()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_TagTakesPrecedenceOverSameKeyBaggage));
+
+        using (var activity = source.StartActivity("chat model"))
+        {
+            activity!.AddBaggage(OpenTelemetryConstants.GenAiOperationNameKey, "execute_tool");
+            activity.AddBaggage(OpenTelemetryConstants.TenantIdKey, "baggage-tenant");
+            activity.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+            activity.SetTag(OpenTelemetryConstants.TenantIdKey, "tag-tenant");
+        }
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        var snapshot = result.Spans.Should().ContainSingle().Which;
+        snapshot.OperationName.Should().Be("chat");
+        snapshot.Attributes[OpenTelemetryConstants.GenAiOperationNameKey]
+            .Should().Be("chat");
+        snapshot.Attributes[OpenTelemetryConstants.TenantIdKey]
+            .Should().Be("tag-tenant");
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_SpanFilterThrows_WrapsInA365ValidationExecutionException()
     {
         using var session = new A365ActivityCaptureSession(
             _ => throw new InvalidOperationException("filter boom"));
         using var source = new ActivitySource(
-            nameof(CompleteAsync_SpanFilterThrows_WrapsInvalidOperationException));
+            nameof(CompleteAsync_SpanFilterThrows_WrapsInA365ValidationExecutionException));
 
         using (var activity = source.StartActivity("chat model"))
         {
@@ -111,7 +186,7 @@ public sealed class A365ActivityCaptureSessionTests
 
         Func<Task> act = () => session.CompleteAsync(ShortTimeout, CancellationToken.None);
 
-        var exception = await act.Should().ThrowAsync<InvalidOperationException>();
+        var exception = await act.Should().ThrowAsync<A365ValidationExecutionException>();
         exception.Which.InnerException.Should().BeOfType<InvalidOperationException>()
             .Which.Message.Should().Be("filter boom");
     }

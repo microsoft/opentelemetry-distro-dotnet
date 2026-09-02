@@ -32,7 +32,8 @@ public sealed class A365SpanValidationResult
     public A365SpanSnapshot Span { get; }
 
     /// <summary>
-    /// Gets the findings for the span.
+    /// Gets the findings for the span. The returned list is an immutable
+    /// snapshot taken when the result was created.
     /// </summary>
-    public ReadOnlyCollection<A365ValidationFinding> Findings { get; }
+    public IReadOnlyList<A365ValidationFinding> Findings { get; }
 }

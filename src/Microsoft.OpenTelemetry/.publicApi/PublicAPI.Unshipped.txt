@@ -30,6 +30,7 @@ Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationReport.Ensu
 override Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationReport.ToString() -> string!
 Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationException
 Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationException.Report.get -> Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationReport!
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationExecutionException
 Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds
 const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.TenantIdRequired = "A365-COMMON-001" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationRuleIds.AgentIdentityRequired = "A365-COMMON-002" -> string!
@@ -69,7 +70,7 @@ Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFinding.Tra
 Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFinding.SpanId.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanValidationResult
 Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanValidationResult.Span.get -> Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanSnapshot!
-Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanValidationResult.Findings.get -> System.Collections.ObjectModel.ReadOnlyCollection<Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFinding!>!
+Microsoft.Agents.A365.Observability.Runtime.Validation.A365SpanValidationResult.Findings.get -> System.Collections.Generic.IReadOnlyList<Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationFinding!>!
 Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions
 Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions.A365ValidationOptions() -> void
 Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationOptions.Profile.get -> Microsoft.Agents.A365.Observability.Runtime.Validation.A365ValidationProfile

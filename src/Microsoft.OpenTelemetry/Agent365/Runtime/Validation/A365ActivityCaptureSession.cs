@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Validation;
@@ -418,10 +419,19 @@ internal sealed class A365ActivityCaptureSession : IDisposable
         return false;
     }
 
+    /// <summary>
+    /// Determines whether <paramref name="activity"/> is a recognized A365
+    /// GenAI span. Eligibility deliberately uses the same tag-or-baggage
+    /// lookup (<see cref="ActivityExtensions.GetAttributeOrBaggage"/>) that
+    /// <c>Agent365ExporterCore</c> applies when it decides which spans to
+    /// export, so a span whose <c>gen_ai.operation.name</c> is carried only in
+    /// <see cref="Activity.Baggage"/> is validated exactly as it would be
+    /// exported.
+    /// </summary>
     private static bool IsEligible(Activity activity)
     {
         var operationName =
-            activity.GetTagItem(OpenTelemetryConstants.GenAiOperationNameKey) as string;
+            activity.GetAttributeOrBaggage(OpenTelemetryConstants.GenAiOperationNameKey);
 
         return !string.IsNullOrEmpty(operationName) &&
             OpenTelemetryConstants.GenAiOperationNames.Contains(operationName!);
@@ -498,7 +508,7 @@ internal sealed class A365ActivityCaptureSession : IDisposable
                     }
                     catch (Exception ex)
                     {
-                        return FilterDecision.Failure(new InvalidOperationException(
+                        return FilterDecision.Failure(new A365ValidationExecutionException(
                             $"Span filter failed for span '{computedSnapshot.SpanId}'.",
                             ex));
                     }
@@ -547,21 +557,54 @@ internal sealed class A365ActivityCaptureSession : IDisposable
         {
             return TryGetFilterDecision(activity, out _);
         }
-        catch (InvalidOperationException)
+        catch (A365ValidationExecutionException)
         {
             return false;
         }
     }
 
+    /// <summary>
+    /// Builds an immutable snapshot of <paramref name="activity"/> using the
+    /// same tag-or-baggage precedence as
+    /// <see cref="ActivityExtensions.GetAttributeOrBaggage"/>, which is what
+    /// <c>Agent365ExporterCore</c> reads when it decides whether a span is
+    /// exportable. <see cref="Activity.Baggage"/> is merged first and
+    /// <see cref="Activity.TagObjects"/> second, so a tag always wins over a
+    /// same-key baggage entry. Certification rules therefore see the value
+    /// the exporter would see, instead of failing a span whose required
+    /// attributes are supplied only through activity baggage.
+    /// </summary>
     private static A365SpanSnapshot CreateSnapshot(Activity activity)
     {
         var operationName =
-            activity.GetTagItem(OpenTelemetryConstants.GenAiOperationNameKey) as string ??
+            activity.GetAttributeOrBaggage(OpenTelemetryConstants.GenAiOperationNameKey) ??
             string.Empty;
 
         var attributes = new Dictionary<string, object?>(StringComparer.Ordinal);
+
+        // Baggage keys may legitimately repeat; Activity.GetBaggageItem returns
+        // the first match, so the first entry wins here too. Empty values are
+        // skipped because GetAttributeOrBaggage treats them as absent.
+        foreach (var baggageItem in activity.Baggage)
+        {
+            if (string.IsNullOrEmpty(baggageItem.Value) ||
+                attributes.ContainsKey(baggageItem.Key))
+            {
+                continue;
+            }
+
+            attributes[baggageItem.Key] = baggageItem.Value;
+        }
+
         foreach (var tag in activity.TagObjects)
         {
+            // GetAttributeOrBaggage only prefers a tag when its value is
+            // non-null, so a null tag must not erase a baggage-supplied value.
+            if (tag.Value == null && attributes.ContainsKey(tag.Key))
+            {
+                continue;
+            }
+
             attributes[tag.Key] = tag.Value;
         }
 

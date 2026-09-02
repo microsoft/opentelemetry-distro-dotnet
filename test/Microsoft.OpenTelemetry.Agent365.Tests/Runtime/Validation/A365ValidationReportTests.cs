@@ -218,6 +218,71 @@ public sealed class A365ValidationReportTests
         text.Should().Contain("SUPPRESSED: Targeted suppression");
     }
 
+    [TestMethod]
+    public void ToString_MatchesDocumentedSampleFailureOutput()
+    {
+        // Guards the sample failure output published in
+        // docs/agent365-getting-started.md ("Validate A365 instrumentation in
+        // an integration test"). The trace and span identifiers are
+        // deliberately ellipsized there for readability, so they are used
+        // verbatim here; everything else -- headline counts, span headers,
+        // rule messages, Fix lines, SUPPRESSED lines and blank-line spacing --
+        // is exactly what the formatter emits.
+        var report = CreateReport(
+            new[]
+            {
+                CreateSpanResult(
+                    "4bf92f35...",
+                    "00f067aa...",
+                    "invoke_agent WeatherAgent",
+                    new Dictionary<string, object?>(),
+                    CreateFinding(
+                        InvokeUserIdRequired,
+                        A365ValidationSeverity.Error,
+                        Suppressed,
+                        "invoke_agent",
+                        "user.id",
+                        "Missing user.id",
+                        "Set CallerDetails.UserDetails.UserId when starting InvokeAgentScope.",
+                        "This entry point intentionally supports anonymous users.")),
+                CreateSpanResult(
+                    "4bf92f35...",
+                    "9a1b2c3d...",
+                    "execute_tool weather",
+                    new Dictionary<string, object?>(),
+                    CreateFinding(
+                        ToolNameRequired,
+                        A365ValidationSeverity.Error,
+                        Active,
+                        "execute_tool",
+                        "gen_ai.tool.name",
+                        "Missing gen_ai.tool.name",
+                        "Set ToolCallDetails.ToolName for execute_tool spans.")),
+            });
+
+        var expected = string.Join(
+            "\n",
+            "A365 instrumentation validation failed: 1 error, 0 warnings, 1 suppressed finding",
+            string.Empty,
+            "invoke_agent WeatherAgent [trace=4bf92f35..., span=00f067aa...]",
+            "  [A365-INVOKE-001] Missing user.id",
+            "  Fix: Set CallerDetails.UserDetails.UserId when starting InvokeAgentScope.",
+            "  SUPPRESSED: This entry point intentionally supports anonymous users.",
+            string.Empty,
+            string.Empty,
+            "execute_tool weather [trace=4bf92f35..., span=9a1b2c3d...]",
+            "  [A365-TOOL-001] Missing gen_ai.tool.name",
+            "  Fix: Set ToolCallDetails.ToolName for execute_tool spans.",
+            string.Empty);
+
+        Normalize(report.ToString()).Should().Be(expected);
+    }
+
+    private static string Normalize(string value)
+    {
+        return value.Replace("\r\n", "\n", StringComparison.Ordinal);
+    }
+
     private static A365ValidationReport CreateReport(
         IEnumerable<A365SpanValidationResult> spans = null!,
         IEnumerable<A365ValidationFinding> sessionFindings = null!)

@@ -732,14 +732,31 @@ report.EnsureValid();
 
 `EnsureValid()` throws `A365ValidationException` when the report still contains
 active errors. The exception message contains the formatted report, so normal
-test failure output includes the remediation text:
+test failure output includes the remediation text (trace and span identifiers
+are abbreviated below; the real output prints them in full):
 
 ```text
 A365 instrumentation validation failed: 1 error, 0 warnings, 1 suppressed finding
-  [A365-TOOL-001] Missing gen_ai.tool.name
-  Fix: Set ToolCallDetails.ToolName.
+
+invoke_agent WeatherAgent [trace=4bf92f35..., span=00f067aa...]
+  [A365-INVOKE-001] Missing user.id
+  Fix: Set CallerDetails.UserDetails.UserId when starting InvokeAgentScope.
   SUPPRESSED: This entry point intentionally supports anonymous users.
+
+
+execute_tool weather [trace=4bf92f35..., span=9a1b2c3d...]
+  [A365-TOOL-001] Missing gen_ai.tool.name
+  Fix: Set ToolCallDetails.ToolName for execute_tool spans.
 ```
+
+> [!WARNING]
+> While `EvaluateAsync` runs, its temporary listener samples **every**
+> `ActivitySource` in the process as `AllDataAndRecorded`. This forces full
+> recording process-wide for the duration of the call, so activities that
+> would normally have been sampled out are created, recorded, and handed to
+> whichever processors and exporters are already registered. Run validation
+> only against test pipelines — never in a process configured with production
+> exporters or production endpoints.
 
 - The test and the application code under test must run in the same process.
   Separate-process validation is not supported in the first release.
@@ -747,6 +764,10 @@ A365 instrumentation validation failed: 1 error, 0 warnings, 1 suppressed findin
   remain visible in the report, but they do not fail validation.
 - Every suppression requires a nonblank reason and remains visible in
   `A365ValidationReport.ToString()` and `A365ValidationException.Message`.
+- An exception thrown by the validated action propagates unchanged. A failure
+  inside a `SpanFilter` or suppression predicate you supplied is reported as
+  `A365ValidationExecutionException` with the original exception attached as
+  `InnerException`; no report is produced in that case.
 
 Choose the narrowest suppression that matches your scenario:
 
@@ -773,10 +794,21 @@ Tenant identity and agent export identity are non-suppressible. If
 setting `AgentDetails.TenantId` and either `AgentDetails.AgentId` or
 `AgentDetails.AgentPlatformId` (or supplying the equivalent A365 baggage).
 
+Validation reads each attribute exactly the way the A365 exporter does: a span
+tag first, then the activity's baggage. A required attribute that is only
+present in baggage still satisfies its rule, and a tag always wins over a
+same-key baggage entry.
+
 Validation sessions are process-wide and serialized, so do not overlap
 unrelated telemetry work in the same process while a validation is running.
-If you need to exclude unrelated spans from other components in the same
-process, set `A365ValidationOptions.SpanFilter`. The predicate may run while a
+Capture is deliberately **not** limited to the sources your `TracerProvider`
+registers — that is external pipeline configuration the validator cannot
+reliably introspect — so every recognized A365 GenAI span in the process is
+validated, including spans from custom `ActivitySource` instances. That is also
+why a recognized custom span with missing tenant or agent identity reports an
+identity failure: the A365 exporter would drop that same span. Use
+`A365ValidationOptions.SpanFilter` as the opt-out for recognized telemetry that
+belongs to another component. The predicate may run while a
 span is still active and on background threads. The first filter decision may
 happen while the span is in flight, is cached, and is not re-evaluated, so base
 it only on `TraceId`, `SpanId`, `DisplayName`, `SourceName`, `OperationName`,

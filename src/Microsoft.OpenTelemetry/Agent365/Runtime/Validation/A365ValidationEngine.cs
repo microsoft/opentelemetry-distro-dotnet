@@ -120,7 +120,7 @@ internal static class A365ValidationEngine
                 }
                 catch (Exception ex)
                 {
-                    throw new InvalidOperationException(
+                    throw new A365ValidationExecutionException(
                         $"Suppression predicate for rule '{rule.Id}' failed for span '{span.SpanId}'.",
                         ex);
                 }

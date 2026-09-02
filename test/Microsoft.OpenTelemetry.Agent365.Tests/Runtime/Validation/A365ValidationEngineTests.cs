@@ -291,8 +291,10 @@ public sealed class A365ValidationEngineTests
             new[] { CreateValidCommonSpan("execute_tool") },
             options);
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*A365-TOOL-001*0000000000000001*");
+        act.Should().Throw<A365ValidationExecutionException>()
+            .WithMessage("*A365-TOOL-001*0000000000000001*")
+            .WithInnerException<InvalidOperationException>()
+            .WithMessage("boom");
     }
 
     [TestMethod]

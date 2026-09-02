@@ -14,6 +14,26 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Validation;
 /// while the supplied action runs, then evaluates the captured spans against
 /// the A365 certification rule catalog.
 /// </summary>
+/// <remarks>
+/// <para>
+/// <b>Warning:</b> the temporary listener samples every
+/// <see cref="System.Diagnostics.ActivitySource"/> in the process as
+/// <c>AllDataAndRecorded</c>. For the duration of
+/// <see cref="EvaluateAsync"/> this forces full recording process-wide, so
+/// activities that would otherwise have been sampled out are created,
+/// recorded, and delivered to whatever processors and exporters are already
+/// registered. Run validation only against test pipelines: do not run it in
+/// a process configured with production exporters or production endpoints.
+/// </para>
+/// <para>
+/// Capture is intentionally not constrained by <c>TracerProvider</c> source
+/// registration, which the validator cannot reliably introspect. Every
+/// recognized A365 GenAI span in the process is validated, including spans
+/// from custom activity sources. Use
+/// <see cref="A365ValidationOptions.SpanFilter"/> to opt unrelated recognized
+/// telemetry out of a validation session.
+/// </para>
+/// </remarks>
 public static class A365InstrumentationValidator
 {
     private static readonly SemaphoreSlim SessionLock = new(1, 1);
@@ -28,6 +48,18 @@ public static class A365InstrumentationValidator
     /// <param name="configure">An optional callback used to configure validation options.</param>
     /// <param name="cancellationToken">A token used to cancel the wait for span completion.</param>
     /// <returns>The validation report.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="action"/> is <see langword="null"/>.</exception>
+    /// <exception cref="A365ValidationExecutionException">
+    /// A caller-supplied <see cref="A365ValidationOptions.SpanFilter"/> or
+    /// suppression predicate threw. The original exception is preserved as
+    /// the inner exception. An exception thrown by <paramref name="action"/>
+    /// itself is never wrapped; it propagates unchanged.
+    /// </exception>
+    /// <remarks>
+    /// While this method runs, all activity sources in the process are
+    /// sampled as recorded. See the remarks on
+    /// <see cref="A365InstrumentationValidator"/>.
+    /// </remarks>
     public static async Task<A365ValidationReport> EvaluateAsync(
         Func<Task> action,
         Action<A365ValidationOptions>? configure = null,

@@ -42,6 +42,15 @@ public sealed class A365ValidationOptions
     /// </summary>
     /// <remarks>
     /// <para>
+    /// This predicate is the only supported way to narrow the set of
+    /// validated spans. Capture is deliberately not constrained by
+    /// <c>TracerProvider</c> source registration: which sources a pipeline
+    /// listens to is external configuration the validator cannot reliably
+    /// introspect, so every recognized A365 GenAI span in the process is
+    /// validated, including spans from custom <see cref="System.Diagnostics.ActivitySource"/>
+    /// instances.
+    /// </para>
+    /// <para>
     /// The predicate may be evaluated while the span is still in flight
     /// (started but not yet stopped) — including to decide, before the span
     /// completes, whether it should keep the capture session waiting. It
@@ -59,7 +68,9 @@ public sealed class A365ValidationOptions
     /// The predicate may be invoked from <see cref="System.Diagnostics.ActivityListener"/>
     /// callbacks and background threads rather than the thread that started
     /// the validated action; it must be thread-safe and must not assume it
-    /// runs on any particular thread.
+    /// runs on any particular thread. If it throws, the validation session
+    /// fails with <see cref="A365ValidationExecutionException"/> wrapping the
+    /// original exception rather than returning a partial report.
     /// </para>
     /// </remarks>
     public Func<A365SpanSnapshot, bool>? SpanFilter { get; set; }
