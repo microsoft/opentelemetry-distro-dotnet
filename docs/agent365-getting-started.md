@@ -700,6 +700,91 @@ The distro recognizes these environment variables:
 
 > **Note:** `ENABLE_A365_OBSERVABILITY_EXPORTER` is a Python/Node.js concept. In the .NET distro, the A365 exporter is controlled entirely through code via `ExportTarget.Agent365`.
 
+## Validate A365 instrumentation in an integration test
+
+Use `A365InstrumentationValidator.EvaluateAsync(...)` to wrap the exact
+request path your integration test exercises. The validator is
+framework-neutral: it attaches a temporary `ActivityListener`, captures
+recognized A365 spans in the current process, and returns an
+`A365ValidationReport`. You do not need an exporter, a collector, or a
+test-framework-specific adapter.
+
+```csharp
+using Microsoft.Agents.A365.Observability.Runtime.Validation;
+
+A365ValidationReport report =
+    await A365InstrumentationValidator.EvaluateAsync(
+        async () =>
+        {
+            await testClient.SendMessageAsync(
+                "What is the weather in Seattle?");
+        },
+        options =>
+        {
+            options.Suppress(
+                A365ValidationRuleIds.InvokeUserIdRequired,
+                operationName: "invoke_agent",
+                reason: "This entry point intentionally supports anonymous users.");
+        });
+
+report.EnsureValid();
+```
+
+`EnsureValid()` throws `A365ValidationException` when the report still contains
+active errors. The exception message contains the formatted report, so normal
+test failure output includes the remediation text:
+
+```text
+A365 instrumentation validation failed: 1 error, 0 warnings, 1 suppressed finding
+  [A365-TOOL-001] Missing gen_ai.tool.name
+  Fix: Set ToolCallDetails.ToolName.
+  SUPPRESSED: This entry point intentionally supports anonymous users.
+```
+
+- The test and the application code under test must run in the same process.
+  Separate-process validation is not supported in the first release.
+- `EnsureValid()` fails on active errors only. Warnings and suppressed findings
+  remain visible in the report, but they do not fail validation.
+- Every suppression requires a nonblank reason and remains visible in
+  `A365ValidationReport.ToString()` and `A365ValidationException.Message`.
+
+Choose the narrowest suppression that matches your scenario:
+
+```csharp
+options.Suppress(
+    A365ValidationRuleIds.ToolNameRequired,
+    reason: "Synthetic tool spans are excluded from this suite.");
+
+options.Suppress(
+    A365ValidationRuleIds.InvokeUserIdRequired,
+    operationName: "invoke_agent",
+    reason: "This entry point intentionally supports anonymous users.");
+
+options.Suppress(
+    A365ValidationRuleIds.ToolNameRequired,
+    operationName: "execute_tool",
+    predicate: span => span.DisplayName == "execute_tool optional",
+    reason: "This synthetic optional tool span is allowed in this test.");
+```
+
+Tenant identity and agent export identity are non-suppressible. If
+`A365ValidationRuleIds.TenantIdRequired` or
+`A365ValidationRuleIds.AgentIdentityRequired` fails, fix the instrumentation by
+setting `AgentDetails.TenantId` and either `AgentDetails.AgentId` or
+`AgentDetails.AgentPlatformId` (or supplying the equivalent A365 baggage).
+
+Validation sessions are process-wide and serialized, so do not overlap
+unrelated telemetry work in the same process while a validation is running.
+If you need to exclude unrelated spans from other components in the same
+process, set `A365ValidationOptions.SpanFilter`. The predicate may run while a
+span is still active and on background threads, so base it only on metadata
+that is stable at span start (`TraceId`, `SpanId`, `DisplayName`, `SourceName`,
+`OperationName`, and attributes already set before the span ends).
+
+`A365ValidationOptions.SpanCompletionTimeout` defaults to 10 seconds. The
+validator waits up to that deadline for recognized spans to complete before it
+reports `A365ValidationRuleIds.SpanCompletionTimeout`.
+
 ## Validate locally
 
 ### Console + Agent365 (validate locally and remotely)

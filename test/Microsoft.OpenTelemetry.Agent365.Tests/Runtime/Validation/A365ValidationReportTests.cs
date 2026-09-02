@@ -84,6 +84,49 @@ public sealed class A365ValidationReportTests
     }
 
     [TestMethod]
+    public void ToString_ContainsGettingStartedGuideExcerpt()
+    {
+        var report = CreateReport(
+            new[]
+            {
+                CreateSpanResult(
+                "00000000000000000000000000000001",
+                "0000000000000001",
+                "execute_tool weather",
+                new Dictionary<string, object?>(),
+                CreateFinding(
+                    ToolNameRequired,
+                    A365ValidationSeverity.Error,
+                    Active,
+                    "execute_tool",
+                    "gen_ai.tool.name",
+                    "Missing gen_ai.tool.name",
+                    "Set ToolCallDetails.ToolName.")),
+                CreateSpanResult(
+                "00000000000000000000000000000002",
+                "0000000000000002",
+                "invoke_agent weather",
+                new Dictionary<string, object?>(),
+                CreateFinding(
+                    InvokeUserIdRequired,
+                    A365ValidationSeverity.Error,
+                    Suppressed,
+                    "invoke_agent",
+                    "user.id",
+                    "Missing user.id",
+                    "Set CallerDetails.UserDetails.UserId.",
+                    "This entry point intentionally supports anonymous users.")),
+            });
+
+        var text = report.ToString();
+
+        text.Should().Contain("A365 instrumentation validation failed: 1 error, 0 warnings, 1 suppressed finding");
+        text.Should().Contain("[A365-TOOL-001] Missing gen_ai.tool.name");
+        text.Should().Contain("Fix: Set ToolCallDetails.ToolName.");
+        text.Should().Contain("SUPPRESSED: This entry point intentionally supports anonymous users.");
+    }
+
+    [TestMethod]
     public void ToString_IsDeterministic_AndHidesAttributeValues()
     {
         var report = CreateReport(
