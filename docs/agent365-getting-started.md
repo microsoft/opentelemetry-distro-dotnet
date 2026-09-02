@@ -777,9 +777,10 @@ Validation sessions are process-wide and serialized, so do not overlap
 unrelated telemetry work in the same process while a validation is running.
 If you need to exclude unrelated spans from other components in the same
 process, set `A365ValidationOptions.SpanFilter`. The predicate may run while a
-span is still active and on background threads, so base it only on metadata
-that is stable at span start (`TraceId`, `SpanId`, `DisplayName`, `SourceName`,
-`OperationName`, and attributes already set before the span ends).
+span is still active and on background threads. The first filter decision may
+happen while the span is in flight, is cached, and is not re-evaluated, so base
+it only on `TraceId`, `SpanId`, `DisplayName`, `SourceName`, `OperationName`,
+or attributes guaranteed to be set and stable at span start.
 
 `A365ValidationOptions.SpanCompletionTimeout` defaults to 10 seconds. The
 validator waits up to that deadline for recognized spans to complete before it
