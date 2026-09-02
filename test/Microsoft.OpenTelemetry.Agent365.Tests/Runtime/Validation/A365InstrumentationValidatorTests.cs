@@ -268,6 +268,9 @@ public sealed class A365InstrumentationValidatorTests
             options => options.SpanCompletionTimeout = TimeSpan.FromMilliseconds(250));
 
         report.Spans.Should().ContainSingle();
+        report.IsValid.Should().BeTrue();
+        report.SessionFindings.Should().NotContain(
+            finding => finding.RuleId == A365ValidationRuleIds.SpanCompletionTimeout);
     }
 
     [TestMethod]

@@ -73,8 +73,10 @@ public sealed class A365ValidationOptions
     /// becomes eligible and is never re-evaluated against later attribute
     /// changes. Note that <see cref="A365SpanSnapshot.Attributes"/> contains
     /// the span's activity tags only — the attributes the A365 exporter
-    /// serializes — so a predicate cannot match on a value carried solely in
-    /// <see cref="System.Diagnostics.Activity"/> baggage.
+    /// serializes — so a predicate cannot match an attribute carried solely
+    /// in <see cref="System.Diagnostics.Activity"/> baggage.
+    /// <see cref="A365SpanSnapshot.OperationName"/> is the exception because
+    /// the exporter resolves it from either a tag or baggage.
     /// </para>
     /// <para>
     /// The predicate may be invoked from <see cref="System.Diagnostics.ActivityListener"/>

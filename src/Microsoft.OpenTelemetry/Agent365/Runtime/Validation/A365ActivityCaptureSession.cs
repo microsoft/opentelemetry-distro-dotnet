@@ -159,7 +159,7 @@ internal sealed class A365ActivityCaptureSession : IDisposable
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        var stopwatch = Stopwatch.StartNew();
+        Stopwatch? stopwatch = null;
 
         while (true)
         {
@@ -175,7 +175,12 @@ internal sealed class A365ActivityCaptureSession : IDisposable
                 return CreateResult(establishedClosure);
             }
 
-            var remaining = timeout - stopwatch.Elapsed;
+            // Start the timeout budget with the first actual wait. In
+            // particular, a timeout equal to QuietPeriod must still permit
+            // one complete quiet-period observation; bookkeeping performed
+            // before the delay must not make that documented minimum
+            // impossible to satisfy.
+            var remaining = stopwatch == null ? timeout : timeout - stopwatch.Elapsed;
             if (remaining <= TimeSpan.Zero)
             {
                 break;
@@ -190,6 +195,7 @@ internal sealed class A365ActivityCaptureSession : IDisposable
 
             var version = Interlocked.Read(ref eligibleChangeVersion);
 
+            stopwatch ??= Stopwatch.StartNew();
             await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
 
             // Unsynchronized *candidate* check. It is deliberately performed

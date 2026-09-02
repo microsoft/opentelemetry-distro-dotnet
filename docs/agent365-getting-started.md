@@ -815,8 +815,9 @@ treats routing metadata and payload attributes differently:
   `A365ValidationRuleIds.ToolNameRequired` are therefore satisfied only by a
   span tag. `A365SpanSnapshot.Attributes` reflects this: it exposes the
   activity's tags only — exactly the attributes the exporter serializes — so a
-  suppression predicate or `SpanFilter` cannot match a baggage-only value
-  either.
+  suppression predicate or `SpanFilter` cannot match a baggage-only attribute
+  either. `OperationName` is the exception because exporter classification
+  resolves it from either a tag or baggage.
 
 In practice this distinction rarely requires extra work: the distro's
 `ActivityProcessor` copies nonempty baggage entries onto spans as tags when
