@@ -164,6 +164,22 @@ internal static class A365ValidationEngine
                 "Span completion timeout must be positive.");
         }
 
+        if (options.SpanCompletionTimeout < A365ActivityCaptureSession.QuietPeriod)
+        {
+            // A session only declares success after a full quiet period with
+            // no eligible activity, so a shorter deadline can never settle
+            // successfully: it would always report a completion timeout, no
+            // matter how correct the instrumentation is. Reject it up front
+            // rather than running the action and returning a meaningless
+            // timeout report.
+            throw new ArgumentOutOfRangeException(
+                nameof(options.SpanCompletionTimeout),
+                options.SpanCompletionTimeout,
+                "Span completion timeout must be at least the " +
+                $"{A365ActivityCaptureSession.QuietPeriod.TotalMilliseconds}ms quiet period " +
+                "that a validation session waits for before it can succeed.");
+        }
+
         foreach (var suppression in options.Suppressions)
         {
             suppression.WasUsed = false;

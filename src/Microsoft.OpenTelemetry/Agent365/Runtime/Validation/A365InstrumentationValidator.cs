@@ -49,6 +49,13 @@ public static class A365InstrumentationValidator
     /// <param name="cancellationToken">A token used to cancel the wait for span completion.</param>
     /// <returns>The validation report.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="action"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <see cref="A365ValidationOptions.SpanCompletionTimeout"/> is shorter
+    /// than the 250-millisecond quiet period a validation session must observe
+    /// before it can succeed, or
+    /// <see cref="A365ValidationOptions.Profile"/> is not supported. Options
+    /// are validated before <paramref name="action"/> runs.
+    /// </exception>
     /// <exception cref="A365ValidationExecutionException">
     /// A caller-supplied <see cref="A365ValidationOptions.SpanFilter"/> or
     /// suppression predicate threw. The original exception is preserved as
@@ -152,12 +159,11 @@ public static class A365InstrumentationValidator
             //
             // The message deliberately does not name a cause: reaching the
             // deadline without a quiet period can happen for reasons besides
-            // continuous eligible activity churn -- e.g. a SpanCompletionTimeout
-            // configured shorter than the 250ms quiet period itself, or a
-            // residual window (the time left before the deadline) that is
-            // too short to qualify as a full quiet period even though no
-            // churn occurred during it. Claiming "continuous ... activity"
-            // would be misleading in those cases.
+            // continuous eligible activity churn -- e.g. a residual window
+            // (the time left before the deadline) that is too short to
+            // qualify as a full quiet period even though no churn occurred
+            // during it. Claiming "continuous ... activity" would be
+            // misleading in those cases.
             sessionFindings.Add(new A365ValidationFinding(
                 A365ValidationRuleIds.SpanCompletionTimeout,
                 A365ValidationSeverity.Error,

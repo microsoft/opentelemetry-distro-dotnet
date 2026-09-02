@@ -329,6 +329,89 @@ public sealed class A365ValidationEngineTests
             .WithParameterName("SpanCompletionTimeout");
     }
 
+    [TestMethod]
+    public void Validate_TimeoutShorterThanQuietPeriod_Throws()
+    {
+        var options = new A365ValidationOptions
+        {
+            SpanCompletionTimeout = TimeSpan.FromMilliseconds(249),
+        };
+
+        Action act = () => A365ValidationEngine.Validate(
+            new[] { CreateValidCommonSpan("chat") },
+            options);
+
+        act.Should().Throw<ArgumentOutOfRangeException>()
+            .WithParameterName("SpanCompletionTimeout")
+            .WithMessage("*250ms quiet period*");
+    }
+
+    [TestMethod]
+    public void Validate_TimeoutEqualToQuietPeriod_IsAccepted()
+    {
+        var options = new A365ValidationOptions
+        {
+            SpanCompletionTimeout = TimeSpan.FromMilliseconds(250),
+        };
+
+        Action act = () => A365ValidationEngine.Validate(
+            new[] { CreateValidCommonSpan("chat") },
+            options);
+
+        act.Should().NotThrow();
+    }
+
+    [TestMethod]
+    public void Validate_RoutingIdentityInAttributes_SatisfiesNonSuppressibleRules()
+    {
+        // A snapshot built from attributes alone must derive its effective
+        // routing identity from those attributes, so tag-supplied identity
+        // still satisfies the two export routing rules.
+        var result = A365ValidationEngine.Validate(
+            new[] { CreateSpan("chat", CreateValidChatAttributes()) },
+            new A365ValidationOptions()).Single();
+
+        result.Findings.Should().NotContain(f =>
+            f.RuleId == A365ValidationRuleIds.TenantIdRequired ||
+            f.RuleId == A365ValidationRuleIds.AgentIdentityRequired);
+    }
+
+    [TestMethod]
+    public void Validate_MissingRoutingIdentity_ReportsBothNonSuppressibleRules()
+    {
+        var attributes = CreateValidChatAttributes();
+        attributes.Remove(TenantIdKey);
+        attributes.Remove(GenAiAgentIdKey);
+
+        var result = A365ValidationEngine.Validate(
+            new[] { CreateSpan("chat", attributes) },
+            new A365ValidationOptions()).Single();
+
+        result.Findings.Should().ContainSingle(f =>
+            f.RuleId == A365ValidationRuleIds.TenantIdRequired &&
+            f.Message == $"Missing {TenantIdKey}");
+        result.Findings.Should().ContainSingle(f =>
+            f.RuleId == A365ValidationRuleIds.AgentIdentityRequired &&
+            f.Message == "Missing agent identity: set gen_ai.agent.id or microsoft.a365.agent.platform.id");
+    }
+
+    [TestMethod]
+    public void Validate_WhitespaceRoutingIdentity_IsReportedAsMissing()
+    {
+        var attributes = CreateValidChatAttributes();
+        attributes[TenantIdKey] = " ";
+        attributes[GenAiAgentIdKey] = " ";
+
+        var result = A365ValidationEngine.Validate(
+            new[] { CreateSpan("chat", attributes) },
+            new A365ValidationOptions()).Single();
+
+        result.Findings.Should().Contain(f =>
+            f.RuleId == A365ValidationRuleIds.TenantIdRequired);
+        result.Findings.Should().Contain(f =>
+            f.RuleId == A365ValidationRuleIds.AgentIdentityRequired);
+    }
+
     private static A365SpanSnapshot CreateSpan(
         string operationName,
         IDictionary<string, object?>? attributes = null,

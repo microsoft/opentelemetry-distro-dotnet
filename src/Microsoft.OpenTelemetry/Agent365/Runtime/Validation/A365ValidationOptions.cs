@@ -27,8 +27,17 @@ public sealed class A365ValidationOptions
         A365ValidationProfile.Certification;
 
     /// <summary>
-    /// Gets or sets the maximum time to wait for span completion.
+    /// Gets or sets the maximum time to wait for span completion. Defaults to
+    /// 10 seconds.
     /// </summary>
+    /// <remarks>
+    /// A validation session only settles after a 250-millisecond quiet period
+    /// during which no recognized span starts or stops, so this value must be
+    /// at least 250 milliseconds. A shorter deadline could never be satisfied
+    /// and is rejected with <see cref="ArgumentOutOfRangeException"/> by
+    /// <see cref="A365InstrumentationValidator.EvaluateAsync"/> before the
+    /// validated action runs.
+    /// </remarks>
     public TimeSpan SpanCompletionTimeout { get; set; } =
         TimeSpan.FromSeconds(10);
 
@@ -62,7 +71,10 @@ public sealed class A365ValidationOptions
     /// only set when the span ends (e.g. response payloads, error status),
     /// since the predicate's decision is cached the first time the span
     /// becomes eligible and is never re-evaluated against later attribute
-    /// changes.
+    /// changes. Note that <see cref="A365SpanSnapshot.Attributes"/> contains
+    /// the span's activity tags only — the attributes the A365 exporter
+    /// serializes — so a predicate cannot match on a value carried solely in
+    /// <see cref="System.Diagnostics.Activity"/> baggage.
     /// </para>
     /// <para>
     /// The predicate may be invoked from <see cref="System.Diagnostics.ActivityListener"/>

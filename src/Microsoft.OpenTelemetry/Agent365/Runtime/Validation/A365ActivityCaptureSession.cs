@@ -51,7 +51,13 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Validation;
 /// </remarks>
 internal sealed class A365ActivityCaptureSession : IDisposable
 {
-    private static readonly TimeSpan QuietPeriod = TimeSpan.FromMilliseconds(250);
+    /// <summary>
+    /// The window of no eligible activity that must elapse before a capture
+    /// session declares success. Exposed internally so option validation can
+    /// reject a <see cref="A365ValidationOptions.SpanCompletionTimeout"/> that
+    /// is too short for a full quiet period to ever be observed.
+    /// </summary>
+    internal static readonly TimeSpan QuietPeriod = TimeSpan.FromMilliseconds(250);
 
     /// <summary>
     /// Serializes listener-callback state mutation against the single
@@ -564,16 +570,30 @@ internal sealed class A365ActivityCaptureSession : IDisposable
     }
 
     /// <summary>
-    /// Builds an immutable snapshot of <paramref name="activity"/> using the
-    /// same tag-or-baggage precedence as
-    /// <see cref="ActivityExtensions.GetAttributeOrBaggage"/>, which is what
-    /// <c>Agent365ExporterCore</c> reads when it decides whether a span is
-    /// exportable. <see cref="Activity.Baggage"/> is merged first and
-    /// <see cref="Activity.TagObjects"/> second, so a tag always wins over a
-    /// same-key baggage entry. Certification rules therefore see the value
-    /// the exporter would see, instead of failing a span whose required
-    /// attributes are supplied only through activity baggage.
+    /// Builds an immutable snapshot of <paramref name="activity"/>.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="A365SpanSnapshot.Attributes"/> mirrors what
+    /// <c>ExportFormatter</c> actually serializes into OTLP: the activity's
+    /// <see cref="Activity.TagObjects"/> only, with the same duplicate-key
+    /// behavior (the last tag written for a key wins).
+    /// <see cref="Activity.Baggage"/> is deliberately not merged in, because
+    /// baggage is never serialized into OTLP span attributes -- a payload
+    /// attribute supplied only through baggage would not reach the Agent 365
+    /// service, so treating it as present would let a span certify while its
+    /// exported payload was incomplete.
+    /// </para>
+    /// <para>
+    /// The two values the exporter resolves <em>before</em> serialization are
+    /// captured separately, exactly as <c>Agent365ExporterCore</c> resolves
+    /// them through <see cref="ActivityExtensions.GetAttributeOrBaggage"/>:
+    /// the operation name used to classify the span as GenAI telemetry, and
+    /// the tenant/agent identity used to route the export request. Those may
+    /// legitimately come from <see cref="Activity.Baggage"/>, so the rules
+    /// that model export routing see the value the exporter would see.
+    /// </para>
+    /// </remarks>
     private static A365SpanSnapshot CreateSnapshot(Activity activity)
     {
         var operationName =
@@ -582,31 +602,18 @@ internal sealed class A365ActivityCaptureSession : IDisposable
 
         var attributes = new Dictionary<string, object?>(StringComparer.Ordinal);
 
-        // Baggage keys may legitimately repeat; Activity.GetBaggageItem returns
-        // the first match, so the first entry wins here too. Empty values are
-        // skipped because GetAttributeOrBaggage treats them as absent.
-        foreach (var baggageItem in activity.Baggage)
-        {
-            if (string.IsNullOrEmpty(baggageItem.Value) ||
-                attributes.ContainsKey(baggageItem.Key))
-            {
-                continue;
-            }
-
-            attributes[baggageItem.Key] = baggageItem.Value;
-        }
-
+        // Activity.AddTag permits duplicate keys; ExportFormatter.MapAttributes
+        // assigns each tag into a dictionary in order, so the last write wins.
         foreach (var tag in activity.TagObjects)
         {
-            // GetAttributeOrBaggage only prefers a tag when its value is
-            // non-null, so a null tag must not erase a baggage-supplied value.
-            if (tag.Value == null && attributes.ContainsKey(tag.Key))
-            {
-                continue;
-            }
-
             attributes[tag.Key] = tag.Value;
         }
+
+        var routingTenantId =
+            activity.GetAttributeOrBaggage(OpenTelemetryConstants.TenantIdKey);
+        var routingAgentId =
+            activity.GetAttributeOrBaggage(OpenTelemetryConstants.GenAiAgentIdKey) ??
+            activity.GetAttributeOrBaggage(OpenTelemetryConstants.AgentPlatformIdKey);
 
         return new A365SpanSnapshot(
             activity.TraceId.ToHexString().ToLowerInvariant(),
@@ -614,7 +621,9 @@ internal sealed class A365ActivityCaptureSession : IDisposable
             activity.DisplayName,
             activity.Source.Name,
             operationName,
-            attributes);
+            attributes,
+            routingTenantId,
+            routingAgentId);
     }
 
     private void OnStarted(Activity activity)

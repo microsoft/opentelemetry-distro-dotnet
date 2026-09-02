@@ -794,10 +794,36 @@ Tenant identity and agent export identity are non-suppressible. If
 setting `AgentDetails.TenantId` and either `AgentDetails.AgentId` or
 `AgentDetails.AgentPlatformId` (or supplying the equivalent A365 baggage).
 
-Validation reads each attribute exactly the way the A365 exporter does: a span
-tag first, then the activity's baggage. A required attribute that is only
-present in baggage still satisfies its rule, and a tag always wins over a
-same-key baggage entry.
+Validation models what the A365 exporter actually does with a span, which
+treats routing metadata and payload attributes differently:
+
+- **Operation name and export routing identity may come from baggage.** The
+  exporter resolves `gen_ai.operation.name` (to classify the span as GenAI
+  telemetry) and the tenant/agent identity it routes the export request with
+  from the span tag first and then the activity's baggage. A span whose
+  operation name, `microsoft.tenant.id`, `gen_ai.agent.id`, or
+  `microsoft.a365.agent.platform.id` is carried only in baggage is still
+  recognized, and still satisfies `A365ValidationRuleIds.TenantIdRequired` and
+  `A365ValidationRuleIds.AgentIdentityRequired`. A tag always wins over a
+  same-key baggage entry.
+- **Every other required attribute must be an activity tag.** Baggage is not
+  serialized into OTLP span attributes, so a value that exists only in baggage
+  never reaches the Agent 365 service. Rules such as
+  `A365ValidationRuleIds.AgentNameRequired`,
+  `A365ValidationRuleIds.InvokeUserIdRequired`,
+  `A365ValidationRuleIds.InferenceModelRequired`, and
+  `A365ValidationRuleIds.ToolNameRequired` are therefore satisfied only by a
+  span tag. `A365SpanSnapshot.Attributes` reflects this: it exposes the
+  activity's tags only — exactly the attributes the exporter serializes — so a
+  suppression predicate or `SpanFilter` cannot match a baggage-only value
+  either.
+
+In practice this distinction rarely requires extra work: the distro's
+`ActivityProcessor` copies nonempty baggage entries onto spans as tags when
+they start, so `BaggageBuilder` values become real tags as long as the
+processor is registered in your `TracerProvider`. A span produced by a source
+that bypasses that processor keeps its baggage as baggage, and payload rules
+will correctly report the attribute as missing.
 
 Validation sessions are process-wide and serialized, so do not overlap
 unrelated telemetry work in the same process while a validation is running.
@@ -816,7 +842,11 @@ or attributes guaranteed to be set and stable at span start.
 
 `A365ValidationOptions.SpanCompletionTimeout` defaults to 10 seconds. The
 validator waits up to that deadline for recognized spans to complete before it
-reports `A365ValidationRuleIds.SpanCompletionTimeout`.
+reports `A365ValidationRuleIds.SpanCompletionTimeout`. A session settles only
+after a 250 ms quiet period in which no recognized span starts or stops, so the
+timeout must be at least 250 ms; a shorter value throws
+`ArgumentOutOfRangeException` before the validated action runs, rather than
+producing a timeout report that no instrumentation could avoid.
 
 ## Validate locally
 

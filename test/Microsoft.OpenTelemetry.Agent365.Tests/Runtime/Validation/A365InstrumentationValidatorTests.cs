@@ -64,11 +64,210 @@ public sealed class A365InstrumentationValidatorTests
         spanResult.Findings.Should().NotContain(f =>
             f.RuleId == A365ValidationRuleIds.TenantIdRequired ||
             f.RuleId == A365ValidationRuleIds.AgentIdentityRequired);
-        spanResult.Span.Attributes[OpenTelemetryConstants.TenantIdKey]
-            .Should().Be("tenant");
-        spanResult.Span.Attributes[OpenTelemetryConstants.GenAiAgentIdKey]
-            .Should().Be("agent");
+
+        // The public attribute set reflects what the exporter serializes --
+        // activity tags only -- so the baggage-only routing identity must not
+        // be reported as an exported attribute.
+        spanResult.Span.Attributes.Should().NotContainKey(
+            OpenTelemetryConstants.TenantIdKey);
+        spanResult.Span.Attributes.Should().NotContainKey(
+            OpenTelemetryConstants.GenAiAgentIdKey);
         report.EnsureValid();
+    }
+
+    [TestMethod]
+    public async Task EvaluateAsync_AgentPlatformIdOnlyInActivityBaggage_SatisfiesAgentIdentityRule()
+    {
+        var report = await A365InstrumentationValidator.EvaluateAsync(() =>
+        {
+            using var source = new ActivitySource("Customer.Agent.BaggagePlatformId");
+            using var activity = source.StartActivity("chat model");
+            activity.Should().NotBeNull();
+
+            SetValidChatAttributes(activity!, includeExportIdentity: false);
+            activity!.AddBaggage(OpenTelemetryConstants.TenantIdKey, "tenant");
+            activity.AddBaggage(
+                OpenTelemetryConstants.AgentPlatformIdKey,
+                "platform-agent");
+
+            return Task.CompletedTask;
+        });
+
+        var spanResult = report.Spans.Should().ContainSingle().Which;
+        spanResult.Findings.Should().NotContain(f =>
+            f.RuleId == A365ValidationRuleIds.TenantIdRequired ||
+            f.RuleId == A365ValidationRuleIds.AgentIdentityRequired);
+        spanResult.Span.Attributes.Should().NotContainKey(
+            OpenTelemetryConstants.AgentPlatformIdKey);
+        report.EnsureValid();
+    }
+
+    [TestMethod]
+    public async Task EvaluateAsync_PayloadAttributesOnlyInActivityBaggage_DoNotSatisfyTheirRules()
+    {
+        var report = await A365InstrumentationValidator.EvaluateAsync(() =>
+        {
+            using var source = new ActivitySource("Customer.Agent.BaggagePayload");
+            using var activity = source.StartActivity("chat model");
+            activity.Should().NotBeNull();
+
+            // Only the values the exporter resolves before serialization --
+            // the operation name and the routing identity -- are tagged or
+            // baggaged in a way that reaches the exporter. Every payload
+            // attribute lives exclusively in Activity baggage, which is never
+            // serialized into OTLP span attributes.
+            activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+            activity.AddBaggage(OpenTelemetryConstants.TenantIdKey, "tenant");
+            activity.AddBaggage(OpenTelemetryConstants.GenAiAgentIdKey, "agent");
+            activity.AddBaggage(OpenTelemetryConstants.GenAiAgentNameKey, "Weather agent");
+            activity.AddBaggage(
+                OpenTelemetryConstants.GenAiAgentDescriptionKey,
+                "Answers weather questions");
+            activity.AddBaggage(OpenTelemetryConstants.AgentAUIDKey, "agent-user");
+            activity.AddBaggage(OpenTelemetryConstants.AgentEmailKey, "agent@example.com");
+            activity.AddBaggage(OpenTelemetryConstants.AgentBlueprintIdKey, "blueprint");
+            activity.AddBaggage(OpenTelemetryConstants.GenAiRequestModelKey, "gpt-4.1");
+            activity.AddBaggage(OpenTelemetryConstants.GenAiProviderNameKey, "openai");
+
+            return Task.CompletedTask;
+        });
+
+        var spanResult = report.Spans.Should().ContainSingle().Which;
+        var activeRuleIds = spanResult.Findings
+            .Where(f => f.Status == A365ValidationFindingStatus.Active)
+            .Select(f => f.RuleId)
+            .ToList();
+
+        // Baggage-only routing identity still routes the export, so only the
+        // routing rules pass.
+        activeRuleIds.Should().NotContain(A365ValidationRuleIds.TenantIdRequired);
+        activeRuleIds.Should().NotContain(A365ValidationRuleIds.AgentIdentityRequired);
+
+        activeRuleIds.Should().Contain(new[]
+        {
+            A365ValidationRuleIds.AgentNameRequired,
+            A365ValidationRuleIds.AgentDescriptionRequired,
+            A365ValidationRuleIds.AgentUserIdRequired,
+            A365ValidationRuleIds.AgentUserEmailRequired,
+            A365ValidationRuleIds.AgentBlueprintIdRequired,
+            A365ValidationRuleIds.InferenceModelRequired,
+            A365ValidationRuleIds.InferenceProviderRequired,
+        });
+
+        spanResult.Findings.Should().Contain(f =>
+            f.RuleId == A365ValidationRuleIds.AgentNameRequired &&
+            f.Message == $"Missing {OpenTelemetryConstants.GenAiAgentNameKey}");
+
+        // None of the baggage-only values are reported as exported attributes.
+        spanResult.Span.Attributes.Keys.Should().Equal(
+            OpenTelemetryConstants.GenAiOperationNameKey);
+    }
+
+    [TestMethod]
+    public async Task EvaluateAsync_OperationSpecificAttributesOnlyInActivityBaggage_DoNotSatisfyTheirRules()
+    {
+        var report = await A365InstrumentationValidator.EvaluateAsync(() =>
+        {
+            using var source = new ActivitySource("Customer.Agent.BaggageOperationPayload");
+
+            using (var invoke = source.StartActivity("invoke_agent WeatherAgent"))
+            {
+                SetBaggageOnlyCommonAttributes(invoke!, "invoke_agent");
+                invoke!.AddBaggage(OpenTelemetryConstants.UserIdKey, "user-id");
+                invoke.AddBaggage(OpenTelemetryConstants.UserNameKey, "User Name");
+                invoke.AddBaggage(OpenTelemetryConstants.UserEmailKey, "user@example.com");
+            }
+
+            using (var tool = source.StartActivity("execute_tool weather"))
+            {
+                SetBaggageOnlyCommonAttributes(tool!, "execute_tool");
+                tool!.AddBaggage(OpenTelemetryConstants.GenAiToolNameKey, "weather");
+            }
+
+            using (var guardrail = source.StartActivity("apply_guardrail input"))
+            {
+                SetBaggageOnlyCommonAttributes(guardrail!, "apply_guardrail");
+                guardrail!.AddBaggage(
+                    OpenTelemetryConstants.GenAiSecurityDecisionTypeKey,
+                    "allow");
+                guardrail.AddBaggage(
+                    OpenTelemetryConstants.GenAiSecurityTargetTypeKey,
+                    "llm_input");
+            }
+
+            return Task.CompletedTask;
+        });
+
+        report.Spans.Should().HaveCount(3);
+
+        foreach (var spanResult in report.Spans)
+        {
+            // Baggage-only operation name still classifies the span, and
+            // baggage-only tenant/agent identity still routes it.
+            spanResult.Span.OperationName.Should().NotBeNullOrEmpty();
+            spanResult.Findings.Should().NotContain(f =>
+                f.RuleId == A365ValidationRuleIds.TenantIdRequired ||
+                f.RuleId == A365ValidationRuleIds.AgentIdentityRequired);
+
+            // Nothing from baggage is reported as an exported attribute.
+            spanResult.Span.Attributes.Should().BeEmpty();
+        }
+
+        ActiveRuleIds("invoke_agent").Should().Contain(new[]
+        {
+            A365ValidationRuleIds.InvokeUserIdRequired,
+            A365ValidationRuleIds.InvokeUserNameRequired,
+            A365ValidationRuleIds.InvokeUserEmailRequired,
+        });
+        ActiveRuleIds("execute_tool").Should().Contain(
+            A365ValidationRuleIds.ToolNameRequired);
+        ActiveRuleIds("apply_guardrail").Should().Contain(new[]
+        {
+            A365ValidationRuleIds.GuardrailDecisionRequired,
+            A365ValidationRuleIds.GuardrailTargetRequired,
+        });
+
+        List<string> ActiveRuleIds(string operationName) => report.Spans
+            .Single(s => s.Span.OperationName == operationName)
+            .Findings
+            .Where(f => f.Status == A365ValidationFindingStatus.Active)
+            .Select(f => f.RuleId)
+            .ToList();
+    }
+
+    [TestMethod]
+    public async Task EvaluateAsync_TimeoutShorterThanQuietPeriod_ThrowsBeforeRunningAction()
+    {
+        var actionRan = false;
+
+        Func<Task> act = () => A365InstrumentationValidator.EvaluateAsync(
+            () =>
+            {
+                actionRan = true;
+                return Task.CompletedTask;
+            },
+            options => options.SpanCompletionTimeout = TimeSpan.FromMilliseconds(249));
+
+        var exception = await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
+        exception.Which.ParamName.Should().Be("SpanCompletionTimeout");
+        exception.Which.Message.Should().Contain("250ms quiet period");
+        actionRan.Should().BeFalse();
+    }
+
+    [TestMethod]
+    public async Task EvaluateAsync_TimeoutEqualToQuietPeriod_IsAccepted()
+    {
+        var report = await A365InstrumentationValidator.EvaluateAsync(
+            () =>
+            {
+                using var source = new ActivitySource("Customer.Agent.MinimumTimeout");
+                using var activity = source.StartActivity("chat model");
+                SetValidChatAttributes(activity!);
+                return Task.CompletedTask;
+            },
+            options => options.SpanCompletionTimeout = TimeSpan.FromMilliseconds(250));
+
+        report.Spans.Should().ContainSingle();
     }
 
     [TestMethod]
@@ -91,6 +290,8 @@ public sealed class A365InstrumentationValidatorTests
 
         var spanResult = report.Spans.Should().ContainSingle().Which;
         spanResult.Span.OperationName.Should().Be("chat");
+        spanResult.Span.Attributes.Should().NotContainKey(
+            OpenTelemetryConstants.GenAiOperationNameKey);
         report.EnsureValid();
     }
 
@@ -654,6 +855,28 @@ public sealed class A365InstrumentationValidatorTests
     private static void SetValidChatAttributes(Activity activity)
     {
         SetValidChatAttributes(activity, includeExportIdentity: true);
+    }
+
+    /// <summary>
+    /// Puts the operation name and the export routing identity -- the only
+    /// values the A365 exporter resolves from tag-or-baggage -- into Activity
+    /// baggage, and nothing into tags. Spans built this way are recognized and
+    /// routable, but carry no serialized payload attributes at all.
+    /// </summary>
+    private static void SetBaggageOnlyCommonAttributes(
+        Activity activity,
+        string operationName)
+    {
+        activity.AddBaggage(OpenTelemetryConstants.GenAiOperationNameKey, operationName);
+        activity.AddBaggage(OpenTelemetryConstants.TenantIdKey, "tenant");
+        activity.AddBaggage(OpenTelemetryConstants.GenAiAgentIdKey, "agent");
+        activity.AddBaggage(OpenTelemetryConstants.GenAiAgentNameKey, "Weather agent");
+        activity.AddBaggage(
+            OpenTelemetryConstants.GenAiAgentDescriptionKey,
+            "Answers weather questions");
+        activity.AddBaggage(OpenTelemetryConstants.AgentAUIDKey, "agent-user");
+        activity.AddBaggage(OpenTelemetryConstants.AgentEmailKey, "agent@example.com");
+        activity.AddBaggage(OpenTelemetryConstants.AgentBlueprintIdKey, "blueprint");
     }
 
     private static void SetValidChatAttributes(

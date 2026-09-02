@@ -33,14 +33,14 @@ internal static class A365CertificationRuleCatalog
                 operationName: null,
                 OpenTelemetryConstants.TenantIdKey,
                 suppressible: false,
-                span => ValidateRequiredString(span, OpenTelemetryConstants.TenantIdKey),
+                ValidateRoutingTenantId,
                 "Set AgentDetails.TenantId or provide microsoft.tenant.id through A365 baggage."),
             CreateRule(
                 A365ValidationRuleIds.AgentIdentityRequired,
                 operationName: null,
                 attributeName: null,
                 suppressible: false,
-                ValidateAgentIdentity,
+                ValidateRoutingAgentIdentity,
                 "Set AgentDetails.AgentId or AgentDetails.AgentPlatformId, or provide gen_ai.agent.id or microsoft.a365.agent.platform.id through A365 baggage."),
             CreateRule(
                 A365ValidationRuleIds.AgentNameRequired,
@@ -169,6 +169,13 @@ internal static class A365CertificationRuleCatalog
             remediation);
     }
 
+    /// <summary>
+    /// Validates a required payload attribute. Payload attributes are read
+    /// from <see cref="A365SpanSnapshot.Attributes"/>, which contains the
+    /// activity's tags only: baggage is never serialized into OTLP span
+    /// attributes, so a value carried only in baggage would be missing from
+    /// the exported payload and must not satisfy the rule.
+    /// </summary>
     private static string? ValidateRequiredString(
         A365SpanSnapshot span,
         string key)
@@ -189,29 +196,31 @@ internal static class A365CertificationRuleCatalog
         return null;
     }
 
-    private static string? ValidateAgentIdentity(A365SpanSnapshot span)
+    /// <summary>
+    /// Validates the tenant identifier the A365 exporter would route this span
+    /// with. Unlike payload attributes, routing identity is resolved by the
+    /// exporter through <c>GetAttributeOrBaggage</c> before serialization, so
+    /// a tenant supplied only through <see cref="System.Diagnostics.Activity"/>
+    /// baggage still routes the export and therefore satisfies this rule.
+    /// </summary>
+    private static string? ValidateRoutingTenantId(A365SpanSnapshot span)
     {
-        var agentIdValidation = ValidateRequiredString(
-            span,
-            OpenTelemetryConstants.GenAiAgentIdKey);
-        if (agentIdValidation == null)
-        {
-            return null;
-        }
+        return string.IsNullOrWhiteSpace(span.RoutingTenantId) ?
+            $"Missing {OpenTelemetryConstants.TenantIdKey}" :
+            null;
+    }
 
-        var agentPlatformValidation = ValidateRequiredString(
-            span,
-            OpenTelemetryConstants.AgentPlatformIdKey);
-        if (agentPlatformValidation == null)
-        {
-            return null;
-        }
-
-        return agentIdValidation.StartsWith("Invalid ", StringComparison.Ordinal) ?
-            agentIdValidation :
-            agentPlatformValidation.StartsWith("Invalid ", StringComparison.Ordinal) ?
-                agentPlatformValidation :
-                "Missing agent identity: set gen_ai.agent.id or microsoft.a365.agent.platform.id";
+    /// <summary>
+    /// Validates the agent identity the A365 exporter would route this span
+    /// with: <c>gen_ai.agent.id</c> from tag or baggage, falling back to the
+    /// agent platform identifier from tag or baggage, exactly as
+    /// <c>Agent365ExporterCore</c> resolves it when partitioning a batch.
+    /// </summary>
+    private static string? ValidateRoutingAgentIdentity(A365SpanSnapshot span)
+    {
+        return string.IsNullOrWhiteSpace(span.RoutingAgentId) ?
+            "Missing agent identity: set gen_ai.agent.id or microsoft.a365.agent.platform.id" :
+            null;
     }
 
     private static string? ValidateGuardrailDecision(A365SpanSnapshot span)

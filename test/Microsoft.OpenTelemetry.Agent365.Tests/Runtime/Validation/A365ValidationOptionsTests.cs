@@ -65,4 +65,60 @@ public sealed class A365ValidationOptionsTests
 
         snapshot.Attributes["gen_ai.operation.name"].Should().Be("chat");
     }
+
+    [TestMethod]
+    public void SpanSnapshot_DerivesRoutingIdentityFromAttributes()
+    {
+        var snapshot = new A365SpanSnapshot(
+            "trace",
+            "span",
+            "chat model",
+            "Custom.Source",
+            "chat",
+            new Dictionary<string, object?>
+            {
+                ["microsoft.tenant.id"] = "tenant",
+                ["gen_ai.agent.id"] = "agent",
+                ["microsoft.a365.agent.platform.id"] = "platform-agent",
+            });
+
+        snapshot.RoutingTenantId.Should().Be("tenant");
+        snapshot.RoutingAgentId.Should().Be("agent");
+    }
+
+    [TestMethod]
+    public void SpanSnapshot_FallsBackToAgentPlatformIdForRoutingIdentity()
+    {
+        var snapshot = new A365SpanSnapshot(
+            "trace",
+            "span",
+            "chat model",
+            "Custom.Source",
+            "chat",
+            new Dictionary<string, object?>
+            {
+                ["microsoft.a365.agent.platform.id"] = "platform-agent",
+            });
+
+        snapshot.RoutingTenantId.Should().BeNull();
+        snapshot.RoutingAgentId.Should().Be("platform-agent");
+    }
+
+    [TestMethod]
+    public void SpanSnapshot_MissingRoutingAttributes_LeavesRoutingIdentityNull()
+    {
+        var snapshot = new A365SpanSnapshot(
+            "trace",
+            "span",
+            "chat model",
+            "Custom.Source",
+            "chat",
+            new Dictionary<string, object?>
+            {
+                ["gen_ai.agent.id"] = null,
+            });
+
+        snapshot.RoutingTenantId.Should().BeNull();
+        snapshot.RoutingAgentId.Should().BeNull();
+    }
 }

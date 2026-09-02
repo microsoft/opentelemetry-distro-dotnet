@@ -108,8 +108,8 @@ public sealed class A365ActivityCaptureSessionTests
             activity.Should().NotBeNull();
 
             // Eligibility must use the same tag-or-baggage lookup the exporter
-            // uses, so a span whose operation name is only in Activity baggage
-            // is still recognized.
+            // uses to classify a span, so a span whose operation name is only
+            // in Activity baggage is still recognized.
             activity!.AddBaggage(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
             activity.GetTagItem(OpenTelemetryConstants.GenAiOperationNameKey)
                 .Should().BeNull();
@@ -119,16 +119,20 @@ public sealed class A365ActivityCaptureSessionTests
 
         var snapshot = result.Spans.Should().ContainSingle().Which;
         snapshot.OperationName.Should().Be("chat");
-        snapshot.Attributes[OpenTelemetryConstants.GenAiOperationNameKey]
-            .Should().Be("chat");
+
+        // The snapshot's attributes are what the exporter would serialize --
+        // tags only -- so the baggage-supplied operation name must not appear
+        // there even though it made the span eligible.
+        snapshot.Attributes.Should().NotContainKey(
+            OpenTelemetryConstants.GenAiOperationNameKey);
     }
 
     [TestMethod]
-    public async Task CompleteAsync_RequiredAttributeOnlyInActivityBaggage_IsSnapshotted()
+    public async Task CompleteAsync_RoutingIdentityOnlyInActivityBaggage_IsResolvedButNotSnapshottedAsAttribute()
     {
         using var session = new A365ActivityCaptureSession(null);
         using var source = new ActivitySource(
-            nameof(CompleteAsync_RequiredAttributeOnlyInActivityBaggage_IsSnapshotted));
+            nameof(CompleteAsync_RoutingIdentityOnlyInActivityBaggage_IsResolvedButNotSnapshottedAsAttribute));
 
         using (var activity = source.StartActivity("chat model"))
         {
@@ -140,10 +144,89 @@ public sealed class A365ActivityCaptureSessionTests
         var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
 
         var snapshot = result.Spans.Should().ContainSingle().Which;
-        snapshot.Attributes[OpenTelemetryConstants.TenantIdKey]
-            .Should().Be("baggage-tenant");
-        snapshot.Attributes[OpenTelemetryConstants.GenAiAgentIdKey]
-            .Should().Be("baggage-agent");
+
+        // Routing identity is what Agent365ExporterCore resolves through
+        // GetAttributeOrBaggage before serialization, so baggage counts.
+        snapshot.RoutingTenantId.Should().Be("baggage-tenant");
+        snapshot.RoutingAgentId.Should().Be("baggage-agent");
+
+        // The serialized attribute set is still tags only.
+        snapshot.Attributes.Should().NotContainKey(OpenTelemetryConstants.TenantIdKey);
+        snapshot.Attributes.Should().NotContainKey(OpenTelemetryConstants.GenAiAgentIdKey);
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_AgentPlatformIdOnlyInActivityBaggage_ResolvesRoutingAgentIdentity()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_AgentPlatformIdOnlyInActivityBaggage_ResolvesRoutingAgentIdentity));
+
+        using (var activity = source.StartActivity("chat model"))
+        {
+            activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+            activity.AddBaggage(
+                OpenTelemetryConstants.AgentPlatformIdKey,
+                "baggage-platform-agent");
+        }
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        var snapshot = result.Spans.Should().ContainSingle().Which;
+        snapshot.RoutingAgentId.Should().Be("baggage-platform-agent");
+        snapshot.RoutingTenantId.Should().BeNull();
+        snapshot.Attributes.Should().NotContainKey(
+            OpenTelemetryConstants.AgentPlatformIdKey);
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_PayloadAttributeOnlyInActivityBaggage_IsNotSnapshotted()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_PayloadAttributeOnlyInActivityBaggage_IsNotSnapshotted));
+
+        using (var activity = source.StartActivity("chat model"))
+        {
+            activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+            activity.AddBaggage(
+                OpenTelemetryConstants.GenAiAgentNameKey,
+                "baggage-agent-name");
+        }
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        var snapshot = result.Spans.Should().ContainSingle().Which;
+
+        // ExportFormatter serializes activity tags only, so a payload
+        // attribute that exists solely in baggage never reaches the service
+        // and must not appear in the snapshot.
+        snapshot.Attributes.Should().NotContainKey(
+            OpenTelemetryConstants.GenAiAgentNameKey);
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_DuplicateTagKeys_KeepsLastTagLikeExportFormatter()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_DuplicateTagKeys_KeepsLastTagLikeExportFormatter));
+
+        using (var activity = source.StartActivity("chat model"))
+        {
+            activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+
+            // Activity.AddTag appends without de-duplicating, and
+            // ExportFormatter.MapAttributes assigns each tag in order, so the
+            // last write for a key is the one that is serialized.
+            activity.AddTag("custom.tag", "first");
+            activity.AddTag("custom.tag", "last");
+        }
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        var snapshot = result.Spans.Should().ContainSingle().Which;
+        snapshot.Attributes["custom.tag"].Should().Be("last");
     }
 
     [TestMethod]
@@ -165,6 +248,7 @@ public sealed class A365ActivityCaptureSessionTests
 
         var snapshot = result.Spans.Should().ContainSingle().Which;
         snapshot.OperationName.Should().Be("chat");
+        snapshot.RoutingTenantId.Should().Be("tag-tenant");
         snapshot.Attributes[OpenTelemetryConstants.GenAiOperationNameKey]
             .Should().Be("chat");
         snapshot.Attributes[OpenTelemetryConstants.TenantIdKey]
