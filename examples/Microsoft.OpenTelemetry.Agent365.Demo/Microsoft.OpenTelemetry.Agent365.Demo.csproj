@@ -16,7 +16,8 @@
 	<ItemGroup>
 		<!-- Microsoft OpenTelemetry Distro (replaces A365 Observability + OTel individual packages) -->
 		<ProjectReference Include="..\..\src\Microsoft.OpenTelemetry\Microsoft.OpenTelemetry.csproj" />
-		<!-- Explicit refs for ProjectReference builds (PrivateAssets=all on Agents.Builder causes 10.x/8.x conflict) -->
+		<!-- Explicit refs for ProjectReference builds (PrivateAssets=all on Agents.Builder causes 10.x/8.x conflict; also pins Microsoft.Bcl.Memory to a patched version) -->
+		<PackageReference Include="Microsoft.Bcl.Memory" Version="10.0.7" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.2" />
 		<PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.2" />
 
