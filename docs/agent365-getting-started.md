@@ -700,6 +700,183 @@ The distro recognizes these environment variables:
 
 > **Note:** `ENABLE_A365_OBSERVABILITY_EXPORTER` is a Python/Node.js concept. In the .NET distro, the A365 exporter is controlled entirely through code via `ExportTarget.Agent365`.
 
+## Validate A365 instrumentation in an integration test
+
+Use `A365InstrumentationValidator.EvaluateAsync(...)` to wrap the exact
+request path your integration test exercises. The validator is
+framework-neutral: it attaches a temporary `ActivityListener`, captures
+recognized A365 spans in the current process, and returns an
+`A365ValidationReport`. You do not need an exporter, a collector, or a
+test-framework-specific adapter.
+
+```csharp
+using Microsoft.Agents.A365.Observability.Runtime.Validation;
+
+A365ValidationReport report =
+    await A365InstrumentationValidator.EvaluateAsync(
+        async () =>
+        {
+            await testClient.SendMessageAsync(
+                "What is the weather in Seattle?");
+        },
+        options =>
+        {
+            options.Suppress(
+                A365ValidationRuleIds.UserIdRequired,
+                operationName: "invoke_agent",
+                reason: "This entry point intentionally supports anonymous users.");
+        });
+
+report.EnsureValid();
+```
+
+`EnsureValid()` throws `A365ValidationException` when the report still contains
+active errors. The exception message contains the formatted report, so normal
+test failure output includes the remediation text (trace and span identifiers
+are abbreviated below; the real output prints them in full):
+
+```text
+A365 instrumentation validation failed: 1 error, 0 warnings, 1 suppressed finding
+
+invoke_agent WeatherAgent [trace=4bf92f35..., span=00f067aa...]
+  [A365-COMMON-011] Missing user.id
+  Fix: Set CallerDetails.UserDetails.UserId when starting InvokeAgentScope.
+  SUPPRESSED: This entry point intentionally supports anonymous users.
+
+
+execute_tool weather [trace=4bf92f35..., span=9a1b2c3d...]
+  [A365-TOOL-001] Missing gen_ai.tool.name
+  Fix: Set ToolCallDetails.ToolName for execute_tool spans.
+```
+
+> [!WARNING]
+> While `EvaluateAsync` runs, its temporary listener samples **every**
+> `ActivitySource` in the process as `AllDataAndRecorded`. This forces full
+> recording process-wide for the duration of the call, so activities that
+> would normally have been sampled out are created, recorded, and handed to
+> whichever processors and exporters are already registered. Run validation
+> only against test pipelines — never in a process configured with production
+> exporters or production endpoints.
+
+- The test and the application code under test must run in the same process.
+  Separate-process validation is not supported in the first release.
+- `EnsureValid()` fails on active errors only. Warnings and suppressed findings
+  remain visible in the report, but they do not fail validation.
+- Every suppression requires a nonblank reason and remains visible in
+  `A365ValidationReport.ToString()` and `A365ValidationException.Message`.
+- An exception thrown by the validated action propagates unchanged. A failure
+  inside a `SpanFilter` or suppression predicate you supplied is reported as
+  `A365ValidationExecutionException` with the original exception attached as
+  `InnerException`; no report is produced in that case.
+
+Choose the narrowest suppression that matches your scenario:
+
+```csharp
+options.Suppress(
+    A365ValidationRuleIds.ToolNameRequired,
+    reason: "Synthetic tool spans are excluded from this suite.");
+
+options.Suppress(
+    A365ValidationRuleIds.UserIdRequired,
+    operationName: "invoke_agent",
+    reason: "This entry point intentionally supports anonymous users.");
+
+options.Suppress(
+    A365ValidationRuleIds.ToolNameRequired,
+    operationName: "execute_tool",
+    predicate: span => span.DisplayName == "execute_tool optional",
+    reason: "This synthetic optional tool span is allowed in this test.");
+```
+
+The `Certification` profile uses the required fields in the Agent 365
+[store-publishing validation tables](https://learn.microsoft.com/microsoft-agent-365/developer/observability#validate-for-store-publishing).
+The canonical
+[attribute reference](https://learn.microsoft.com/microsoft-agent-365/developer/observability-attribute-reference#attribute-table)
+defines attribute names, value formats, and remediation guidance. When the two
+pages assign different requirement levels, the store-publishing tables govern
+this profile because its purpose is publishing readiness.
+
+| Applies to | Required attributes validated |
+|---|---|
+| All publishing operations | `microsoft.tenant.id`, `gen_ai.agent.id`, `gen_ai.agent.name`, `microsoft.a365.agent.blueprint.id`, `microsoft.agent.user.id`, `microsoft.agent.user.email`, `microsoft.channel.name`, `gen_ai.conversation.id`, `client.address`, `user.id`, `user.email` |
+| `invoke_agent` | `server.address`, `gen_ai.input.messages`, `gen_ai.output.messages` |
+| `chat` | `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.request.model`, `gen_ai.provider.name` |
+| `execute_tool` | `gen_ai.tool.name`, `gen_ai.tool.type`, `gen_ai.tool.call.id`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result` |
+| `output_messages` | `gen_ai.output.messages` |
+
+Every payload value must be a nonempty string, matching the Agent 365 OTLP
+contract. `gen_ai.agent.description` and `user.name` are optional and do not
+produce certification findings. `server.port` is emitted only for nonstandard
+ports; the default HTTPS port 443 is omitted and inferred according to
+OpenTelemetry network semantic conventions. `gen_ai.operation.name` is the capture
+discriminator: an unrecognized value is not an A365 publishing operation, and
+a validation run that captures no recognized operations reports
+`A365ValidationRuleIds.NoSpansCaptured`.
+
+Tenant identity and agent export identity are non-suppressible. If
+`A365ValidationRuleIds.TenantIdRequired` or
+`A365ValidationRuleIds.AgentIdentityRequired` fails, fix the instrumentation by
+setting `AgentDetails.TenantId` and either `AgentDetails.AgentId` or
+`AgentDetails.AgentPlatformId` (or supplying the equivalent A365 baggage).
+Store publishing additionally requires `gen_ai.agent.id`; a platform identity
+can satisfy exporter routing but does not replace the calling application's
+Entra appId in the span payload.
+
+Validation models what the A365 exporter actually does with a span, which
+treats routing metadata and payload attributes differently:
+
+- **Operation name and export routing identity may come from baggage.** The
+  exporter resolves `gen_ai.operation.name` (to classify the span as GenAI
+  telemetry) and the tenant/agent identity it routes the export request with
+  from the span tag first and then the activity's baggage. A span whose
+  operation name, `microsoft.tenant.id`, `gen_ai.agent.id`, or
+  `microsoft.a365.agent.platform.id` is carried only in baggage is still
+  recognized, and still satisfies `A365ValidationRuleIds.TenantIdRequired` and
+  `A365ValidationRuleIds.AgentIdentityRequired`. A tag always wins over a
+  same-key baggage entry.
+- **Every other required attribute must be an activity tag.** Baggage is not
+  serialized into OTLP span attributes, so a value that exists only in baggage
+  never reaches the Agent 365 service. Rules such as
+  `A365ValidationRuleIds.AgentNameRequired`,
+  `A365ValidationRuleIds.UserIdRequired`,
+  `A365ValidationRuleIds.InferenceModelRequired`, and
+  `A365ValidationRuleIds.ToolNameRequired` are therefore satisfied only by a
+  span tag. `A365SpanSnapshot.Attributes` reflects this: it exposes the
+  activity's tags only — exactly the attributes the exporter serializes — so a
+  suppression predicate or `SpanFilter` cannot match a baggage-only attribute
+  either. `OperationName` is the exception because exporter classification
+  resolves it from either a tag or baggage.
+
+In practice this distinction rarely requires extra work: the distro's
+`ActivityProcessor` copies nonempty baggage entries onto spans as tags when
+they start, so `BaggageBuilder` values become real tags as long as the
+processor is registered in your `TracerProvider`. A span produced by a source
+that bypasses that processor keeps its baggage as baggage, and payload rules
+will correctly report the attribute as missing.
+
+Validation sessions are process-wide and serialized, so do not overlap
+unrelated telemetry work in the same process while a validation is running.
+Capture is deliberately **not** limited to the sources your `TracerProvider`
+registers — that is external pipeline configuration the validator cannot
+reliably introspect — so every recognized A365 GenAI span in the process is
+validated, including spans from custom `ActivitySource` instances. That is also
+why a recognized custom span with missing tenant or agent identity reports an
+identity failure: the A365 exporter would drop that same span. Use
+`A365ValidationOptions.SpanFilter` as the opt-out for recognized telemetry that
+belongs to another component. The predicate may run while a
+span is still active and on background threads. The first filter decision may
+happen while the span is in flight, is cached, and is not re-evaluated, so base
+it only on `TraceId`, `SpanId`, `DisplayName`, `SourceName`, `OperationName`,
+or attributes guaranteed to be set and stable at span start.
+
+`A365ValidationOptions.SpanCompletionTimeout` defaults to 10 seconds. The
+validator waits up to that deadline for recognized spans to complete before it
+reports `A365ValidationRuleIds.SpanCompletionTimeout`. A session settles only
+after a 250 ms quiet period in which no recognized span starts or stops, so the
+timeout must be at least 250 ms; a shorter value throws
+`ArgumentOutOfRangeException` before the validated action runs, rather than
+producing a timeout report that no instrumentation could avoid.
+
 ## Validate locally
 
 ### Console + Agent365 (validate locally and remotely)
@@ -804,7 +981,7 @@ Received HTTP response headers after *ms - 200
     "gen_ai.operation.name": "Required",
     "gen_ai.output.messages": "Required",
     "server.address": "Required",
-    "server.port": "Required",
+    "server.port": "Required only for nonstandard ports; omit HTTPS 443",
     "microsoft.session.id": "Optional",
     "microsoft.session.description": "Optional",
     "microsoft.tenant.id": "Required"

@@ -1,0 +1,1126 @@
+using System;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using FluentAssertions;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
+using Microsoft.Agents.A365.Observability.Runtime.Validation;
+
+namespace Microsoft.OpenTelemetry.Agent365.Tests.Runtime.Validation;
+
+[TestClass]
+public sealed class A365ActivityCaptureSessionTests
+{
+    private static readonly TimeSpan ShortTimeout = TimeSpan.FromMilliseconds(400);
+
+    [TestMethod]
+    public async Task CompleteAsync_CapturesEligibleActivity()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(nameof(CompleteAsync_CapturesEligibleActivity));
+
+        using (var activity = source.StartActivity("chat model"))
+        {
+            activity.Should().NotBeNull();
+            activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+        }
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        result.Spans.Should().ContainSingle();
+        result.Spans[0].OperationName.Should().Be("chat");
+        result.Spans[0].DisplayName.Should().Be("chat model");
+        result.TimedOutSpans.Should().BeEmpty();
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_IgnoresIneligibleActivity()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(nameof(CompleteAsync_IgnoresIneligibleActivity));
+
+        using (var activity = source.StartActivity("http request"))
+        {
+            activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "unsupported");
+        }
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        result.Spans.Should().BeEmpty();
+        result.TimedOutSpans.Should().BeEmpty();
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_SnapshotAttributes_AreImmutableAfterCapture()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_SnapshotAttributes_AreImmutableAfterCapture));
+
+        var activity = source.StartActivity("chat model");
+        activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+        activity.SetTag("custom.tag", "original");
+        activity.Dispose();
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+        var snapshot = result.Spans.Single();
+
+        // Mutate the underlying Activity after the snapshot was captured; the
+        // snapshot must not observe the change because it copies attributes
+        // eagerly at capture time.
+        activity.SetTag("custom.tag", "mutated-after-capture");
+
+        snapshot.Attributes["custom.tag"].Should().Be("original");
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_AppliesSpanFilter()
+    {
+        using var session = new A365ActivityCaptureSession(
+            span => span.DisplayName == "keep me");
+        using var source = new ActivitySource(nameof(CompleteAsync_AppliesSpanFilter));
+
+        using (var keep = source.StartActivity("keep me"))
+        {
+            keep!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+        }
+
+        using (var drop = source.StartActivity("drop me"))
+        {
+            drop!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+        }
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        result.Spans.Should().ContainSingle(s => s.DisplayName == "keep me");
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_OperationNameOnlyInActivityBaggage_IsCaptured()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_OperationNameOnlyInActivityBaggage_IsCaptured));
+
+        using (var activity = source.StartActivity("chat model"))
+        {
+            activity.Should().NotBeNull();
+
+            // Eligibility must use the same tag-or-baggage lookup the exporter
+            // uses to classify a span, so a span whose operation name is only
+            // in Activity baggage is still recognized.
+            activity!.AddBaggage(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+            activity.GetTagItem(OpenTelemetryConstants.GenAiOperationNameKey)
+                .Should().BeNull();
+        }
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        var snapshot = result.Spans.Should().ContainSingle().Which;
+        snapshot.OperationName.Should().Be("chat");
+
+        // The snapshot's attributes are what the exporter would serialize --
+        // tags only -- so the baggage-supplied operation name must not appear
+        // there even though it made the span eligible.
+        snapshot.Attributes.Should().NotContainKey(
+            OpenTelemetryConstants.GenAiOperationNameKey);
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_RoutingIdentityOnlyInActivityBaggage_IsResolvedButNotSnapshottedAsAttribute()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_RoutingIdentityOnlyInActivityBaggage_IsResolvedButNotSnapshottedAsAttribute));
+
+        using (var activity = source.StartActivity("chat model"))
+        {
+            activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+            activity.AddBaggage(OpenTelemetryConstants.TenantIdKey, "baggage-tenant");
+            activity.AddBaggage(OpenTelemetryConstants.GenAiAgentIdKey, "baggage-agent");
+        }
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        var snapshot = result.Spans.Should().ContainSingle().Which;
+
+        // Routing identity is what Agent365ExporterCore resolves through
+        // GetAttributeOrBaggage before serialization, so baggage counts.
+        snapshot.RoutingTenantId.Should().Be("baggage-tenant");
+        snapshot.RoutingAgentId.Should().Be("baggage-agent");
+
+        // The serialized attribute set is still tags only.
+        snapshot.Attributes.Should().NotContainKey(OpenTelemetryConstants.TenantIdKey);
+        snapshot.Attributes.Should().NotContainKey(OpenTelemetryConstants.GenAiAgentIdKey);
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_AgentPlatformIdOnlyInActivityBaggage_ResolvesRoutingAgentIdentity()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_AgentPlatformIdOnlyInActivityBaggage_ResolvesRoutingAgentIdentity));
+
+        using (var activity = source.StartActivity("chat model"))
+        {
+            activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+            activity.AddBaggage(
+                OpenTelemetryConstants.AgentPlatformIdKey,
+                "baggage-platform-agent");
+        }
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        var snapshot = result.Spans.Should().ContainSingle().Which;
+        snapshot.RoutingAgentId.Should().Be("baggage-platform-agent");
+        snapshot.RoutingTenantId.Should().BeNull();
+        snapshot.Attributes.Should().NotContainKey(
+            OpenTelemetryConstants.AgentPlatformIdKey);
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_PayloadAttributeOnlyInActivityBaggage_IsNotSnapshotted()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_PayloadAttributeOnlyInActivityBaggage_IsNotSnapshotted));
+
+        using (var activity = source.StartActivity("chat model"))
+        {
+            activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+            activity.AddBaggage(
+                OpenTelemetryConstants.GenAiAgentNameKey,
+                "baggage-agent-name");
+        }
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        var snapshot = result.Spans.Should().ContainSingle().Which;
+
+        // ExportFormatter serializes activity tags only, so a payload
+        // attribute that exists solely in baggage never reaches the service
+        // and must not appear in the snapshot.
+        snapshot.Attributes.Should().NotContainKey(
+            OpenTelemetryConstants.GenAiAgentNameKey);
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_DuplicateTagKeys_KeepsLastTagLikeExportFormatter()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_DuplicateTagKeys_KeepsLastTagLikeExportFormatter));
+
+        using (var activity = source.StartActivity("chat model"))
+        {
+            activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+
+            // Activity.AddTag appends without de-duplicating, and
+            // ExportFormatter.MapAttributes assigns each tag in order, so the
+            // last write for a key is the one that is serialized.
+            activity.AddTag("custom.tag", "first");
+            activity.AddTag("custom.tag", "last");
+        }
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        var snapshot = result.Spans.Should().ContainSingle().Which;
+        snapshot.Attributes["custom.tag"].Should().Be("last");
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_TagTakesPrecedenceOverSameKeyBaggage()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_TagTakesPrecedenceOverSameKeyBaggage));
+
+        using (var activity = source.StartActivity("chat model"))
+        {
+            activity!.AddBaggage(OpenTelemetryConstants.GenAiOperationNameKey, "execute_tool");
+            activity.AddBaggage(OpenTelemetryConstants.TenantIdKey, "baggage-tenant");
+            activity.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+            activity.SetTag(OpenTelemetryConstants.TenantIdKey, "tag-tenant");
+        }
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        var snapshot = result.Spans.Should().ContainSingle().Which;
+        snapshot.OperationName.Should().Be("chat");
+        snapshot.RoutingTenantId.Should().Be("tag-tenant");
+        snapshot.Attributes[OpenTelemetryConstants.GenAiOperationNameKey]
+            .Should().Be("chat");
+        snapshot.Attributes[OpenTelemetryConstants.TenantIdKey]
+            .Should().Be("tag-tenant");
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_SpanFilterThrows_WrapsInA365ValidationExecutionException()
+    {
+        using var session = new A365ActivityCaptureSession(
+            _ => throw new InvalidOperationException("filter boom"));
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_SpanFilterThrows_WrapsInA365ValidationExecutionException));
+
+        using (var activity = source.StartActivity("chat model"))
+        {
+            activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+        }
+
+        Func<Task> act = () => session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<A365ValidationExecutionException>();
+        exception.Which.InnerException.Should().BeOfType<InvalidOperationException>()
+            .Which.Message.Should().Be("filter boom");
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_LateOrphanActivityDuringQuietPeriod_IsStillCaptured()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_LateOrphanActivityDuringQuietPeriod_IsStillCaptured));
+
+        using (var first = source.StartActivity("first"))
+        {
+            first!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+        }
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(150).ConfigureAwait(false);
+            using var second = source.StartActivity("second");
+            second!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+        });
+
+        var result = await session.CompleteAsync(TimeSpan.FromSeconds(2), CancellationToken.None);
+
+        result.Spans.Should().HaveCount(2);
+        result.Spans.Select(s => s.DisplayName).Should().Contain(new[] { "first", "second" });
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_TimesOut_ReportsEligibleActiveSpan()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_TimesOut_ReportsEligibleActiveSpan));
+
+        var activity = source.StartActivity("stuck chat");
+        activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+
+        try
+        {
+            var result = await session.CompleteAsync(
+                TimeSpan.FromMilliseconds(300),
+                CancellationToken.None);
+
+            result.Spans.Should().BeEmpty();
+            result.TimedOutSpans.Should().ContainSingle(s => s.DisplayName == "stuck chat");
+        }
+        finally
+        {
+            activity.Dispose();
+        }
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_Cancelled_ThrowsOperationCanceledException()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Func<Task> act = () => session.CompleteAsync(TimeSpan.FromSeconds(5), cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [TestMethod]
+    public void Dispose_DetachesListenerFromActivitySources()
+    {
+        var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(nameof(Dispose_DetachesListenerFromActivitySources));
+
+        source.HasListeners().Should().BeTrue();
+
+        session.Dispose();
+
+        source.HasListeners().Should().BeFalse();
+    }
+
+    [TestMethod]
+    public void Dispose_IsIdempotent()
+    {
+        var session = new A365ActivityCaptureSession(null);
+
+        session.Dispose();
+        Action act = session.Dispose;
+
+        act.Should().NotThrow();
+    }
+
+    [TestMethod]
+    public async Task OnStopped_PausedBetweenEnqueueAndActiveRemoval_ActivityRemainsObservable()
+    {
+        // Regression test for a race where OnStopped removed a stopping
+        // activity from `active` before it was queued to `completed`. If a
+        // completion check ran in that gap, the activity was visible in
+        // neither collection and the completed span was silently lost. The
+        // whole transition now runs inside the closure gate, but the
+        // enqueue-before-remove ordering is still asserted here for
+        // lock-free readers (this test observes the session without taking
+        // the gate, exactly as such a reader would).
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(OnStopped_PausedBetweenEnqueueAndActiveRemoval_ActivityRemainsObservable));
+
+        using var reachedTransition = new ManualResetEventSlim(false);
+        using var releaseTransition = new ManualResetEventSlim(false);
+
+        session.OnStoppedTransitionHookForTests = _ =>
+        {
+            reachedTransition.Set();
+            releaseTransition.Wait(TimeSpan.FromSeconds(5));
+        };
+
+        var activity = source.StartActivity("chat model");
+        activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+
+        var stopTask = Task.Run(() => activity.Dispose());
+
+        reachedTransition.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue(
+            "OnStopped should reach the transition point deterministically");
+
+        // At this exact instant, OnStopped is paused between queuing the
+        // completed activity and removing it from the active set.
+        session.IsObservableForTests(activity).Should().BeTrue(
+            "an eligible activity must remain visible in the active set or " +
+            "the completed queue at every point during OnStopped, so a " +
+            "concurrently running completion check can never observe it in " +
+            "neither collection");
+
+        releaseTransition.Set();
+        await stopTask;
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_LongLivedFilteredOutActiveActivity_CompletesQuicklyWithoutTimeout()
+    {
+        // A foreign span that is eligible by operation name but excluded by
+        // the configured span filter must not extend the quiet-period wait,
+        // nor be reported as a completion timeout, even though it stays
+        // active for the entire (much longer) configured timeout.
+        using var session = new A365ActivityCaptureSession(
+            span => span.DisplayName != "foreign long-lived");
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_LongLivedFilteredOutActiveActivity_CompletesQuicklyWithoutTimeout));
+
+        var foreign = source.StartActivity("foreign long-lived");
+        foreign!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var result = await session.CompleteAsync(
+                TimeSpan.FromSeconds(2),
+                CancellationToken.None);
+            stopwatch.Stop();
+
+            result.Spans.Should().BeEmpty();
+            result.TimedOutSpans.Should().BeEmpty();
+            result.TimedOut.Should().BeFalse();
+            stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1),
+                "a filtered-out active span must not block the quiet period from being reached");
+        }
+        finally
+        {
+            foreign.Dispose();
+        }
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_FilteredOutStartChurn_DoesNotExtendQuietWaitOrTimeout()
+    {
+        // Regression test: eligibleChangeVersion must track the same cached
+        // span-filter decision used for active waiting/completed capture,
+        // not raw operation-name recognition. Here the operation-name tag is
+        // supplied at Activity creation time, so OnStarted itself observes
+        // each churned activity as eligible-by-name immediately. If
+        // OnStarted bumped the version for every such start regardless of
+        // the filter's exclusion, this continuous churn would perpetually
+        // reset the quiet-period window and produce a false timeout.
+        using var session = new A365ActivityCaptureSession(
+            span => span.DisplayName != "churn");
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_FilteredOutStartChurn_DoesNotExtendQuietWaitOrTimeout));
+        using var churnStop = new CancellationTokenSource();
+
+        var tags = new[]
+        {
+            new KeyValuePair<string, object?>(OpenTelemetryConstants.GenAiOperationNameKey, "chat"),
+        };
+
+        var churnTask = Task.Run(async () =>
+        {
+            while (!churnStop.IsCancellationRequested)
+            {
+                using var churn = source.StartActivity(
+                    "churn",
+                    ActivityKind.Internal,
+                    default(ActivityContext),
+                    tags);
+                await Task.Delay(20, CancellationToken.None).ConfigureAwait(false);
+            }
+        });
+
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var result = await session.CompleteAsync(
+                TimeSpan.FromSeconds(2),
+                CancellationToken.None);
+            stopwatch.Stop();
+
+            result.TimedOut.Should().BeFalse(
+                "a filtered-out span's start churn must not reset the quiet-period window");
+            result.Spans.Should().BeEmpty();
+            result.TimedOutSpans.Should().BeEmpty();
+            stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1),
+                "filtered-out start churn must not block the quiet period from being reached");
+        }
+        finally
+        {
+            churnStop.Cancel();
+            await churnTask;
+        }
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_FilteredOutStopChurn_DoesNotExtendQuietWaitOrTimeout()
+    {
+        // Companion regression test to the start-churn case above, for
+        // OnStopped: here the operation-name tag is only applied after the
+        // activity has already started (as in most of this file's tests),
+        // so only OnStopped -- not OnStarted -- ever observes each churned
+        // activity as eligible-by-name. If OnStopped bumped the version for
+        // every such stop regardless of the filter's exclusion, this
+        // continuous churn would perpetually reset the quiet-period window
+        // and produce a false timeout.
+        using var session = new A365ActivityCaptureSession(
+            span => span.DisplayName != "churn");
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_FilteredOutStopChurn_DoesNotExtendQuietWaitOrTimeout));
+        using var churnStop = new CancellationTokenSource();
+
+        var churnTask = Task.Run(async () =>
+        {
+            while (!churnStop.IsCancellationRequested)
+            {
+                using var churn = source.StartActivity("churn");
+                churn?.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+                await Task.Delay(20, CancellationToken.None).ConfigureAwait(false);
+            }
+        });
+
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var result = await session.CompleteAsync(
+                TimeSpan.FromSeconds(2),
+                CancellationToken.None);
+            stopwatch.Stop();
+
+            result.TimedOut.Should().BeFalse(
+                "a filtered-out span's stop churn must not reset the quiet-period window");
+            result.Spans.Should().BeEmpty();
+            result.TimedOutSpans.Should().BeEmpty();
+            stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1),
+                "filtered-out stop churn must not block the quiet period from being reached");
+        }
+        finally
+        {
+            churnStop.Cancel();
+            await churnTask;
+        }
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_TimesOut_DoesNotSleepPastConfiguredTimeout()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_TimesOut_DoesNotSleepPastConfiguredTimeout));
+
+        var activity = source.StartActivity("stuck chat");
+        activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+
+        try
+        {
+            var timeout = TimeSpan.FromMilliseconds(300);
+            var stopwatch = Stopwatch.StartNew();
+            await session.CompleteAsync(timeout, CancellationToken.None);
+            stopwatch.Stop();
+
+            // Previously, the loop always slept the full 250ms quiet period
+            // regardless of remaining budget, so it could overshoot the
+            // deadline by nearly a full quiet period on the final iteration.
+            stopwatch.Elapsed.Should().BeLessThan(
+                timeout + TimeSpan.FromMilliseconds(150),
+                "CompleteAsync must not intentionally sleep past the remaining timeout");
+        }
+        finally
+        {
+            activity.Dispose();
+        }
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_ContinuousChurn_PreservesTimedOutState()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_ContinuousChurn_PreservesTimedOutState));
+        using var churnStop = new CancellationTokenSource();
+
+        var churnTask = Task.Run(async () =>
+        {
+            while (!churnStop.IsCancellationRequested)
+            {
+                using var churn = source.StartActivity("churn");
+                churn?.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+                await Task.Delay(20, CancellationToken.None)
+                    .ConfigureAwait(false);
+            }
+        });
+
+        try
+        {
+            var result = await session.CompleteAsync(
+                TimeSpan.FromMilliseconds(400),
+                CancellationToken.None);
+
+            // Continuous churn keeps resetting the quiet-period window for
+            // the full deadline, so completion must still be reported as
+            // timed out (never silently downgraded to a clean/quiet result)
+            // even though individual churned spans are extremely short-lived
+            // and may or may not happen to be active at the exact deadline.
+            // The "no active span at the exact deadline" edge case is covered
+            // deterministically by
+            // BuildReport_ChurnTimeoutWithNoActiveSpanAtDeadline_AddsGenericTimeoutFinding.
+            result.TimedOut.Should().BeTrue();
+            result.Spans.Should().NotBeEmpty("churned spans should still be captured as completed");
+        }
+        finally
+        {
+            churnStop.Cancel();
+            await churnTask;
+        }
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_SpanFilter_ReceivesStableStartMetadataWhileSpanStillActive()
+    {
+        // The SpanFilter contract documents that the predicate may be
+        // evaluated while a span is still in flight, so it must only rely on
+        // metadata that is already stable at span start. This asserts that
+        // an active (not yet stopped) activity, when observed by the
+        // quiet-period wait loop, already exposes fully-populated identity
+        // metadata to the predicate.
+        A365SpanSnapshot? observed = null;
+        using var session = new A365ActivityCaptureSession(snapshot =>
+        {
+            observed = snapshot;
+            return true;
+        });
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_SpanFilter_ReceivesStableStartMetadataWhileSpanStillActive));
+
+        var activity = source.StartActivity("chat model");
+        activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+
+        try
+        {
+            // Timeout is long enough for at least one quiet-period polling
+            // iteration to run against the still-active span.
+            await session.CompleteAsync(TimeSpan.FromMilliseconds(300), CancellationToken.None);
+        }
+        finally
+        {
+            activity.Dispose();
+        }
+
+        observed.Should().NotBeNull();
+        observed!.TraceId.Should().Be(activity.TraceId.ToHexString().ToLowerInvariant());
+        observed.SpanId.Should().Be(activity.SpanId.ToHexString().ToLowerInvariant());
+        observed.DisplayName.Should().Be("chat model");
+        observed.SourceName.Should().Be(
+            nameof(CompleteAsync_SpanFilter_ReceivesStableStartMetadataWhileSpanStillActive));
+        observed.OperationName.Should().Be("chat");
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_SpanFilter_InvokedOnceAndCachedAcrossPolling()
+    {
+        var invocationCount = 0;
+        using var session = new A365ActivityCaptureSession(_ =>
+        {
+            Interlocked.Increment(ref invocationCount);
+            return true;
+        });
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_SpanFilter_InvokedOnceAndCachedAcrossPolling));
+
+        var activity = source.StartActivity("chat model");
+        activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+
+        try
+        {
+            // Stays active across multiple 250ms quiet-period polling
+            // iterations, which would invoke the predicate repeatedly
+            // without caching.
+            var result = await session.CompleteAsync(
+                TimeSpan.FromMilliseconds(600),
+                CancellationToken.None);
+
+            result.TimedOutSpans.Should().ContainSingle(s => s.DisplayName == "chat model");
+        }
+        finally
+        {
+            activity.Dispose();
+        }
+
+        Volatile.Read(ref invocationCount).Should().Be(
+            1,
+            "the filter decision is cached the first time the span becomes eligible and must " +
+            "never be re-evaluated across subsequent polling iterations or the final result build");
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_OnStoppedWinsTimeoutBoundaryGate_ClassifiesSpanAsCompletedOnly()
+    {
+        // Deterministic gate-race coverage for the timeout boundary, with the
+        // listener callback winning. OnStopped applies its whole transition
+        // (enqueue to `completed`, then removal from `active`) inside the
+        // closure gate, so the deadline boundary can never observe the
+        // activity mid-transition -- which is what previously allowed the
+        // very same span to be reported as both completed (in Spans) and
+        // timed out (in TimedOutSpans). The transition hook holds the gate
+        // across that window while the deadline elapses, forcing
+        // CompleteAsync's boundary to queue behind the callback that won.
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_OnStoppedWinsTimeoutBoundaryGate_ClassifiesSpanAsCompletedOnly));
+
+        using var reachedTransition = new ManualResetEventSlim(false);
+        using var releaseTransition = new ManualResetEventSlim(false);
+
+        session.OnStoppedTransitionHookForTests = _ =>
+        {
+            reachedTransition.Set();
+            releaseTransition.Wait(TimeSpan.FromSeconds(5));
+        };
+
+        var activity = source.StartActivity("chat model");
+        activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+
+        var completeTask = session.CompleteAsync(TimeSpan.FromMilliseconds(300), CancellationToken.None);
+        var stopTask = Task.Run(() => activity.Dispose());
+
+        reachedTransition.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue(
+            "OnStopped should reach the in-gate transition point deterministically");
+
+        // The 300ms deadline elapses while OnStopped still holds the gate.
+        await Task.Delay(600);
+
+        completeTask.IsCompleted.Should().BeFalse(
+            "the closure boundary must wait for the listener callback that won the gate instead " +
+            "of reading a half-applied transition out of the live collections");
+
+        releaseTransition.Set();
+
+        var result = await completeTask;
+        await stopTask;
+
+        result.TimedOut.Should().BeTrue();
+        result.Spans.Should().ContainSingle(s => s.DisplayName == "chat model");
+        result.TimedOutSpans.Should().NotContain(s => s.DisplayName == "chat model");
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_TimeoutBoundaryWinsGateAgainstOnStopped_KeepsPerSpanTimeoutIdentity()
+    {
+        // Companion to the test above, with the closure boundary winning the
+        // race instead. The stop callback is parked immediately *before* it
+        // acquires the gate, so the deadline boundary defines the end of the
+        // evaluation window first: the span was active at that boundary and
+        // must keep its per-span timeout identity even though it completes
+        // microseconds later. Deadline state is authoritative, and closure is
+        // idempotent, so a subsequent CompleteAsync reports the identical
+        // classification.
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_TimeoutBoundaryWinsGateAgainstOnStopped_KeepsPerSpanTimeoutIdentity));
+
+        using var reachedCallbackGate = new ManualResetEventSlim(false);
+        using var releaseCallbackGate = new ManualResetEventSlim(false);
+
+        var activity = source.StartActivity("stuck chat");
+        activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+
+        // Installed only after the start callback has already run, so this
+        // parks the stop callback exclusively.
+        session.OnBeforeCallbackGateForTests = observed =>
+        {
+            if (!ReferenceEquals(observed, activity))
+            {
+                return;
+            }
+
+            reachedCallbackGate.Set();
+            releaseCallbackGate.Wait(TimeSpan.FromSeconds(5));
+        };
+
+        var stopTask = Task.Run(() => activity.Dispose());
+
+        reachedCallbackGate.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue(
+            "the stop callback must be parked just outside the gate before the boundary races it");
+
+        var result = await session.CompleteAsync(
+            TimeSpan.FromMilliseconds(300),
+            CancellationToken.None);
+
+        result.TimedOut.Should().BeTrue();
+        result.TimedOutSpans.Should().ContainSingle(s => s.DisplayName == "stuck chat");
+        result.Spans.Should().BeEmpty(
+            "the stop had not been applied when the deadline boundary was defined");
+        source.HasListeners().Should().BeFalse(
+            "the listener must already be detached when CompleteAsync returns");
+
+        releaseCallbackGate.Set();
+        await stopTask;
+
+        var afterStop = await session.CompleteAsync(
+            TimeSpan.FromMilliseconds(300),
+            CancellationToken.None);
+
+        afterStop.TimedOut.Should().BeTrue();
+        afterStop.TimedOutSpans.Should().ContainSingle(s => s.DisplayName == "stuck chat");
+        afterStop.Spans.Should().BeEmpty(
+            "a stop applied after the closure boundary is outside the evaluation window and must " +
+            "never re-classify a span the deadline already recorded as timed out");
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_OnStartedWinsFinalSuccessGate_InvalidatesQuietPeriod()
+    {
+        // Deterministic gate-race coverage for the final success check. The
+        // hook runs after the unsynchronized candidate check has already
+        // found the window quiet, but before CompleteAsync acquires the gate,
+        // so this start wins the gate. Because the span is still *active*
+        // (and unfinished) when the gated re-check runs, that re-check must
+        // reject the candidate quiet period and keep waiting, so the span is
+        // captured once it later completes. Without the gated re-check the
+        // session would close immediately after this hook returns, silently
+        // dropping a span that started inside the evaluation window.
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_OnStartedWinsFinalSuccessGate_InvalidatesQuietPeriod));
+
+        var tags = new[]
+        {
+            new KeyValuePair<string, object?>(OpenTelemetryConstants.GenAiOperationNameKey, "chat"),
+        };
+
+        var injected = 0;
+        Task? stopTask = null;
+
+        session.OnBeforeClosureGateForTests = () =>
+        {
+            if (Interlocked.Exchange(ref injected, 1) != 0)
+            {
+                return;
+            }
+
+            var late = source.StartActivity(
+                "late chat",
+                ActivityKind.Internal,
+                default(ActivityContext),
+                tags);
+
+            stopTask = Task.Run(async () =>
+            {
+                await Task.Delay(100).ConfigureAwait(false);
+                late?.Dispose();
+            });
+        };
+
+        var result = await session.CompleteAsync(TimeSpan.FromSeconds(3), CancellationToken.None);
+
+        Volatile.Read(ref injected).Should().Be(1, "the closure gate hook must have run");
+        stopTask.Should().NotBeNull();
+        await stopTask!;
+
+        result.TimedOut.Should().BeFalse();
+        result.Spans.Should().ContainSingle(s => s.DisplayName == "late chat",
+            "a span that won the closure gate started inside the evaluation window, so the gated " +
+            "re-check must invalidate the candidate quiet period and wait for it instead of " +
+            "closing the session and losing it");
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_OnStartedLosesFinalSuccessGate_IsOutsideEvaluationWindow()
+    {
+        // Mirror of the test above with the closure winning: the start
+        // callback is parked immediately before it acquires the gate, so the
+        // successful closure defines the end of the evaluation window first
+        // and this start falls outside it. It must not join the active set,
+        // must not invalidate the accepted quiet period, and must not appear
+        // in the result.
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_OnStartedLosesFinalSuccessGate_IsOutsideEvaluationWindow));
+
+        using var reachedCallbackGate = new ManualResetEventSlim(false);
+        using var releaseCallbackGate = new ManualResetEventSlim(false);
+
+        var parked = 0;
+        session.OnBeforeCallbackGateForTests = observed =>
+        {
+            if (observed.DisplayName != "late chat" ||
+                Interlocked.Exchange(ref parked, 1) != 0)
+            {
+                return;
+            }
+
+            reachedCallbackGate.Set();
+            releaseCallbackGate.Wait(TimeSpan.FromSeconds(5));
+        };
+
+        var tags = new[]
+        {
+            new KeyValuePair<string, object?>(OpenTelemetryConstants.GenAiOperationNameKey, "chat"),
+        };
+
+        Activity? late = null;
+        var startTask = Task.Run(() =>
+        {
+            late = source.StartActivity(
+                "late chat",
+                ActivityKind.Internal,
+                default(ActivityContext),
+                tags);
+        });
+
+        reachedCallbackGate.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue(
+            "the start callback must be parked just outside the gate before the closure races it");
+
+        var result = await session.CompleteAsync(TimeSpan.FromSeconds(2), CancellationToken.None);
+
+        result.TimedOut.Should().BeFalse();
+        result.Spans.Should().BeEmpty();
+        result.TimedOutSpans.Should().BeEmpty();
+        source.HasListeners().Should().BeFalse(
+            "the listener must already be detached when CompleteAsync returns");
+
+        releaseCallbackGate.Set();
+        await startTask;
+
+        late.Should().NotBeNull();
+        session.IsObservableForTests(late!).Should().BeFalse(
+            "a start that lost the closure gate is outside the evaluation window and must be " +
+            "ignored entirely");
+
+        late!.Dispose();
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_QuietPeriodReached_DetachesListenerBeforeReturning()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_QuietPeriodReached_DetachesListenerBeforeReturning));
+
+        source.HasListeners().Should().BeTrue();
+
+        var result = await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+
+        result.TimedOut.Should().BeFalse();
+        source.HasListeners().Should().BeFalse(
+            "closing the session on a quiet period must detach the listener before CompleteAsync " +
+            "returns, so nothing started afterwards can be observed");
+        source.StartActivity("after closure").Should().BeNull();
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_TimedOut_DetachesListenerBeforeReturning()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_TimedOut_DetachesListenerBeforeReturning));
+
+        var activity = source.StartActivity("stuck chat");
+        activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+
+        try
+        {
+            var result = await session.CompleteAsync(
+                TimeSpan.FromMilliseconds(300),
+                CancellationToken.None);
+
+            result.TimedOut.Should().BeTrue();
+            source.HasListeners().Should().BeFalse(
+                "closing the session at the deadline must detach the listener before " +
+                "CompleteAsync returns");
+            source.StartActivity("after closure").Should().BeNull();
+        }
+        finally
+        {
+            activity.Dispose();
+        }
+    }
+
+    [TestMethod]
+    public async Task Dispose_AfterCompleteAsyncAlreadyDetached_IsStillSafeAndIdempotent()
+    {
+        var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(Dispose_AfterCompleteAsyncAlreadyDetached_IsStillSafeAndIdempotent));
+
+        await session.CompleteAsync(ShortTimeout, CancellationToken.None);
+        source.HasListeners().Should().BeFalse();
+
+        Action act = () =>
+        {
+            session.Dispose();
+            session.Dispose();
+        };
+
+        act.Should().NotThrow();
+        source.HasListeners().Should().BeFalse();
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_TimeoutShorterThanQuietPeriod_NeverDeclaresSuccessAndDoesNotOversleep()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+
+        var stopwatch = Stopwatch.StartNew();
+        var result = await session.CompleteAsync(TimeSpan.FromMilliseconds(100), CancellationToken.None);
+        stopwatch.Stop();
+
+        result.TimedOut.Should().BeTrue(
+            "a residual delay shorter than the full 250ms quiet period must never be treated " +
+            "as a successfully observed quiet period");
+        result.Spans.Should().BeEmpty();
+        result.TimedOutSpans.Should().BeEmpty();
+        stopwatch.Elapsed.Should().BeLessThan(
+            TimeSpan.FromMilliseconds(250),
+            "CompleteAsync must not sleep past the configured timeout even when it is shorter " +
+            "than the quiet period");
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_ResidualWindowShorterThanQuietPeriod_DoesNotDeclareSuccess()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_ResidualWindowShorterThanQuietPeriod_DoesNotDeclareSuccess));
+
+        // A short-lived span starts/stops during the first (full) 250ms
+        // quiet-period window, so that window correctly fails the quiet
+        // check. After it stops, only ~100ms of genuine quiescence remains
+        // before the 350ms deadline -- short of the required 250ms quiet
+        // period. The fix must still report a timeout instead of treating
+        // that shorter residual quiescent window as a valid quiet period.
+        var churnTask = Task.Run(async () =>
+        {
+            await Task.Delay(180).ConfigureAwait(false);
+            using var shortLived = source.StartActivity("short lived");
+            shortLived?.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+        });
+
+        var result = await session.CompleteAsync(TimeSpan.FromMilliseconds(350), CancellationToken.None);
+        await churnTask;
+
+        result.TimedOut.Should().BeTrue(
+            "only ~100ms of quiescence remained before the deadline, short of the required " +
+            "250ms quiet period");
+    }
+
+    [TestMethod]
+    public async Task TryGetFilterDecision_CallbackAndWaitPathsRaceUnderContention_InvokesPredicateExactlyOnce()
+    {
+        // Deterministic regression coverage for at-most-once predicate
+        // evaluation under genuine contention. ConcurrentDictionary.GetOrAdd
+        // does NOT guarantee its value factory runs only once when multiple
+        // threads race on a missing key -- if the factory evaluated the span
+        // filter directly, several threads could each invoke the customer
+        // predicate concurrently. This test forces exactly that race between
+        // the two real call sites -- the ActivityListener callback path
+        // (OnStopped, via TryGetFilterDecisionForVersionTracking) and the
+        // quiet-period wait-loop path (CompleteAsync's
+        // active.Keys.Any(IsEligibleForWait) check) -- against the very same
+        // activity, and asserts the predicate is invoked exactly once.
+        var invocationCount = 0;
+        using var enteredPredicate = new ManualResetEventSlim(false);
+        using var releasePredicate = new ManualResetEventSlim(false);
+
+        using var session = new A365ActivityCaptureSession(_ =>
+        {
+            Interlocked.Increment(ref invocationCount);
+
+            // Block the *first* (winning) evaluation here so every other
+            // concurrent caller racing for the same activity is provably
+            // still contending -- blocked inside Lazy<FilterDecision>.Value
+            // -- for the whole window below, rather than merely observing an
+            // already-published result.
+            enteredPredicate.Set();
+            releasePredicate.Wait(TimeSpan.FromSeconds(5));
+            return true;
+        });
+        using var source = new ActivitySource(
+            nameof(TryGetFilterDecision_CallbackAndWaitPathsRaceUnderContention_InvokesPredicateExactlyOnce));
+
+        var activity = source.StartActivity("chat model");
+        activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+
+        // "Callback path": OnStopped enqueues the activity as completed
+        // (still leaving it in `active` until after the filter is
+        // evaluated -- see OnStopped) and then evaluates the filter. Run on
+        // a background thread since it blocks inside the predicate above.
+        var stopTask = Task.Run(() => activity.Dispose());
+
+        enteredPredicate.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue(
+            "the callback path must reach the predicate deterministically before racing it " +
+            "against the wait path");
+
+        // "Wait path": while the callback path is still blocked *inside* the
+        // predicate, race several concurrent CompleteAsync quiet-period
+        // pollers against it. The activity remains visible in `active` at
+        // this point, so each poller's active.Keys.Any(IsEligibleForWait)
+        // reaches the very same cached Lazy<FilterDecision> the callback
+        // path is currently executing, and must block rather than
+        // re-evaluate the predicate.
+        var waitTasks = Enumerable.Range(0, 4)
+            .Select(_ => session.CompleteAsync(TimeSpan.FromMilliseconds(900), CancellationToken.None))
+            .ToArray();
+
+        // Generous margin over the 250ms quiet-period poll interval so at
+        // least one wait-path poller has genuinely reached (and blocked on)
+        // the in-flight predicate execution before it is released.
+        await Task.Delay(500);
+
+        releasePredicate.Set();
+
+        await stopTask;
+        await Task.WhenAll(waitTasks);
+
+        Volatile.Read(ref invocationCount).Should().Be(
+            1,
+            "the Lazy<FilterDecision>-backed cache must guarantee the span filter predicate runs " +
+            "at most once per activity even when the listener callback path and the quiet-period " +
+            "wait-loop path race to evaluate the same activity concurrently");
+    }
+}
