@@ -322,7 +322,14 @@ public sealed class A365InstrumentationValidatorTests
 
         var report = await A365InstrumentationValidator.EvaluateAsync(() =>
         {
-            var agent = CreateCertificationAgentDetails();
+            // Only the identity AgentDetails needed by the scopes directly (AgentId) is passed
+            // in. Every other certification attribute -- tenant, agent name/description,
+            // agentic user id/email, blueprint id -- is supplied exclusively through
+            // BaggageBuilder, so a passing report can only be explained by
+            // ActivityProcessor.OnStart actually coalescing baggage onto each span (rather
+            // than the scopes' direct-from-AgentDetails tagging, which is exercised by
+            // CreateCertificationAgentDetails() in the other tests below).
+            var agent = new AgentDetails(agentId: "agent");
             var user = new UserDetails(
                 "user-id",
                 "user@example.com",
@@ -332,49 +339,59 @@ public sealed class A365InstrumentationValidatorTests
                 sessionId: "session",
                 conversationId: "conversation");
 
-            using (InvokeAgentScope.Start(
-                request,
-                new InvokeAgentScopeDetails(new Uri("https://example.com")),
-                agent,
-                new CallerDetails(user)))
+            using (new BaggageBuilder()
+                .TenantId("tenant")
+                .AgentName("Weather agent")
+                .AgentDescription("Answers weather questions")
+                .AgenticUserId("agent-user")
+                .AgenticUserEmail("agent@example.com")
+                .AgentBlueprintId("blueprint")
+                .Build())
             {
-            }
+                using (InvokeAgentScope.Start(
+                    request,
+                    new InvokeAgentScopeDetails(new Uri("https://example.com")),
+                    agent,
+                    new CallerDetails(user)))
+                {
+                }
 
-            using (InferenceScope.Start(
-                request,
-                new InferenceCallDetails(
-                    InferenceOperationType.Chat,
-                    "gpt-4.1",
-                    "openai"),
-                agent,
-                user))
-            {
-            }
+                using (InferenceScope.Start(
+                    request,
+                    new InferenceCallDetails(
+                        InferenceOperationType.Chat,
+                        "gpt-4.1",
+                        "openai"),
+                    agent,
+                    user))
+                {
+                }
 
-            using (ExecuteToolScope.Start(
-                request,
-                new ToolCallDetails("weather", "{}"),
-                agent,
-                user))
-            {
-            }
+                using (ExecuteToolScope.Start(
+                    request,
+                    new ToolCallDetails("weather", "{}"),
+                    agent,
+                    user))
+                {
+                }
 
-            using (OutputScope.Start(
-                request,
-                new Response(new[] { "sunny" }),
-                agent,
-                user))
-            {
-            }
+                using (OutputScope.Start(
+                    request,
+                    new Response(new[] { "sunny" }),
+                    agent,
+                    user))
+                {
+                }
 
-            using (ApplyGuardrailScope.Start(
-                new GuardrailDetails(
-                    GuardrailTargetType.LlmInput,
-                    GuardrailDecisionType.Allow),
-                agent,
-                request,
-                user))
-            {
+                using (ApplyGuardrailScope.Start(
+                    new GuardrailDetails(
+                        GuardrailTargetType.LlmInput,
+                        GuardrailDecisionType.Allow),
+                    agent,
+                    request,
+                    user))
+                {
+                }
             }
 
             return Task.CompletedTask;
@@ -382,6 +399,29 @@ public sealed class A365InstrumentationValidatorTests
 
         report.EnsureValid();
         report.Spans.Should().HaveCount(5);
+
+        // Every one of the five manual scopes must carry the baggage-derived certification
+        // attributes plus the ActivityProcessor's own SDK identity tags -- proof the real
+        // ActivityProcessor.OnStart path ran for each span, not just that the report happens
+        // to be valid (which minimal AgentDetails alone could not achieve).
+        foreach (var spanResult in report.Spans)
+        {
+            var attributes = spanResult.Span.Attributes;
+            attributes.Should().ContainKey(OpenTelemetryConstants.TenantIdKey)
+                .WhoseValue.Should().Be("tenant");
+            attributes.Should().ContainKey(OpenTelemetryConstants.GenAiAgentNameKey)
+                .WhoseValue.Should().Be("Weather agent");
+            attributes.Should().ContainKey(OpenTelemetryConstants.GenAiAgentDescriptionKey)
+                .WhoseValue.Should().Be("Answers weather questions");
+            attributes.Should().ContainKey(OpenTelemetryConstants.AgentAUIDKey)
+                .WhoseValue.Should().Be("agent-user");
+            attributes.Should().ContainKey(OpenTelemetryConstants.AgentEmailKey)
+                .WhoseValue.Should().Be("agent@example.com");
+            attributes.Should().ContainKey(OpenTelemetryConstants.AgentBlueprintIdKey)
+                .WhoseValue.Should().Be("blueprint");
+            attributes.Should().ContainKey(OpenTelemetryConstants.TelemetrySdkNameKey)
+                .WhoseValue.Should().Be(OpenTelemetryConstants.TelemetrySdkNameValue);
+        }
     }
 
     [TestMethod]
@@ -396,6 +436,21 @@ public sealed class A365InstrumentationValidatorTests
 
         using var serviceProvider = services.BuildServiceProvider();
         serviceProvider.GetService<TracerProvider>();
+
+        // Raw Agent Framework wire format ({role, parts:[{type, content}], ...}). The input
+        // message carries a participant name plus an unrecognized property, and the output
+        // message deliberately omits finish_reason. Only
+        // AgentFrameworkSpanProcessor.OnEnd -> AgentFrameworkMessageMapper reconstructs these
+        // into the A365 ChatMessage/OutputMessage shape: the unrecognized property can only
+        // disappear, and finish_reason can only default to "stop", if that mapping actually
+        // executed -- generic ActivityProcessor enrichment never touches these tags.
+        const string rawInputMessages =
+            "[{\"role\":\"user\",\"name\":\"end-user\"," +
+            "\"parts\":[{\"type\":\"text\",\"content\":\"What is the weather in Seattle?\"}]," +
+            "\"unsupported_field\":\"should-be-dropped\"}]";
+        const string rawOutputMessages =
+            "[{\"role\":\"assistant\"," +
+            "\"parts\":[{\"type\":\"text\",\"content\":\"It is sunny in Seattle.\"}]}]";
 
         var report = await A365InstrumentationValidator.EvaluateAsync(() =>
         {
@@ -420,6 +475,8 @@ public sealed class A365InstrumentationValidatorTests
                     { OpenTelemetryConstants.UserIdKey, "user-id" },
                     { OpenTelemetryConstants.UserNameKey, "User Name" },
                     { OpenTelemetryConstants.UserEmailKey, "user@example.com" },
+                    { OpenTelemetryConstants.GenAiInputMessagesKey, rawInputMessages },
+                    { OpenTelemetryConstants.GenAiOutputMessagesKey, rawOutputMessages },
                 };
 
                 using var activity = source.StartActivity(
@@ -436,11 +493,45 @@ public sealed class A365InstrumentationValidatorTests
         // The synthetic activity is tagged with gen_ai.operation.name = invoke_agent
         // (the operation actually recognized by the capture session for this span),
         // not gen_ai.operation.name = chat.
-        report.Spans.Should().ContainSingle(span =>
+        var spanResult = report.Spans.Should().ContainSingle(span =>
             string.Equals(
                 span.Span.OperationName,
                 OpenTelemetryConstants.InvokeAgentOperationName,
-                StringComparison.OrdinalIgnoreCase));
+                StringComparison.OrdinalIgnoreCase)).Which;
+
+        var attributes = spanResult.Span.Attributes;
+
+        // Prove AgentFrameworkSpanProcessor.OnEnd actually ran: the final tag values are the
+        // re-serialized A365 messages, not a pass-through of the raw Agent Framework strings.
+        var finalInput = attributes[OpenTelemetryConstants.GenAiInputMessagesKey]!.ToString()!;
+        finalInput.Should().NotBe(rawInputMessages);
+        finalInput.Should().Contain("\"role\":\"user\"");
+        finalInput.Should().Contain("\"content\":\"What is the weather in Seattle?\"");
+        finalInput.Should().Contain("\"name\":\"end-user\"");
+        finalInput.Should().NotContain("unsupported_field");
+
+        var finalOutput = attributes[OpenTelemetryConstants.GenAiOutputMessagesKey]!.ToString()!;
+        finalOutput.Should().NotBe(rawOutputMessages);
+        finalOutput.Should().Contain("\"role\":\"assistant\"");
+        finalOutput.Should().Contain("\"content\":\"It is sunny in Seattle.\"");
+        // finish_reason is absent from the raw payload; OutputMessage defaults it to "stop",
+        // so its presence here can only be explained by the mapper having run.
+        finalOutput.Should().Contain("\"finish_reason\":\"stop\"");
+
+        // Baggage-derived certification metadata must also be present on the final span.
+        attributes.Should().ContainKey(OpenTelemetryConstants.TenantIdKey)
+            .WhoseValue.Should().Be("tenant");
+        attributes.Should().ContainKey(OpenTelemetryConstants.GenAiAgentNameKey)
+            .WhoseValue.Should().Be("Weather agent");
+        attributes.Should().ContainKey(OpenTelemetryConstants.GenAiAgentDescriptionKey)
+            .WhoseValue.Should().Be("Answers weather questions");
+        attributes.Should().ContainKey(OpenTelemetryConstants.AgentAUIDKey)
+            .WhoseValue.Should().Be("agent-user");
+        attributes.Should().ContainKey(OpenTelemetryConstants.AgentEmailKey)
+            .WhoseValue.Should().Be("agent@example.com");
+        attributes.Should().ContainKey(OpenTelemetryConstants.AgentBlueprintIdKey)
+            .WhoseValue.Should().Be("blueprint");
+
         report.EnsureValid();
     }
 
