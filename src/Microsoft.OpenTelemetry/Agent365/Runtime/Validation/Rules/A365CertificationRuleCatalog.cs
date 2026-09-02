@@ -42,62 +42,72 @@ internal static class A365CertificationRuleCatalog
                 suppressible: false,
                 ValidateRoutingAgentIdentity,
                 "Set AgentDetails.AgentId or AgentDetails.AgentPlatformId, or provide gen_ai.agent.id or microsoft.a365.agent.platform.id through A365 baggage."),
-            CreateRule(
+            CreateStorePublishingRule(
+                A365ValidationRuleIds.AgentIdRequired,
+                OpenTelemetryConstants.GenAiAgentIdKey,
+                StorePublishingOperations,
+                "Set AgentDetails.AgentId to the calling application's Entra appId.",
+                ValidateRequiredAgentId),
+            CreateStorePublishingRule(
                 A365ValidationRuleIds.AgentNameRequired,
-                operationName: null,
                 OpenTelemetryConstants.GenAiAgentNameKey,
-                suppressible: true,
-                span => ValidateRequiredString(span, OpenTelemetryConstants.GenAiAgentNameKey),
+                StorePublishingOperations,
                 "Set AgentDetails.AgentName or provide gen_ai.agent.name through A365 baggage."),
-            CreateRule(
-                A365ValidationRuleIds.AgentDescriptionRequired,
-                operationName: null,
-                OpenTelemetryConstants.GenAiAgentDescriptionKey,
-                suppressible: true,
-                span => ValidateRequiredString(span, OpenTelemetryConstants.GenAiAgentDescriptionKey),
-                "Set AgentDetails.AgentDescription or provide gen_ai.agent.description through A365 baggage."),
-            CreateRule(
+            CreateStorePublishingRule(
                 A365ValidationRuleIds.AgentUserIdRequired,
-                operationName: null,
                 OpenTelemetryConstants.AgentAUIDKey,
-                suppressible: true,
-                span => ValidateRequiredString(span, OpenTelemetryConstants.AgentAUIDKey),
+                StorePublishingOperations,
                 "Set AgentDetails.AgenticUserId or provide microsoft.agent.user.id through A365 baggage."),
-            CreateRule(
+            CreateStorePublishingRule(
                 A365ValidationRuleIds.AgentUserEmailRequired,
-                operationName: null,
                 OpenTelemetryConstants.AgentEmailKey,
-                suppressible: true,
-                span => ValidateRequiredString(span, OpenTelemetryConstants.AgentEmailKey),
+                StorePublishingOperations,
                 "Set AgentDetails.AgenticUserEmail or provide microsoft.agent.user.email through A365 baggage."),
-            CreateRule(
+            CreateStorePublishingRule(
                 A365ValidationRuleIds.AgentBlueprintIdRequired,
-                operationName: null,
                 OpenTelemetryConstants.AgentBlueprintIdKey,
-                suppressible: true,
-                span => ValidateRequiredString(span, OpenTelemetryConstants.AgentBlueprintIdKey),
+                StorePublishingOperations,
                 "Set AgentDetails.AgentBlueprintId or provide microsoft.a365.agent.blueprint.id through A365 baggage."),
-            CreateRule(
-                A365ValidationRuleIds.InvokeUserIdRequired,
-                OpenTelemetryConstants.InvokeAgentOperationName,
+            CreateStorePublishingRule(
+                A365ValidationRuleIds.ChannelNameRequired,
+                OpenTelemetryConstants.ChannelNameKey,
+                StorePublishingOperations,
+                "Set Request.Channel.Name or microsoft.channel.name through A365 baggage."),
+            CreateStorePublishingRule(
+                A365ValidationRuleIds.ConversationIdRequired,
+                OpenTelemetryConstants.GenAiConversationIdKey,
+                StorePublishingOperations,
+                "Set Request.ConversationId or gen_ai.conversation.id through A365 baggage."),
+            CreateStorePublishingRule(
+                A365ValidationRuleIds.ClientAddressRequired,
+                OpenTelemetryConstants.CallerClientIpKey,
+                StorePublishingOperations,
+                "Set the caller client address through UserDetails.UserClientIP or A365 baggage."),
+            CreateStorePublishingRule(
+                A365ValidationRuleIds.UserIdRequired,
                 OpenTelemetryConstants.UserIdKey,
-                suppressible: true,
-                span => ValidateRequiredString(span, OpenTelemetryConstants.UserIdKey),
-                "Set CallerDetails.UserDetails.UserId when starting InvokeAgentScope."),
-            CreateRule(
-                A365ValidationRuleIds.InvokeUserNameRequired,
-                OpenTelemetryConstants.InvokeAgentOperationName,
-                OpenTelemetryConstants.UserNameKey,
-                suppressible: true,
-                span => ValidateRequiredString(span, OpenTelemetryConstants.UserNameKey),
-                "Set CallerDetails.UserDetails.UserName when starting InvokeAgentScope."),
-            CreateRule(
-                A365ValidationRuleIds.InvokeUserEmailRequired,
-                OpenTelemetryConstants.InvokeAgentOperationName,
+                StorePublishingOperations,
+                "Set CallerDetails.UserDetails.UserId or user.id through A365 baggage."),
+            CreateStorePublishingRule(
+                A365ValidationRuleIds.UserEmailRequired,
                 OpenTelemetryConstants.UserEmailKey,
-                suppressible: true,
-                span => ValidateRequiredString(span, OpenTelemetryConstants.UserEmailKey),
-                "Set CallerDetails.UserDetails.UserEmail when starting InvokeAgentScope."),
+                StorePublishingOperations,
+                "Set CallerDetails.UserDetails.UserEmail or user.email through A365 baggage."),
+            CreateStorePublishingRule(
+                A365ValidationRuleIds.ServerAddressRequired,
+                OpenTelemetryConstants.ServerAddressKey,
+                NetworkOperations,
+                "Set the scope endpoint or server.address through A365 baggage."),
+            CreateStorePublishingRule(
+                A365ValidationRuleIds.InputMessagesRequired,
+                OpenTelemetryConstants.GenAiInputMessagesKey,
+                InputMessageOperations,
+                "Record input messages on invoke_agent and chat spans."),
+            CreateStorePublishingRule(
+                A365ValidationRuleIds.OutputMessagesRequired,
+                OpenTelemetryConstants.GenAiOutputMessagesKey,
+                OutputMessageOperations,
+                "Record output messages on invoke_agent, chat, and output_messages spans."),
             CreateRule(
                 A365ValidationRuleIds.InferenceModelRequired,
                 OpenTelemetryConstants.ChatOperationName,
@@ -119,6 +129,34 @@ internal static class A365CertificationRuleCatalog
                 suppressible: true,
                 span => ValidateRequiredString(span, OpenTelemetryConstants.GenAiToolNameKey),
                 "Set ToolCallDetails.ToolName for execute_tool spans."),
+            CreateRule(
+                A365ValidationRuleIds.ToolTypeRequired,
+                OpenTelemetryConstants.ExecuteToolOperationName,
+                OpenTelemetryConstants.GenAiToolTypeKey,
+                suppressible: true,
+                span => ValidateRequiredString(span, OpenTelemetryConstants.GenAiToolTypeKey),
+                "Set ToolCallDetails.ToolType for execute_tool spans."),
+            CreateRule(
+                A365ValidationRuleIds.ToolCallIdRequired,
+                OpenTelemetryConstants.ExecuteToolOperationName,
+                OpenTelemetryConstants.GenAiToolCallIdKey,
+                suppressible: true,
+                span => ValidateRequiredString(span, OpenTelemetryConstants.GenAiToolCallIdKey),
+                "Set ToolCallDetails.ToolCallId for execute_tool spans."),
+            CreateRule(
+                A365ValidationRuleIds.ToolCallArgumentsRequired,
+                OpenTelemetryConstants.ExecuteToolOperationName,
+                OpenTelemetryConstants.GenAiToolArgumentsKey,
+                suppressible: true,
+                span => ValidateRequiredString(span, OpenTelemetryConstants.GenAiToolArgumentsKey),
+                "Set ToolCallDetails arguments for execute_tool spans."),
+            CreateRule(
+                A365ValidationRuleIds.ToolCallResultRequired,
+                OpenTelemetryConstants.ExecuteToolOperationName,
+                OpenTelemetryConstants.GenAiToolCallResultKey,
+                suppressible: true,
+                span => ValidateRequiredString(span, OpenTelemetryConstants.GenAiToolCallResultKey),
+                "Call ExecuteToolScope.RecordResponse with the tool result."),
             CreateRule(
                 A365ValidationRuleIds.GuardrailDecisionRequired,
                 OpenTelemetryConstants.ApplyGuardrailOperationName,
@@ -145,6 +183,32 @@ internal static class A365CertificationRuleCatalog
 
     internal static IReadOnlyList<A365ValidationRule> Rules { get; }
 
+    private static readonly string[] StorePublishingOperations =
+    {
+        OpenTelemetryConstants.InvokeAgentOperationName,
+        OpenTelemetryConstants.ExecuteToolOperationName,
+        OpenTelemetryConstants.ChatOperationName,
+        OpenTelemetryConstants.OutputMessagesOperationName,
+    };
+
+    private static readonly string[] NetworkOperations =
+    {
+        OpenTelemetryConstants.InvokeAgentOperationName,
+    };
+
+    private static readonly string[] InputMessageOperations =
+    {
+        OpenTelemetryConstants.InvokeAgentOperationName,
+        OpenTelemetryConstants.ChatOperationName,
+    };
+
+    private static readonly string[] OutputMessageOperations =
+    {
+        OpenTelemetryConstants.InvokeAgentOperationName,
+        OpenTelemetryConstants.ChatOperationName,
+        OpenTelemetryConstants.OutputMessagesOperationName,
+    };
+
     internal static bool TryGetRule(string ruleId, out A365ValidationRule rule)
     {
         var found = RulesById.TryGetValue(ruleId, out var candidate);
@@ -162,10 +226,26 @@ internal static class A365CertificationRuleCatalog
     {
         return new A365ValidationRule(
             id,
-            operationName,
+            operationName == null ? null : new[] { operationName },
             attributeName,
             suppressible,
             validate,
+            remediation);
+    }
+
+    private static A365ValidationRule CreateStorePublishingRule(
+        string id,
+        string attributeName,
+        IReadOnlyCollection<string> operationNames,
+        string remediation,
+        Func<A365SpanSnapshot, string?>? validate = null)
+    {
+        return new A365ValidationRule(
+            id,
+            operationNames,
+            attributeName,
+            suppressible: true,
+            validate ?? (span => ValidateRequiredString(span, attributeName)),
             remediation);
     }
 
@@ -221,6 +301,16 @@ internal static class A365CertificationRuleCatalog
         return string.IsNullOrWhiteSpace(span.RoutingAgentId) ?
             "Missing agent identity: set gen_ai.agent.id or microsoft.a365.agent.platform.id" :
             null;
+    }
+
+    private static string? ValidateRequiredAgentId(A365SpanSnapshot span)
+    {
+        // Avoid reporting the same root cause twice when the exporter cannot
+        // route the span at all. A platform identity can route legacy spans,
+        // but it does not replace the store-required gen_ai.agent.id payload.
+        return string.IsNullOrWhiteSpace(span.RoutingAgentId) ?
+            null :
+            ValidateRequiredString(span, OpenTelemetryConstants.GenAiAgentIdKey);
     }
 
     private static string? ValidateGuardrailDecision(A365SpanSnapshot span)

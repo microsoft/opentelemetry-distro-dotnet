@@ -40,6 +40,24 @@ public sealed class ExecuteToolScopeTest : ActivityTest
     }
 
     [TestMethod]
+    public void DefaultHttpsEndpoint_OmitsServerPort()
+    {
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails(
+                    "TestTool",
+                    "{}",
+                    endpoint: new Uri("https://example.com")),
+                Util.GetAgentDetails());
+        });
+
+        activity.ShouldHaveTag(OpenTelemetryConstants.ServerAddressKey, "example.com");
+        activity.GetTagItem(OpenTelemetryConstants.ServerPortKey).Should().BeNull();
+    }
+
+    [TestMethod]
     public void RecordResponse_Response_Set()
     {
         const string expected = "Output: 42";

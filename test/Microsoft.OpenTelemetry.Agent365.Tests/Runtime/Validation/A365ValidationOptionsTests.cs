@@ -37,7 +37,7 @@ public sealed class A365ValidationOptionsTests
         var options = new A365ValidationOptions();
 
         Action act = () => options.Suppress(
-            A365ValidationRuleIds.InvokeUserIdRequired,
+            A365ValidationRuleIds.UserIdRequired,
             operationName: "",
             reason: "Anonymous invocation");
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -34,7 +35,7 @@ public sealed class A365InstrumentationValidatorTests
 
         report.Spans.Should().ContainSingle();
         report.Spans[0].Span.SourceName.Should().Be("Customer.Agent");
-        report.IsValid.Should().BeTrue();
+        report.IsValid.Should().BeTrue(report.ToString());
     }
 
     [TestMethod]
@@ -64,6 +65,8 @@ public sealed class A365InstrumentationValidatorTests
         spanResult.Findings.Should().NotContain(f =>
             f.RuleId == A365ValidationRuleIds.TenantIdRequired ||
             f.RuleId == A365ValidationRuleIds.AgentIdentityRequired);
+        spanResult.Findings.Should().ContainSingle(f =>
+            f.RuleId == A365ValidationRuleIds.AgentIdRequired);
 
         // The public attribute set reflects what the exporter serializes --
         // activity tags only -- so the baggage-only routing identity must not
@@ -72,7 +75,6 @@ public sealed class A365InstrumentationValidatorTests
             OpenTelemetryConstants.TenantIdKey);
         spanResult.Span.Attributes.Should().NotContainKey(
             OpenTelemetryConstants.GenAiAgentIdKey);
-        report.EnsureValid();
     }
 
     [TestMethod]
@@ -97,9 +99,10 @@ public sealed class A365InstrumentationValidatorTests
         spanResult.Findings.Should().NotContain(f =>
             f.RuleId == A365ValidationRuleIds.TenantIdRequired ||
             f.RuleId == A365ValidationRuleIds.AgentIdentityRequired);
+        spanResult.Findings.Should().ContainSingle(f =>
+            f.RuleId == A365ValidationRuleIds.AgentIdRequired);
         spanResult.Span.Attributes.Should().NotContainKey(
             OpenTelemetryConstants.AgentPlatformIdKey);
-        report.EnsureValid();
     }
 
     [TestMethod]
@@ -146,7 +149,7 @@ public sealed class A365InstrumentationValidatorTests
         activeRuleIds.Should().Contain(new[]
         {
             A365ValidationRuleIds.AgentNameRequired,
-            A365ValidationRuleIds.AgentDescriptionRequired,
+            A365ValidationRuleIds.AgentIdRequired,
             A365ValidationRuleIds.AgentUserIdRequired,
             A365ValidationRuleIds.AgentUserEmailRequired,
             A365ValidationRuleIds.AgentBlueprintIdRequired,
@@ -215,9 +218,8 @@ public sealed class A365InstrumentationValidatorTests
 
         ActiveRuleIds("invoke_agent").Should().Contain(new[]
         {
-            A365ValidationRuleIds.InvokeUserIdRequired,
-            A365ValidationRuleIds.InvokeUserNameRequired,
-            A365ValidationRuleIds.InvokeUserEmailRequired,
+            A365ValidationRuleIds.UserIdRequired,
+            A365ValidationRuleIds.UserEmailRequired,
         });
         ActiveRuleIds("execute_tool").Should().Contain(
             A365ValidationRuleIds.ToolNameRequired);
@@ -594,11 +596,13 @@ public sealed class A365InstrumentationValidatorTests
             var user = new UserDetails(
                 "user-id",
                 "user@example.com",
-                "User Name");
+                "User Name",
+                IPAddress.Loopback);
             var request = new Request(
                 "hello",
                 sessionId: "session",
-                conversationId: "conversation");
+                conversationId: "conversation",
+                channel: new Channel("web"));
 
             using (new BaggageBuilder()
                 .TenantId("tenant")
@@ -607,17 +611,19 @@ public sealed class A365InstrumentationValidatorTests
                 .AgenticUserId("agent-user")
                 .AgenticUserEmail("agent@example.com")
                 .AgentBlueprintId("blueprint")
+                .InvokeAgentServer("example.com", 443)
                 .Build())
             {
-                using (InvokeAgentScope.Start(
+                using (var invokeScope = InvokeAgentScope.Start(
                     request,
                     new InvokeAgentScopeDetails(new Uri("https://example.com")),
                     agent,
                     new CallerDetails(user)))
                 {
+                    invokeScope.RecordOutputMessages(new[] { "sunny" });
                 }
 
-                using (InferenceScope.Start(
+                using (var inferenceScope = InferenceScope.Start(
                     request,
                     new InferenceCallDetails(
                         InferenceOperationType.Chat,
@@ -626,14 +632,20 @@ public sealed class A365InstrumentationValidatorTests
                     agent,
                     user))
                 {
+                    inferenceScope.RecordOutputMessages(new[] { "sunny" });
                 }
 
-                using (ExecuteToolScope.Start(
+                using (var toolScope = ExecuteToolScope.Start(
                     request,
-                    new ToolCallDetails("weather", "{}"),
+                    new ToolCallDetails(
+                        "weather",
+                        "{}",
+                        toolCallId: "call-1",
+                        toolType: "function"),
                     agent,
                     user))
                 {
+                    toolScope.RecordResponse("{\"temperature\":72}");
                 }
 
                 using (OutputScope.Start(
@@ -725,6 +737,10 @@ public sealed class A365InstrumentationValidatorTests
                 .AgenticUserId("agent-user")
                 .AgenticUserEmail("agent@example.com")
                 .AgentBlueprintId("blueprint")
+                .ConversationId("conversation")
+                .ChannelName("web")
+                .UserClientIp(IPAddress.Loopback)
+                .InvokeAgentServer("agent.example.com", 443)
                 .Build())
             {
                 var tags = new ActivityTagsCollection
@@ -809,13 +825,21 @@ public sealed class A365InstrumentationValidatorTests
                 var request = new Request(
                     "hello",
                     sessionId: "session",
-                    conversationId: "conversation");
+                    conversationId: "conversation",
+                    channel: new Channel("web"));
 
-                using (InvokeAgentScope.Start(
-                    request,
-                    new InvokeAgentScopeDetails(new Uri("https://example.com")),
-                    agent))
+                using (new BaggageBuilder()
+                    .UserClientIp(IPAddress.Any)
+                    .InvokeAgentServer("example.com", 443)
+                    .Build())
                 {
+                    using var scope = InvokeAgentScope.Start(
+                        request,
+                        new InvokeAgentScopeDetails(new Uri("https://example.com")),
+                        agent,
+                        new CallerDetails(
+                            new UserDetails(userClientIP: IPAddress.Any)));
+                    scope.RecordOutputMessages(new[] { "anonymous response" });
                 }
 
                 return Task.CompletedTask;
@@ -823,21 +847,17 @@ public sealed class A365InstrumentationValidatorTests
             options =>
             {
                 options.Suppress(
-                    A365ValidationRuleIds.InvokeUserIdRequired,
+                    A365ValidationRuleIds.UserIdRequired,
                     OpenTelemetryConstants.InvokeAgentOperationName,
                     suppressionReason);
                 options.Suppress(
-                    A365ValidationRuleIds.InvokeUserNameRequired,
-                    OpenTelemetryConstants.InvokeAgentOperationName,
-                    suppressionReason);
-                options.Suppress(
-                    A365ValidationRuleIds.InvokeUserEmailRequired,
+                    A365ValidationRuleIds.UserEmailRequired,
                     OpenTelemetryConstants.InvokeAgentOperationName,
                     suppressionReason);
             });
 
-        report.IsValid.Should().BeTrue();
-        report.SuppressedFindingCount.Should().Be(3);
+        report.IsValid.Should().BeTrue(report.ToString());
+        report.SuppressedFindingCount.Should().Be(2);
         report.Spans.Single().Findings.Should().OnlyContain(
             finding => finding.Status == A365ValidationFindingStatus.Suppressed);
         report.ToString().Should().Contain("Anonymous entry point");
@@ -905,6 +925,15 @@ public sealed class A365InstrumentationValidatorTests
         activity.SetTag(
             OpenTelemetryConstants.AgentBlueprintIdKey,
             "blueprint");
+        activity.SetTag(OpenTelemetryConstants.ChannelNameKey, "web");
+        activity.SetTag(OpenTelemetryConstants.GenAiConversationIdKey, "conversation");
+        activity.SetTag(OpenTelemetryConstants.CallerClientIpKey, "127.0.0.1");
+        activity.SetTag(OpenTelemetryConstants.UserIdKey, "user");
+        activity.SetTag(OpenTelemetryConstants.UserEmailKey, "user@example.com");
+        activity.SetTag(OpenTelemetryConstants.ServerAddressKey, "agent.example.com");
+        activity.SetTag(OpenTelemetryConstants.ServerPortKey, "443");
+        activity.SetTag(OpenTelemetryConstants.GenAiInputMessagesKey, "[]");
+        activity.SetTag(OpenTelemetryConstants.GenAiOutputMessagesKey, "[]");
         activity.SetTag(OpenTelemetryConstants.GenAiRequestModelKey, "gpt-4.1");
         activity.SetTag(OpenTelemetryConstants.GenAiProviderNameKey, "openai");
     }

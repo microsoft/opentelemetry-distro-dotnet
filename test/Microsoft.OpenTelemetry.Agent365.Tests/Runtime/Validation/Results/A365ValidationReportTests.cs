@@ -54,7 +54,7 @@ public sealed class A365ValidationReportTests
                 "invoke_agent weather",
                 new Dictionary<string, object?>(),
                 CreateFinding(
-                    InvokeUserIdRequired,
+                    UserIdRequired,
                     A365ValidationSeverity.Error,
                     Suppressed,
                     "invoke_agent",
@@ -71,7 +71,7 @@ public sealed class A365ValidationReportTests
                     Active,
                     null,
                     null,
-                    "Suppression A365-INVOKE-001 did not match any finding.",
+                    "Suppression A365-COMMON-011 did not match any finding.",
                     "Remove the stale suppression or correct its targeting."),
             });
 
@@ -108,7 +108,7 @@ public sealed class A365ValidationReportTests
                 "invoke_agent weather",
                 new Dictionary<string, object?>(),
                 CreateFinding(
-                    InvokeUserIdRequired,
+                    UserIdRequired,
                     A365ValidationSeverity.Error,
                     Suppressed,
                     "invoke_agent",
@@ -237,7 +237,7 @@ public sealed class A365ValidationReportTests
                     "invoke_agent WeatherAgent",
                     new Dictionary<string, object?>(),
                     CreateFinding(
-                        InvokeUserIdRequired,
+                        UserIdRequired,
                         A365ValidationSeverity.Error,
                         Suppressed,
                         "invoke_agent",
@@ -265,7 +265,7 @@ public sealed class A365ValidationReportTests
             "A365 instrumentation validation failed: 1 error, 0 warnings, 1 suppressed finding",
             string.Empty,
             "invoke_agent WeatherAgent [trace=4bf92f35..., span=00f067aa...]",
-            "  [A365-INVOKE-001] Missing user.id",
+            "  [A365-COMMON-011] Missing user.id",
             "  Fix: Set CallerDetails.UserDetails.UserId when starting InvokeAgentScope.",
             "  SUPPRESSED: This entry point intentionally supports anonymous users.",
             string.Empty,

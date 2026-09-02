@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Validation;
 
@@ -9,14 +10,14 @@ internal sealed class A365ValidationRule
 {
     internal A365ValidationRule(
         string id,
-        string? operationName,
+        IReadOnlyCollection<string>? operationNames,
         string? attributeName,
         bool suppressible,
         Func<A365SpanSnapshot, string?> validate,
         string remediation)
     {
         Id = id;
-        OperationName = operationName;
+        OperationNames = operationNames;
         AttributeName = attributeName;
         Suppressible = suppressible;
         Validate = validate;
@@ -25,7 +26,7 @@ internal sealed class A365ValidationRule
 
     internal string Id { get; }
 
-    internal string? OperationName { get; }
+    internal IReadOnlyCollection<string>? OperationNames { get; }
 
     internal string? AttributeName { get; }
 

@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Validation;
 
@@ -59,11 +60,10 @@ internal static class A365ValidationEngine
         A365ValidationRule rule,
         A365SpanSnapshot span)
     {
-        return rule.OperationName == null ||
-            string.Equals(
-                rule.OperationName,
+        return rule.OperationNames == null ||
+            rule.OperationNames.Contains(
                 span.OperationName,
-                StringComparison.OrdinalIgnoreCase);
+                StringComparer.OrdinalIgnoreCase);
     }
 
     private static A365ValidationFinding CreateFinding(

@@ -722,7 +722,7 @@ A365ValidationReport report =
         options =>
         {
             options.Suppress(
-                A365ValidationRuleIds.InvokeUserIdRequired,
+                A365ValidationRuleIds.UserIdRequired,
                 operationName: "invoke_agent",
                 reason: "This entry point intentionally supports anonymous users.");
         });
@@ -739,7 +739,7 @@ are abbreviated below; the real output prints them in full):
 A365 instrumentation validation failed: 1 error, 0 warnings, 1 suppressed finding
 
 invoke_agent WeatherAgent [trace=4bf92f35..., span=00f067aa...]
-  [A365-INVOKE-001] Missing user.id
+  [A365-COMMON-011] Missing user.id
   Fix: Set CallerDetails.UserDetails.UserId when starting InvokeAgentScope.
   SUPPRESSED: This entry point intentionally supports anonymous users.
 
@@ -777,7 +777,7 @@ options.Suppress(
     reason: "Synthetic tool spans are excluded from this suite.");
 
 options.Suppress(
-    A365ValidationRuleIds.InvokeUserIdRequired,
+    A365ValidationRuleIds.UserIdRequired,
     operationName: "invoke_agent",
     reason: "This entry point intentionally supports anonymous users.");
 
@@ -788,11 +788,39 @@ options.Suppress(
     reason: "This synthetic optional tool span is allowed in this test.");
 ```
 
+The `Certification` profile uses the required fields in the Agent 365
+[store-publishing validation tables](https://learn.microsoft.com/microsoft-agent-365/developer/observability#validate-for-store-publishing).
+The canonical
+[attribute reference](https://learn.microsoft.com/microsoft-agent-365/developer/observability-attribute-reference#attribute-table)
+defines attribute names, value formats, and remediation guidance. When the two
+pages assign different requirement levels, the store-publishing tables govern
+this profile because its purpose is publishing readiness.
+
+| Applies to | Required attributes validated |
+|---|---|
+| All publishing operations | `microsoft.tenant.id`, `gen_ai.agent.id`, `gen_ai.agent.name`, `microsoft.a365.agent.blueprint.id`, `microsoft.agent.user.id`, `microsoft.agent.user.email`, `microsoft.channel.name`, `gen_ai.conversation.id`, `client.address`, `user.id`, `user.email` |
+| `invoke_agent` | `server.address`, `gen_ai.input.messages`, `gen_ai.output.messages` |
+| `chat` | `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.request.model`, `gen_ai.provider.name` |
+| `execute_tool` | `gen_ai.tool.name`, `gen_ai.tool.type`, `gen_ai.tool.call.id`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result` |
+| `output_messages` | `gen_ai.output.messages` |
+
+Every payload value must be a nonempty string, matching the Agent 365 OTLP
+contract. `gen_ai.agent.description` and `user.name` are optional and do not
+produce certification findings. `server.port` is emitted only for nonstandard
+ports; the default HTTPS port 443 is omitted and inferred according to
+OpenTelemetry network semantic conventions. `gen_ai.operation.name` is the capture
+discriminator: an unrecognized value is not an A365 publishing operation, and
+a validation run that captures no recognized operations reports
+`A365ValidationRuleIds.NoSpansCaptured`.
+
 Tenant identity and agent export identity are non-suppressible. If
 `A365ValidationRuleIds.TenantIdRequired` or
 `A365ValidationRuleIds.AgentIdentityRequired` fails, fix the instrumentation by
 setting `AgentDetails.TenantId` and either `AgentDetails.AgentId` or
 `AgentDetails.AgentPlatformId` (or supplying the equivalent A365 baggage).
+Store publishing additionally requires `gen_ai.agent.id`; a platform identity
+can satisfy exporter routing but does not replace the calling application's
+Entra appId in the span payload.
 
 Validation models what the A365 exporter actually does with a span, which
 treats routing metadata and payload attributes differently:
@@ -810,7 +838,7 @@ treats routing metadata and payload attributes differently:
   serialized into OTLP span attributes, so a value that exists only in baggage
   never reaches the Agent 365 service. Rules such as
   `A365ValidationRuleIds.AgentNameRequired`,
-  `A365ValidationRuleIds.InvokeUserIdRequired`,
+  `A365ValidationRuleIds.UserIdRequired`,
   `A365ValidationRuleIds.InferenceModelRequired`, and
   `A365ValidationRuleIds.ToolNameRequired` are therefore satisfied only by a
   span tag. `A365SpanSnapshot.Attributes` reflects this: it exposes the
@@ -953,7 +981,7 @@ Received HTTP response headers after *ms - 200
     "gen_ai.operation.name": "Required",
     "gen_ai.output.messages": "Required",
     "server.address": "Required",
-    "server.port": "Required",
+    "server.port": "Required only for nonstandard ports; omit HTTPS 443",
     "microsoft.session.id": "Optional",
     "microsoft.session.description": "Optional",
     "microsoft.tenant.id": "Required"

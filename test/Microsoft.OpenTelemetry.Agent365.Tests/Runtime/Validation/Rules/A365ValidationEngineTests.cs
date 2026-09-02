@@ -12,21 +12,92 @@ namespace Microsoft.OpenTelemetry.Agent365.Tests.Runtime.Validation;
 [TestClass]
 public sealed class A365ValidationEngineTests
 {
+    [DataTestMethod]
+    [DataRow("invoke_agent", "microsoft.channel.name", "A365-COMMON-008")]
+    [DataRow("invoke_agent", "gen_ai.conversation.id", "A365-COMMON-009")]
+    [DataRow("invoke_agent", "client.address", "A365-COMMON-010")]
+    [DataRow("invoke_agent", "user.id", "A365-COMMON-011")]
+    [DataRow("invoke_agent", "user.email", "A365-COMMON-012")]
+    [DataRow("invoke_agent", "server.address", "A365-COMMON-013")]
+    [DataRow("invoke_agent", "gen_ai.input.messages", "A365-CONTENT-001")]
+    [DataRow("invoke_agent", "gen_ai.output.messages", "A365-CONTENT-002")]
+    [DataRow("execute_tool", "gen_ai.tool.type", "A365-TOOL-002")]
+    [DataRow("execute_tool", "gen_ai.tool.call.id", "A365-TOOL-003")]
+    [DataRow("execute_tool", "gen_ai.tool.call.arguments", "A365-TOOL-004")]
+    [DataRow("execute_tool", "gen_ai.tool.call.result", "A365-TOOL-005")]
+    [DataRow("chat", "gen_ai.input.messages", "A365-CONTENT-001")]
+    [DataRow("chat", "gen_ai.output.messages", "A365-CONTENT-002")]
+    [DataRow("output_messages", "gen_ai.output.messages", "A365-CONTENT-002")]
+    public void Validate_StorePublishingRequiredAttribute_IsEnforced(
+        string operationName,
+        string attributeName,
+        string ruleId)
+    {
+        var attributes = CreateStorePublishingAttributes(operationName);
+        attributes.Remove(attributeName);
+
+        var result = A365ValidationEngine.Validate(
+            new[] { CreateSpan(operationName, attributes) },
+            new A365ValidationOptions()).Single();
+
+        result.Findings.Should().ContainSingle(f =>
+            f.RuleId == ruleId &&
+            f.AttributeName == attributeName &&
+            f.Message == $"Missing {attributeName}");
+    }
+
+    [TestMethod]
+    public void Validate_StorePublishingOptionalAttributes_AreNotRequired()
+    {
+        var attributes = CreateStorePublishingAttributes("invoke_agent");
+        attributes.Remove(GenAiAgentDescriptionKey);
+        attributes.Remove(UserNameKey);
+
+        var result = A365ValidationEngine.Validate(
+            new[] { CreateSpan("invoke_agent", attributes) },
+            new A365ValidationOptions()).Single();
+
+        result.Findings.Should().NotContain(f =>
+            f.AttributeName == GenAiAgentDescriptionKey ||
+            f.AttributeName == UserNameKey);
+    }
+
+    [DataTestMethod]
+    [DataRow("execute_tool")]
+    [DataRow("chat")]
+    [DataRow("output_messages")]
+    public void Validate_ServerRules_ApplyOnlyToInvokeAgent(string operationName)
+    {
+        var attributes = CreateStorePublishingAttributes(operationName);
+        attributes.Remove(ServerAddressKey);
+        attributes.Remove(ServerPortKey);
+
+        var result = A365ValidationEngine.Validate(
+            new[] { CreateSpan(operationName, attributes) },
+            new A365ValidationOptions()).Single();
+
+        result.Findings.Should().NotContain(f =>
+            f.RuleId == A365ValidationRuleIds.ServerAddressRequired);
+    }
+
+    [TestMethod]
+    public void Validate_InvokeAgent_DefaultServerPortMayBeOmitted()
+    {
+        var attributes = CreateStorePublishingAttributes("invoke_agent");
+        attributes.Remove(ServerPortKey);
+
+        var result = A365ValidationEngine.Validate(
+            new[] { CreateSpan("invoke_agent", attributes) },
+            new A365ValidationOptions()).Single();
+
+        result.Findings.Should().NotContain(f =>
+            f.AttributeName == ServerPortKey);
+    }
+
     [TestMethod]
     public void Validate_ValidChatSpan_HasNoFindings()
     {
-        var span = CreateSpan("chat", new Dictionary<string, object?>
-        {
-            [TenantIdKey] = "tenant",
-            [GenAiAgentIdKey] = "agent",
-            [GenAiAgentNameKey] = "Weather agent",
-            [GenAiAgentDescriptionKey] = "Answers weather questions",
-            [AgentAUIDKey] = "agent-user",
-            [AgentEmailKey] = "agent@example.com",
-            [AgentBlueprintIdKey] = "blueprint",
-            [GenAiRequestModelKey] = "gpt-4.1",
-            [GenAiProviderNameKey] = "openai",
-        });
+        var span = CreateSpan("chat", CreateStorePublishingAttributes("chat"));
 
         var results = A365ValidationEngine.Validate(
             new[] { span },
@@ -75,16 +146,19 @@ public sealed class A365ValidationEngineTests
     {
         var options = new A365ValidationOptions();
         options.Suppress(
-            A365ValidationRuleIds.InvokeUserIdRequired,
+            A365ValidationRuleIds.UserIdRequired,
             "invoke_agent",
             "Anonymous entry point");
 
+        var attributes = CreateStorePublishingAttributes("invoke_agent");
+        attributes.Remove(UserIdKey);
+
         var result = A365ValidationEngine.Validate(
-            new[] { CreateValidCommonSpan("invoke_agent") },
+            new[] { CreateSpan("invoke_agent", attributes) },
             options).Single();
 
         result.Findings.Should().ContainSingle(f =>
-            f.RuleId == A365ValidationRuleIds.InvokeUserIdRequired &&
+            f.RuleId == A365ValidationRuleIds.UserIdRequired &&
             f.Status == A365ValidationFindingStatus.Suppressed &&
             f.SuppressionReason == "Anonymous entry point");
     }
@@ -99,11 +173,16 @@ public sealed class A365ValidationEngineTests
             span => span.DisplayName.Contains("optional", StringComparison.Ordinal),
             "Synthetic optional tool span");
 
+        var optionalAttributes = CreateStorePublishingAttributes("execute_tool");
+        optionalAttributes.Remove(GenAiToolNameKey);
+        var requiredAttributes = CreateStorePublishingAttributes("execute_tool");
+        requiredAttributes.Remove(GenAiToolNameKey);
+
         var results = A365ValidationEngine.Validate(
             new[]
             {
-                CreateValidCommonSpan("execute_tool", "execute_tool optional"),
-                CreateValidCommonSpan("execute_tool", "execute_tool required"),
+                CreateSpan("execute_tool", optionalAttributes, "execute_tool optional"),
+                CreateSpan("execute_tool", requiredAttributes, "execute_tool required"),
             },
             options);
 
@@ -134,8 +213,11 @@ public sealed class A365ValidationEngineTests
             span => span.DisplayName == "preferred",
             "Predicate suppression");
 
+        var attributes = CreateStorePublishingAttributes("execute_tool");
+        attributes.Remove(GenAiToolNameKey);
+
         var result = A365ValidationEngine.Validate(
-            new[] { CreateValidCommonSpan("execute_tool", "preferred") },
+            new[] { CreateSpan("execute_tool", attributes, "preferred") },
             options).Single();
 
         result.Findings.Should().ContainSingle(f =>
@@ -177,7 +259,7 @@ public sealed class A365ValidationEngineTests
             new A365ValidationOptions()).Single();
 
         result.Findings.Should().ContainSingle(f =>
-            f.RuleId == A365ValidationRuleIds.InvokeUserEmailRequired &&
+            f.RuleId == A365ValidationRuleIds.UserEmailRequired &&
             f.Message == $"Invalid {UserEmailKey}: expected a non-empty string but found Int32");
     }
 
@@ -194,6 +276,24 @@ public sealed class A365ValidationEngineTests
 
         result.Findings.Should().NotContain(f =>
             f.RuleId == A365ValidationRuleIds.AgentIdentityRequired);
+    }
+
+    [TestMethod]
+    public void Validate_AgentPlatformId_DoesNotReplaceRequiredAgentIdAttribute()
+    {
+        var attributes = CreateStorePublishingAttributes("chat");
+        attributes.Remove(GenAiAgentIdKey);
+        attributes[AgentPlatformIdKey] = "platform-agent";
+
+        var result = A365ValidationEngine.Validate(
+            new[] { CreateSpan("chat", attributes) },
+            new A365ValidationOptions()).Single();
+
+        result.Findings.Should().NotContain(f =>
+            f.RuleId == A365ValidationRuleIds.AgentIdentityRequired);
+        result.Findings.Should().ContainSingle(f =>
+            f.RuleId == A365ValidationRuleIds.AgentIdRequired &&
+            f.AttributeName == GenAiAgentIdKey);
     }
 
     [TestMethod]
@@ -251,16 +351,23 @@ public sealed class A365ValidationEngineTests
     }
 
     [TestMethod]
-    public void Validate_CallerRules_ApplyOnlyToInvokeAgent()
+    public void Validate_UserRules_ApplyToOutputMessages()
     {
+        var attributes = CreateStorePublishingAttributes("output_messages");
+        attributes.Remove(UserIdKey);
+        attributes.Remove(UserEmailKey);
+        attributes.Remove(UserNameKey);
+
         var result = A365ValidationEngine.Validate(
-            new[] { CreateValidCommonSpan("chat") },
+            new[] { CreateSpan("output_messages", attributes) },
             new A365ValidationOptions()).Single();
 
+        result.Findings.Should().Contain(f =>
+            f.RuleId == A365ValidationRuleIds.UserIdRequired);
+        result.Findings.Should().Contain(f =>
+            f.RuleId == A365ValidationRuleIds.UserEmailRequired);
         result.Findings.Should().NotContain(f =>
-            f.RuleId == A365ValidationRuleIds.InvokeUserIdRequired ||
-            f.RuleId == A365ValidationRuleIds.InvokeUserNameRequired ||
-            f.RuleId == A365ValidationRuleIds.InvokeUserEmailRequired);
+            f.AttributeName == UserNameKey);
     }
 
     [TestMethod]
@@ -287,8 +394,11 @@ public sealed class A365ValidationEngineTests
             _ => throw new InvalidOperationException("boom"),
             "Predicate failure");
 
+        var attributes = CreateStorePublishingAttributes("execute_tool");
+        attributes.Remove(GenAiToolNameKey);
+
         Action act = () => A365ValidationEngine.Validate(
-            new[] { CreateValidCommonSpan("execute_tool") },
+            new[] { CreateSpan("execute_tool", attributes) },
             options);
 
         act.Should().Throw<A365ValidationExecutionException>()
@@ -435,16 +545,15 @@ public sealed class A365ValidationEngineTests
         string operationName,
         string displayName = "test span")
     {
-        return CreateSpan(operationName, CreateValidCommonAttributes(), displayName);
+        return CreateSpan(
+            operationName,
+            CreateStorePublishingAttributes(operationName),
+            displayName);
     }
 
     private static Dictionary<string, object?> CreateValidChatAttributes()
     {
-        return new Dictionary<string, object?>(CreateValidCommonAttributes())
-        {
-            [GenAiRequestModelKey] = "gpt-4.1",
-            [GenAiProviderNameKey] = "openai",
-        };
+        return CreateStorePublishingAttributes(ChatOperationName);
     }
 
     private static Dictionary<string, object?> CreateValidCommonAttributes()
@@ -459,5 +568,56 @@ public sealed class A365ValidationEngineTests
             [AgentEmailKey] = "agent@example.com",
             [AgentBlueprintIdKey] = "blueprint",
         };
+    }
+
+    private static Dictionary<string, object?> CreateStorePublishingAttributes(
+        string operationName)
+    {
+        var attributes = new Dictionary<string, object?>(CreateValidCommonAttributes())
+        {
+            [ChannelNameKey] = "web",
+            [GenAiConversationIdKey] = "conversation",
+            [CallerClientIpKey] = "127.0.0.1",
+            [UserIdKey] = "user",
+            [UserEmailKey] = "user@example.com",
+        };
+
+        if (operationName == InvokeAgentOperationName ||
+            operationName == ExecuteToolOperationName ||
+            operationName == ChatOperationName)
+        {
+            attributes[ServerAddressKey] = "agent.example.com";
+            attributes[ServerPortKey] = "443";
+        }
+
+        if (operationName == InvokeAgentOperationName ||
+            operationName == ChatOperationName)
+        {
+            attributes[GenAiInputMessagesKey] = "[]";
+        }
+
+        if (operationName == InvokeAgentOperationName ||
+            operationName == ChatOperationName ||
+            operationName == OutputMessagesOperationName)
+        {
+            attributes[GenAiOutputMessagesKey] = "[]";
+        }
+
+        if (operationName == ChatOperationName)
+        {
+            attributes[GenAiRequestModelKey] = "gpt-4.1";
+            attributes[GenAiProviderNameKey] = "openai";
+        }
+
+        if (operationName == ExecuteToolOperationName)
+        {
+            attributes[GenAiToolNameKey] = "search";
+            attributes[GenAiToolTypeKey] = "function";
+            attributes[GenAiToolCallIdKey] = "call-1";
+            attributes[GenAiToolArgumentsKey] = "{}";
+            attributes[GenAiToolCallResultKey] = "{}";
+        }
+
+        return attributes;
     }
 }
