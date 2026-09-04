@@ -15,6 +15,21 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
     {
         internal static readonly TimeSpan DefaultObservationWindow = TimeSpan.FromMinutes(10);
 
+        private const DistroInstrumentation TracingInstrumentations =
+            DistroInstrumentation.AzureSdk
+            | DistroInstrumentation.AspNetCore
+            | DistroInstrumentation.HttpClient
+            | DistroInstrumentation.SqlClient
+            | DistroInstrumentation.OpenAI
+            | DistroInstrumentation.SemanticKernel
+            | DistroInstrumentation.AgentFramework
+            | DistroInstrumentation.Agent365;
+
+        private const DistroInstrumentation MetricsInstrumentations =
+            DistroInstrumentation.AspNetCore
+            | DistroInstrumentation.HttpClient
+            | DistroInstrumentation.AgentFramework;
+
         private readonly ActivityListener? _activityListener;
         private readonly MeterListener? _meterListener;
         private readonly Timer _observationTimer;
@@ -139,7 +154,18 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
                 enabled |= DistroInstrumentation.Agent365;
             }
 
-            return enabled;
+            var supported = DistroInstrumentation.None;
+            if (options.EnableTracing)
+            {
+                supported |= TracingInstrumentations;
+            }
+
+            if (options.EnableMetrics)
+            {
+                supported |= MetricsInstrumentations;
+            }
+
+            return enabled & supported;
         }
 
         internal static DistroInstrumentation GetInstrumentations(string sourceName) =>

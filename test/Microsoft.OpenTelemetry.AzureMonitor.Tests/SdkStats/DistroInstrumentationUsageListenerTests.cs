@@ -6,7 +6,10 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenTelemetry.AzureMonitor.SdkStats;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
 using Xunit;
 
 namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
@@ -262,6 +265,89 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
                     | DistroInstrumentation.SemanticKernel
                     | DistroInstrumentation.Agent365,
                 DistroInstrumentationUsageListener.GetEnabledInstrumentations(options));
+        }
+
+        [Fact]
+        public void GetEnabledInstrumentations_MetricsOnlyUsesMetricsSupportedOptions()
+        {
+            var options = new InstrumentationOptions
+            {
+                EnableTracing = false,
+                EnableMetrics = true,
+                EnableAzureSdkInstrumentation = true,
+                EnableAspNetCoreInstrumentation = true,
+                EnableHttpClientInstrumentation = true,
+                EnableSqlClientInstrumentation = true,
+                EnableOpenAIInstrumentation = true,
+                EnableSemanticKernelInstrumentation = true,
+                EnableAgentFrameworkInstrumentation = true,
+                EnableAgent365Instrumentation = true,
+            };
+
+            Assert.Equal(
+                DistroInstrumentation.AspNetCore
+                    | DistroInstrumentation.HttpClient
+                    | DistroInstrumentation.AgentFramework,
+                DistroInstrumentationUsageListener.GetEnabledInstrumentations(options));
+        }
+
+        [Fact]
+        public void GetEnabledInstrumentations_TracingOnlyUsesAllEnabledOptions()
+        {
+            var options = new InstrumentationOptions
+            {
+                EnableTracing = true,
+                EnableMetrics = false,
+            };
+
+            Assert.Equal(
+                DistroInstrumentation.AzureSdk
+                    | DistroInstrumentation.AspNetCore
+                    | DistroInstrumentation.HttpClient
+                    | DistroInstrumentation.SqlClient
+                    | DistroInstrumentation.OpenAI
+                    | DistroInstrumentation.SemanticKernel
+                    | DistroInstrumentation.AgentFramework
+                    | DistroInstrumentation.Agent365,
+                DistroInstrumentationUsageListener.GetEnabledInstrumentations(options));
+        }
+
+        [Fact]
+        public void Builder_MetricsOnlyTracksOnlyMetricsSupportedInstrumentations()
+        {
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(options =>
+                {
+                    options.Exporters = ExportTarget.Console;
+                    options.Instrumentation.EnableTracing = false;
+                    options.Instrumentation.EnableMetrics = true;
+                    options.Instrumentation.EnableAzureSdkInstrumentation = false;
+                    options.Instrumentation.EnableAspNetCoreInstrumentation = false;
+                    options.Instrumentation.EnableHttpClientInstrumentation = false;
+                    options.Instrumentation.EnableSqlClientInstrumentation = true;
+                    options.Instrumentation.EnableOpenAIInstrumentation = false;
+                    options.Instrumentation.EnableSemanticKernelInstrumentation = false;
+                    options.Instrumentation.EnableAgentFrameworkInstrumentation = true;
+                    options.Instrumentation.EnableAgent365Instrumentation = false;
+                });
+
+            using var serviceProvider = services.BuildServiceProvider();
+            _ = serviceProvider.GetRequiredService<MeterProvider>();
+            DistroSdkStatsUsage.ResetForTesting();
+
+            using var sqlMeter = new Meter("Microsoft.Data.SqlClient.Tests.MetricsOnly");
+            _ = sqlMeter.CreateCounter<long>("commands");
+            Assert.Equal(
+                DistroInstrumentation.None,
+                DistroSdkStatsUsage.Instrumentations);
+
+            using var agentFrameworkMeter =
+                new Meter("Experimental.Microsoft.Agents.AI.Tests.MetricsOnly");
+            _ = agentFrameworkMeter.CreateCounter<long>("operations");
+            Assert.Equal(
+                DistroInstrumentation.AgentFramework,
+                DistroSdkStatsUsage.Instrumentations);
         }
 
         [Theory]
