@@ -395,27 +395,33 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         }
 
         var enabledInstrumentations =
-            DistroInstrumentationUsageActivityListener.GetEnabledInstrumentations(instrumentationOptions);
+            DistroInstrumentationUsageListener.GetEnabledInstrumentations(instrumentationOptions);
+
+        if (enabledInstrumentations != DistroInstrumentation.None
+            && (instrumentationOptions.EnableTracing || instrumentationOptions.EnableMetrics))
+        {
+            services.AddSingleton(_ =>
+                new DistroInstrumentationUsageListener(
+                    enabledInstrumentations,
+                    instrumentationOptions.EnableTracing,
+                    instrumentationOptions.EnableMetrics));
+        }
 
         if (instrumentationOptions.EnableTracing
             && enabledInstrumentations != DistroInstrumentation.None)
         {
-            services.AddSingleton(_ =>
-                new DistroInstrumentationUsageActivityListener(enabledInstrumentations));
             services.ConfigureOpenTelemetryTracerProvider((sp, _) =>
             {
-                sp.GetRequiredService<DistroInstrumentationUsageActivityListener>();
+                sp.GetRequiredService<DistroInstrumentationUsageListener>();
             });
         }
 
         if (instrumentationOptions.EnableMetrics
             && enabledInstrumentations != DistroInstrumentation.None)
         {
-            services.AddSingleton(_ =>
-                new DistroInstrumentationUsageMeterListener(enabledInstrumentations));
             services.ConfigureOpenTelemetryMeterProvider((sp, _) =>
             {
-                sp.GetRequiredService<DistroInstrumentationUsageMeterListener>();
+                sp.GetRequiredService<DistroInstrumentationUsageListener>();
             });
         }
 

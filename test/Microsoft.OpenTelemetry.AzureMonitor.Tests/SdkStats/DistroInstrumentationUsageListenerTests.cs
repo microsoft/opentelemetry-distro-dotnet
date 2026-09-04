@@ -1,8 +1,10 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
+using System;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Threading;
 using Microsoft.OpenTelemetry.AzureMonitor.SdkStats;
 using Xunit;
 
@@ -17,15 +19,96 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         }
 
         [Fact]
-        public void ActivityListener_DoesNotReportDisabledOrNonmatchingSources()
+        public void DefaultObservationWindow_IsTenMinutes()
         {
-            using var usageListener = new DistroInstrumentationUsageActivityListener(
-                DistroInstrumentation.HttpClient);
-            DistroSdkStatsUsage.ResetForTesting();
+            Assert.Equal(
+                TimeSpan.FromMinutes(10),
+                DistroInstrumentationUsageListener.DefaultObservationWindow);
+        }
 
-            using var sqlSource =
-                new ActivitySource("OpenTelemetry.Instrumentation.SqlClient.Tests");
+        [Fact]
+        public void Listener_DoesNotReportDisabledOrNonmatchingPublications()
+        {
+            using var usageListener = new DistroInstrumentationUsageListener(
+                DistroInstrumentation.Agent365,
+                observeActivitySources: true,
+                observeMetricInstruments: true);
+            using var disabledSource =
+                new ActivitySource("Experimental.Microsoft.Agents.AI.Disabled");
             using var customSource = new ActivitySource("Customer.CustomSource");
+            using var disabledMeter =
+                new Meter("Experimental.Microsoft.Agents.AI.Disabled");
+            using var customMeter = new Meter("Customer.CustomMeter");
+
+            _ = disabledMeter.CreateCounter<long>("disabled");
+            _ = customMeter.CreateCounter<long>("custom");
+
+            Assert.Equal(
+                DistroInstrumentation.None,
+                DistroSdkStatsUsage.Instrumentations);
+            Assert.True(usageListener.IsListening);
+        }
+
+        [Fact]
+        public void Listener_StopsEarlyAfterAllCandidatesAreFoundAcrossSignals()
+        {
+            using var usageListener = new DistroInstrumentationUsageListener(
+                DistroInstrumentation.AgentFramework | DistroInstrumentation.Agent365,
+                observeActivitySources: true,
+                observeMetricInstruments: true);
+
+            using var agentFrameworkSource =
+                new ActivitySource("Experimental.Microsoft.Agents.AI.Tests");
+            using var duplicateAgentFrameworkSource =
+                new ActivitySource("Experimental.Microsoft.Agents.AI.Tests.Duplicate");
+
+            Assert.Equal(
+                DistroInstrumentation.AgentFramework,
+                DistroSdkStatsUsage.Instrumentations);
+            Assert.Equal(1, usageListener.RemainingInstrumentationCount);
+            Assert.True(usageListener.IsListening);
+
+            using var duplicateAgentFrameworkMeter =
+                new Meter("Experimental.Microsoft.Agents.AI.Tests.Duplicate");
+            _ = duplicateAgentFrameworkMeter.CreateCounter<long>("requests");
+            Assert.Equal(1, usageListener.RemainingInstrumentationCount);
+
+            using var agent365Meter = new Meter("Agent365Sdk");
+            _ = agent365Meter.CreateCounter<long>("requests");
+
+            Assert.Equal(
+                DistroInstrumentation.AgentFramework | DistroInstrumentation.Agent365,
+                DistroSdkStatsUsage.Instrumentations);
+            Assert.True(
+                SpinWait.SpinUntil(
+                    () => !usageListener.IsListening,
+                    TimeSpan.FromSeconds(5)));
+
+            DistroSdkStatsUsage.ResetForTesting();
+            using var publicationAfterStop = new ActivitySource("Agent365Sdk");
+            Assert.Equal(
+                DistroInstrumentation.None,
+                DistroSdkStatsUsage.Instrumentations);
+        }
+
+        [Fact]
+        public void Listener_StopsAtObservationWindow()
+        {
+            using var usageListener = new DistroInstrumentationUsageListener(
+                DistroInstrumentation.Agent365,
+                observeActivitySources: true,
+                observeMetricInstruments: true,
+                observationWindow: TimeSpan.FromMilliseconds(50));
+
+            Assert.True(
+                SpinWait.SpinUntil(
+                    () => !usageListener.IsListening,
+                    TimeSpan.FromSeconds(5)));
+
+            DistroSdkStatsUsage.ResetForTesting();
+            using var source = new ActivitySource("Agent365Sdk");
+            using var meter = new Meter("Agent365Sdk");
+            _ = meter.CreateCounter<long>("requests");
 
             Assert.Equal(
                 DistroInstrumentation.None,
@@ -33,47 +116,51 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         }
 
         [Fact]
-        public void ActivityListener_TracksSourcePublicationWithoutActivities()
+        public void Listener_TracksActivitySourcesCreatedBeforeListener()
         {
-            using var usageListener = new DistroInstrumentationUsageActivityListener(
-                DistroInstrumentation.HttpClient | DistroInstrumentation.SqlClient);
-            DistroSdkStatsUsage.ResetForTesting();
-
-            using var httpSource = new ActivitySource("System.Net.Http.Tests");
-            Assert.Equal(
-                DistroInstrumentation.HttpClient,
-                DistroSdkStatsUsage.Instrumentations);
-
-            using var sqlSource =
-                new ActivitySource("OpenTelemetry.Instrumentation.SqlClient.Tests");
-            using var duplicateHttpSource = new ActivitySource("System.Net.Http.Tests.Duplicate");
+            using var source =
+                new ActivitySource("Experimental.Microsoft.Agents.AI.PreExisting");
+            using var usageListener = new DistroInstrumentationUsageListener(
+                DistroInstrumentation.AgentFramework,
+                observeActivitySources: true,
+                observeMetricInstruments: false);
 
             Assert.Equal(
-                DistroInstrumentation.HttpClient | DistroInstrumentation.SqlClient,
+                DistroInstrumentation.AgentFramework,
                 DistroSdkStatsUsage.Instrumentations);
-        }
-
-        [Fact]
-        public void ActivityListener_TracksSourcesCreatedBeforeListener()
-        {
-            DistroSdkStatsUsage.ResetForTesting();
-            using var source = new ActivitySource("Microsoft.SemanticKernel.Tests");
-
-            using var usageListener = new DistroInstrumentationUsageActivityListener(
-                DistroInstrumentation.SemanticKernel);
-
             Assert.True(
-                DistroSdkStatsUsage.Instrumentations.HasFlag(
-                    DistroInstrumentation.SemanticKernel));
+                SpinWait.SpinUntil(
+                    () => !usageListener.IsListening,
+                    TimeSpan.FromSeconds(5)));
         }
 
         [Fact]
-        public void ActivityListener_AgentFrameworkUpdatesOnlyInstrumentationUsage()
+        public void Listener_TracksMetricInstrumentsCreatedBeforeListener()
         {
-            using var usageListener = new DistroInstrumentationUsageActivityListener(
-                DistroInstrumentation.AgentFramework);
-            DistroSdkStatsUsage.ResetForTesting();
+            using var meter = new Meter("Agent365Sdk");
+            _ = meter.CreateCounter<long>("requests");
 
+            using var usageListener = new DistroInstrumentationUsageListener(
+                DistroInstrumentation.Agent365,
+                observeActivitySources: false,
+                observeMetricInstruments: true);
+
+            Assert.Equal(
+                DistroInstrumentation.Agent365,
+                DistroSdkStatsUsage.Instrumentations);
+            Assert.True(
+                SpinWait.SpinUntil(
+                    () => !usageListener.IsListening,
+                    TimeSpan.FromSeconds(5)));
+        }
+
+        [Fact]
+        public void Listener_AgentFrameworkUpdatesOnlyInstrumentationUsage()
+        {
+            using var usageListener = new DistroInstrumentationUsageListener(
+                DistroInstrumentation.AgentFramework,
+                observeActivitySources: true,
+                observeMetricInstruments: false);
             using var source =
                 new ActivitySource("Experimental.Microsoft.Agents.AI.Agent");
 
@@ -84,12 +171,12 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         }
 
         [Fact]
-        public void ActivityListener_MicrosoftExtensionsAiMarksOpenAIOnly()
+        public void Listener_MicrosoftExtensionsAiMarksOpenAIOnly()
         {
-            using var usageListener = new DistroInstrumentationUsageActivityListener(
-                DistroInstrumentation.OpenAI | DistroInstrumentation.AgentFramework);
-            DistroSdkStatsUsage.ResetForTesting();
-
+            using var usageListener = new DistroInstrumentationUsageListener(
+                DistroInstrumentation.OpenAI | DistroInstrumentation.AgentFramework,
+                observeActivitySources: true,
+                observeMetricInstruments: false);
             using var source =
                 new ActivitySource("Experimental.Microsoft.Extensions.AI");
 
@@ -119,63 +206,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
                     | DistroInstrumentation.SqlClient
                     | DistroInstrumentation.SemanticKernel
                     | DistroInstrumentation.Agent365,
-                DistroInstrumentationUsageActivityListener.GetEnabledInstrumentations(options));
-        }
-
-        [Fact]
-        public void MeterListener_TracksInstrumentPublicationWithoutMeasurements()
-        {
-            using var usageListener = new DistroInstrumentationUsageMeterListener(
-                DistroInstrumentation.HttpClient | DistroInstrumentation.SqlClient);
-            DistroSdkStatsUsage.ResetForTesting();
-            using var httpMeter = new Meter("System.Net.Http.Tests");
-            using var sqlMeter = new Meter("Microsoft.Data.SqlClient.Tests");
-
-            Assert.Equal(
-                DistroInstrumentation.None,
-                DistroSdkStatsUsage.Instrumentations);
-
-            _ = httpMeter.CreateCounter<long>("requests");
-            Assert.Equal(
-                DistroInstrumentation.HttpClient,
-                DistroSdkStatsUsage.Instrumentations);
-
-            _ = sqlMeter.CreateObservableGauge("commands", () => 0L);
-            Assert.Equal(
-                DistroInstrumentation.HttpClient | DistroInstrumentation.SqlClient,
-                DistroSdkStatsUsage.Instrumentations);
-        }
-
-        [Fact]
-        public void MeterListener_TracksInstrumentsCreatedBeforeListener()
-        {
-            DistroSdkStatsUsage.ResetForTesting();
-            using var meter = new Meter("Agent365Sdk");
-            _ = meter.CreateCounter<long>("requests");
-
-            using var usageListener = new DistroInstrumentationUsageMeterListener(
-                DistroInstrumentation.Agent365);
-
-            Assert.True(
-                DistroSdkStatsUsage.Instrumentations.HasFlag(
-                    DistroInstrumentation.Agent365));
-        }
-
-        [Fact]
-        public void MeterListener_DoesNotReportDisabledOrNonmatchingInstruments()
-        {
-            using var usageListener = new DistroInstrumentationUsageMeterListener(
-                DistroInstrumentation.HttpClient);
-            DistroSdkStatsUsage.ResetForTesting();
-            using var sqlMeter = new Meter("Microsoft.Data.SqlClient.Tests");
-            using var customMeter = new Meter("Customer.CustomMeter");
-
-            _ = sqlMeter.CreateCounter<long>("commands");
-            _ = customMeter.CreateCounter<long>("operations");
-
-            Assert.Equal(
-                DistroInstrumentation.None,
-                DistroSdkStatsUsage.Instrumentations);
+                DistroInstrumentationUsageListener.GetEnabledInstrumentations(options));
         }
 
         [Theory]
@@ -197,7 +228,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         {
             Assert.Equal(
                 (DistroInstrumentation)expected,
-                DistroInstrumentationUsageActivityListener.GetInstrumentations(sourceName));
+                DistroInstrumentationUsageListener.GetInstrumentations(sourceName));
         }
 
         [Theory]
@@ -214,7 +245,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
         {
             Assert.Equal(
                 DistroInstrumentation.None,
-                DistroInstrumentationUsageActivityListener.GetInstrumentations(sourceName));
+                DistroInstrumentationUsageListener.GetInstrumentations(sourceName));
         }
     }
 }
