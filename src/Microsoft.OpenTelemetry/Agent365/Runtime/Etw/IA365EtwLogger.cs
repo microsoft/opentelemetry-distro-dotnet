@@ -1,7 +1,9 @@
+#pragma warning disable RS0026 // Multiple overloads with optional parameters — by design for string vs structured results
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
 using System;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Etw
@@ -151,6 +153,23 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
             DateTimeOffset? startTime = null,
             DateTimeOffset? endTime = null,
             string? spanId = null,
+            Channel? channel = null,
+            CallerDetails? callerDetails = null,
+            string? traceId = null,
+            Exception? error = null);
+
+        /// <summary>
+        /// Logs an execute_tool event with a structured result payload.
+        /// </summary>
+        public void LogToolCall(
+            ToolCallDetails toolCallDetails,
+            ExecuteToolCallResult? result,
+            AgentDetails agentDetails,
+            string conversationId,
+            DateTimeOffset? startTime = null,
+            DateTimeOffset? endTime = null,
+            string? spanId = null,
+            string? parentSpanId = null,
             Channel? channel = null,
             CallerDetails? callerDetails = null,
             string? traceId = null,
