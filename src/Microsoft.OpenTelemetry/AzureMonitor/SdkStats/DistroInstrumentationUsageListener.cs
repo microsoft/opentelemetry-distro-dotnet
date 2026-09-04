@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Threading;
@@ -16,25 +15,16 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
     {
         internal static readonly TimeSpan DefaultObservationWindow = TimeSpan.FromMinutes(10);
 
-        private static readonly DistroInstrumentation[] s_instrumentations =
-        {
-            DistroInstrumentation.AzureSdk,
-            DistroInstrumentation.AspNetCore,
-            DistroInstrumentation.HttpClient,
-            DistroInstrumentation.SqlClient,
-            DistroInstrumentation.OpenAI,
-            DistroInstrumentation.SemanticKernel,
-            DistroInstrumentation.AgentFramework,
-            DistroInstrumentation.Agent365,
-        };
-
-        private readonly object _lock = new();
-        private readonly HashSet<DistroInstrumentation> _remainingInstrumentations;
         private readonly ActivityListener? _activityListener;
         private readonly MeterListener? _meterListener;
         private readonly Timer _observationTimer;
-        private bool _initializing = true;
-        private int _disposed;
+
+        // Publication callbacks may overlap. A stale write can only restore enabled candidate bits,
+        // causing duplicate work or deferring early shutdown; usage marking is idempotent and the
+        // observation timer remains the authoritative cleanup boundary.
+        private DistroInstrumentation _remainingInstrumentations;
+        private bool _started;
+        private bool _disposed;
 
         internal DistroInstrumentationUsageListener(
             DistroInstrumentation enabledInstrumentations,
@@ -50,14 +40,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
                     "The instrumentation observation window must be greater than zero.");
             }
 
-            _remainingInstrumentations = new HashSet<DistroInstrumentation>();
-            foreach (var instrumentation in s_instrumentations)
-            {
-                if ((enabledInstrumentations & instrumentation) != DistroInstrumentation.None)
-                {
-                    _remainingInstrumentations.Add(instrumentation);
-                }
-            }
+            _remainingInstrumentations = enabledInstrumentations;
 
             if (observeActivitySources)
             {
@@ -88,43 +71,27 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 
             _meterListener?.Start();
 
-            lock (_lock)
+            _observationTimer.Change(
+                effectiveObservationWindow,
+                Timeout.InfiniteTimeSpan);
+            _started = true;
+            if (_remainingInstrumentations == DistroInstrumentation.None)
             {
-                _initializing = false;
-                var dueTime = _remainingInstrumentations.Count == 0
-                    ? TimeSpan.Zero
-                    : effectiveObservationWindow;
-                _observationTimer.Change(dueTime, Timeout.InfiniteTimeSpan);
+                ScheduleStop();
             }
         }
 
-        internal bool IsListening => Volatile.Read(ref _disposed) == 0;
-
-        internal int RemainingInstrumentationCount
-        {
-            get
-            {
-                lock (_lock)
-                {
-                    return _remainingInstrumentations.Count;
-                }
-            }
-        }
+        internal bool IsListening => !_disposed;
 
         public void Dispose()
         {
-            lock (_lock)
+            if (_disposed)
             {
-                if (_disposed != 0)
-                {
-                    return;
-                }
-
-                Volatile.Write(ref _disposed, 1);
-                _remainingInstrumentations.Clear();
-                _observationTimer.Dispose();
+                return;
             }
 
+            _disposed = true;
+            _observationTimer.Dispose();
             _activityListener?.Dispose();
             _meterListener?.Dispose();
         }
@@ -180,7 +147,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 
         private static DistroInstrumentation GetInstrumentations(
             string sourceName,
-            HashSet<DistroInstrumentation>? candidates)
+            DistroInstrumentation? candidates)
         {
             var instrumentations = DistroInstrumentation.None;
 
@@ -241,9 +208,10 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
         }
 
         private static bool IsCandidate(
-            HashSet<DistroInstrumentation>? candidates,
+            DistroInstrumentation? candidates,
             DistroInstrumentation instrumentation) =>
-            candidates == null || candidates.Contains(instrumentation);
+            candidates == null
+            || (candidates.Value & instrumentation) != DistroInstrumentation.None;
 
         private bool ObserveActivitySource(ActivitySource source)
         {
@@ -260,44 +228,47 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 
         private void ObservePublication(string name)
         {
-            if (Volatile.Read(ref _disposed) != 0)
+            if (_disposed)
             {
                 return;
             }
 
-            var newlyObserved = DistroInstrumentation.None;
-            lock (_lock)
+            var remaining = _remainingInstrumentations;
+            if (remaining == DistroInstrumentation.None)
             {
-                if (_disposed != 0 || _remainingInstrumentations.Count == 0)
-                {
-                    return;
-                }
-
-                var publishedInstrumentations =
-                    GetInstrumentations(name, _remainingInstrumentations);
-                if (publishedInstrumentations == DistroInstrumentation.None)
-                {
-                    return;
-                }
-
-                foreach (var instrumentation in s_instrumentations)
-                {
-                    if ((publishedInstrumentations & instrumentation) != DistroInstrumentation.None
-                        && _remainingInstrumentations.Remove(instrumentation))
-                    {
-                        newlyObserved |= instrumentation;
-                    }
-                }
-
-                if (!_initializing && _remainingInstrumentations.Count == 0)
-                {
-                    _observationTimer.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
-                }
+                return;
             }
 
-            if (newlyObserved != DistroInstrumentation.None)
+            var newlyObserved = GetInstrumentations(name, remaining);
+            if (newlyObserved == DistroInstrumentation.None)
             {
-                DistroSdkStatsUsage.MarkInstrumentationInUse(newlyObserved);
+                return;
+            }
+
+            DistroSdkStatsUsage.MarkInstrumentationInUse(newlyObserved);
+
+            var updatedRemaining = remaining & ~newlyObserved;
+            _remainingInstrumentations = updatedRemaining;
+            if (_started && updatedRemaining == DistroInstrumentation.None)
+            {
+                ScheduleStop();
+            }
+        }
+
+        private void ScheduleStop()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            try
+            {
+                _observationTimer.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Dispose won the race with a publication callback.
             }
         }
     }

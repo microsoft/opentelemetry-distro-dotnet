@@ -5,6 +5,7 @@ using System;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.OpenTelemetry.AzureMonitor.SdkStats;
 using Xunit;
 
@@ -65,13 +66,12 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
             Assert.Equal(
                 DistroInstrumentation.AgentFramework,
                 DistroSdkStatsUsage.Instrumentations);
-            Assert.Equal(1, usageListener.RemainingInstrumentationCount);
             Assert.True(usageListener.IsListening);
 
             using var duplicateAgentFrameworkMeter =
                 new Meter("Experimental.Microsoft.Agents.AI.Tests.Duplicate");
             _ = duplicateAgentFrameworkMeter.CreateCounter<long>("requests");
-            Assert.Equal(1, usageListener.RemainingInstrumentationCount);
+            Assert.True(usageListener.IsListening);
 
             using var agent365Meter = new Meter("Agent365Sdk");
             _ = agent365Meter.CreateCounter<long>("requests");
@@ -86,6 +86,61 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests.SdkStats
 
             DistroSdkStatsUsage.ResetForTesting();
             using var publicationAfterStop = new ActivitySource("Agent365Sdk");
+            Assert.Equal(
+                DistroInstrumentation.None,
+                DistroSdkStatsUsage.Instrumentations);
+        }
+
+        [Fact]
+        public async Task Listener_HandlesConcurrentDuplicatePublications()
+        {
+            using var usageListener = new DistroInstrumentationUsageListener(
+                DistroInstrumentation.AgentFramework | DistroInstrumentation.Agent365,
+                observeActivitySources: true,
+                observeMetricInstruments: true);
+            var publications = new Task[32];
+
+            for (var i = 0; i < publications.Length; i++)
+            {
+                var publicationIndex = i;
+                publications[i] = Task.Run(() =>
+                {
+                    if (publicationIndex % 2 == 0)
+                    {
+                        using var source = new ActivitySource(
+                            $"Experimental.Microsoft.Agents.AI.Concurrent.{publicationIndex}");
+                    }
+                    else
+                    {
+                        using var meter = new Meter("Agent365Sdk");
+                        _ = meter.CreateCounter<long>($"requests-{publicationIndex}");
+                    }
+                });
+            }
+
+            await Task.WhenAll(publications);
+
+            Assert.Equal(
+                DistroInstrumentation.AgentFramework | DistroInstrumentation.Agent365,
+                DistroSdkStatsUsage.Instrumentations);
+        }
+
+        [Fact]
+        public async Task Listener_DisposeIsIdempotent()
+        {
+            var usageListener = new DistroInstrumentationUsageListener(
+                DistroInstrumentation.Agent365,
+                observeActivitySources: true,
+                observeMetricInstruments: true);
+
+            await Task.WhenAll(
+                Task.Run(usageListener.Dispose),
+                Task.Run(usageListener.Dispose));
+
+            Assert.False(usageListener.IsListening);
+            using var source = new ActivitySource("Agent365Sdk");
+            using var meter = new Meter("Agent365Sdk");
+            _ = meter.CreateCounter<long>("requests-after-dispose");
             Assert.Equal(
                 DistroInstrumentation.None,
                 DistroSdkStatsUsage.Instrumentations);
