@@ -4,6 +4,7 @@
 
 - Add extensible, dictionary-backed JSON schema models for `gen_ai.tool.call.arguments` and `gen_ai.tool.call.result`, including `schema_version` on both payloads and typed Execute Tool span and ETW APIs.
 - Add a thread-safe SDK Stats usage foundation that independently emits feature (`type=0`) and instrumentation (`type=1`) masks at the next scheduled long-interval export.
+- Report enabled distro trace instrumentations in SDK Stats when they produce a completed activity during a bounded 10-minute startup window.
 - Shift Microsoft distro Feature SDK Stats flags to bits 8–21, reserving bits 0–7 for existing .NET `Track*` feature mappings and preventing backend bitmap conflicts.
 - Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.8.3.
 - Add durable Agent365 store-and-forward delivery with bounded local storage, restart replay, adaptive shared backoff, and draining shutdown for the asynchronous processor.
