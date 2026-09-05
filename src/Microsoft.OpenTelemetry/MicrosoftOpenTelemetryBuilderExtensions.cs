@@ -395,34 +395,14 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         }
 
         var enabledInstrumentations =
-            DistroInstrumentationUsageListener.GetEnabledInstrumentations(instrumentationOptions);
-
-        if (enabledInstrumentations != DistroInstrumentation.None
-            && (instrumentationOptions.EnableTracing || instrumentationOptions.EnableMetrics))
-        {
-            services.AddSingleton(_ =>
-                new DistroInstrumentationUsageListener(
-                    enabledInstrumentations,
-                    instrumentationOptions.EnableTracing,
-                    instrumentationOptions.EnableMetrics));
-        }
+            DistroInstrumentationUsageProcessor.GetEnabledInstrumentations(instrumentationOptions);
 
         if (instrumentationOptions.EnableTracing
             && enabledInstrumentations != DistroInstrumentation.None)
         {
-            services.ConfigureOpenTelemetryTracerProvider((sp, _) =>
-            {
-                sp.GetRequiredService<DistroInstrumentationUsageListener>();
-            });
-        }
-
-        if (instrumentationOptions.EnableMetrics
-            && enabledInstrumentations != DistroInstrumentation.None)
-        {
-            services.ConfigureOpenTelemetryMeterProvider((sp, _) =>
-            {
-                sp.GetRequiredService<DistroInstrumentationUsageListener>();
-            });
+            services.ConfigureOpenTelemetryTracerProvider((_, tracing) =>
+                tracing.AddProcessor(
+                    new DistroInstrumentationUsageProcessor(enabledInstrumentations)));
         }
 
         // Defer snapshot construction until the MeterProvider builds: by then the exporter's

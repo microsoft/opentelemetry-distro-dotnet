@@ -3,48 +3,25 @@
 
 using System;
 using System.Diagnostics;
-using System.Diagnostics.Metrics;
-using System.Threading;
+using OpenTelemetry;
 
 namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
 {
     /// <summary>
-    /// Observes activity source and metric instrument publication during a bounded startup window.
+    /// Marks enabled instrumentations that produce completed activities during a bounded startup window.
     /// </summary>
-    internal sealed class DistroInstrumentationUsageListener : IDisposable
+    internal sealed class DistroInstrumentationUsageProcessor : BaseProcessor<Activity>
     {
         internal static readonly TimeSpan DefaultObservationWindow = TimeSpan.FromMinutes(10);
 
-        private const DistroInstrumentation TracingInstrumentations =
-            DistroInstrumentation.AzureSdk
-            | DistroInstrumentation.AspNetCore
-            | DistroInstrumentation.HttpClient
-            | DistroInstrumentation.SqlClient
-            | DistroInstrumentation.OpenAI
-            | DistroInstrumentation.SemanticKernel
-            | DistroInstrumentation.AgentFramework
-            | DistroInstrumentation.Agent365;
+        private readonly long _observationDeadline;
 
-        private const DistroInstrumentation MetricsInstrumentations =
-            DistroInstrumentation.AspNetCore
-            | DistroInstrumentation.HttpClient
-            | DistroInstrumentation.AgentFramework;
-
-        private readonly ActivityListener? _activityListener;
-        private readonly MeterListener? _meterListener;
-        private readonly Timer _observationTimer;
-
-        // Publication callbacks may overlap. A stale write can only restore enabled candidate bits,
-        // causing duplicate work or deferring early shutdown; usage marking is idempotent and the
-        // observation timer remains the authoritative cleanup boundary.
+        // OnEnd calls may overlap. A stale write can only restore enabled candidate bits,
+        // causing duplicate work; usage marking occurs first and is idempotent.
         private DistroInstrumentation _remainingInstrumentations;
-        private bool _started;
-        private bool _disposed;
 
-        internal DistroInstrumentationUsageListener(
+        internal DistroInstrumentationUsageProcessor(
             DistroInstrumentation enabledInstrumentations,
-            bool observeActivitySources,
-            bool observeMetricInstruments,
             TimeSpan? observationWindow = null)
         {
             var effectiveObservationWindow = observationWindow ?? DefaultObservationWindow;
@@ -56,59 +33,35 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             }
 
             _remainingInstrumentations = enabledInstrumentations;
-
-            if (observeActivitySources)
-            {
-                _activityListener = new ActivityListener
-                {
-                    ShouldListenTo = ObserveActivitySource,
-                };
-            }
-
-            if (observeMetricInstruments)
-            {
-                _meterListener = new MeterListener
-                {
-                    InstrumentPublished = ObserveMetricInstrument,
-                };
-            }
-
-            _observationTimer = new Timer(
-                static state => ((DistroInstrumentationUsageListener)state!).Dispose(),
-                this,
-                Timeout.InfiniteTimeSpan,
-                Timeout.InfiniteTimeSpan);
-
-            if (_activityListener != null)
-            {
-                ActivitySource.AddActivityListener(_activityListener);
-            }
-
-            _meterListener?.Start();
-
-            _observationTimer.Change(
-                effectiveObservationWindow,
-                Timeout.InfiniteTimeSpan);
-            _started = true;
-            if (_remainingInstrumentations == DistroInstrumentation.None)
-            {
-                ScheduleStop();
-            }
+            _observationDeadline = Stopwatch.GetTimestamp()
+                + (long)(effectiveObservationWindow.TotalSeconds * Stopwatch.Frequency);
         }
 
-        internal bool IsListening => !_disposed;
+        internal bool HasRemainingInstrumentations =>
+            _remainingInstrumentations != DistroInstrumentation.None;
 
-        public void Dispose()
+        public override void OnEnd(Activity activity)
         {
-            if (_disposed)
+            var remaining = _remainingInstrumentations;
+            if (remaining == DistroInstrumentation.None)
             {
                 return;
             }
 
-            _disposed = true;
-            _observationTimer.Dispose();
-            _activityListener?.Dispose();
-            _meterListener?.Dispose();
+            if (Stopwatch.GetTimestamp() >= _observationDeadline)
+            {
+                _remainingInstrumentations = DistroInstrumentation.None;
+                return;
+            }
+
+            var observed = GetInstrumentations(activity.Source.Name, remaining);
+            if (observed == DistroInstrumentation.None)
+            {
+                return;
+            }
+
+            DistroSdkStatsUsage.MarkInstrumentationInUse(observed);
+            _remainingInstrumentations = remaining & ~observed;
         }
 
         internal static DistroInstrumentation GetEnabledInstrumentations(InstrumentationOptions options)
@@ -154,18 +107,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
                 enabled |= DistroInstrumentation.Agent365;
             }
 
-            var supported = DistroInstrumentation.None;
-            if (options.EnableTracing)
-            {
-                supported |= TracingInstrumentations;
-            }
-
-            if (options.EnableMetrics)
-            {
-                supported |= MetricsInstrumentations;
-            }
-
-            return enabled & supported;
+            return enabled;
         }
 
         internal static DistroInstrumentation GetInstrumentations(string sourceName) =>
@@ -238,64 +180,5 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.SdkStats
             DistroInstrumentation instrumentation) =>
             candidates == null
             || (candidates.Value & instrumentation) != DistroInstrumentation.None;
-
-        private bool ObserveActivitySource(ActivitySource source)
-        {
-            ObservePublication(source.Name);
-
-            // This listener observes source publication only and never receives activities.
-            return false;
-        }
-
-        private void ObserveMetricInstrument(Instrument instrument, MeterListener listener)
-        {
-            ObservePublication(instrument.Meter.Name);
-        }
-
-        private void ObservePublication(string name)
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            var remaining = _remainingInstrumentations;
-            if (remaining == DistroInstrumentation.None)
-            {
-                return;
-            }
-
-            var newlyObserved = GetInstrumentations(name, remaining);
-            if (newlyObserved == DistroInstrumentation.None)
-            {
-                return;
-            }
-
-            DistroSdkStatsUsage.MarkInstrumentationInUse(newlyObserved);
-
-            var updatedRemaining = remaining & ~newlyObserved;
-            _remainingInstrumentations = updatedRemaining;
-            if (_started && updatedRemaining == DistroInstrumentation.None)
-            {
-                ScheduleStop();
-            }
-        }
-
-        private void ScheduleStop()
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            try
-            {
-                _observationTimer.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
-            }
-            catch (ObjectDisposedException)
-            {
-                // Dispose won the race with a publication callback.
-            }
-        }
     }
 }
