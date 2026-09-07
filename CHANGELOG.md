@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Allow `IA365EtwLogger<T>.LogInvokeAgent` callers to set the OpenTelemetry span kind and default omitted Invoke Agent span kinds to `Internal` on both the Activity-based and ETW logging paths.
+
 - Add extensible, dictionary-backed JSON schema models for `gen_ai.tool.call.arguments` and `gen_ai.tool.call.result`, including `schema_version` on both payloads and typed Execute Tool span and ETW APIs.
 - Add a thread-safe SDK Stats usage foundation that independently emits feature (`type=0`) and instrumentation (`type=1`) masks at the next scheduled long-interval export.
 - Shift Microsoft distro Feature SDK Stats flags to bits 8–21, reserving bits 0–7 for existing .NET `Track*` feature mappings and preventing backend bitmap conflicts.
