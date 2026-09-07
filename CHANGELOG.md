@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Breaking change: replaced signatures of both `IA365EtwLogger<T>.LogInvokeAgent` and `A365EtwLogger<T>.LogInvokeAgent` to add an optional `ActivityKind? spanKind`; consumers must rebuild and update any custom interface implementations. Omitted Invoke Agent kinds default to `Internal` on Activity-based and ETW paths.
+- InvokeAgentScope now defaults omitted span kind to ActivityKind.Internal while preserving explicit overrides.
 
 - Add extensible, dictionary-backed JSON schema models for `gen_ai.tool.call.arguments` and `gen_ai.tool.call.result`, including `schema_version` on both payloads and typed Execute Tool span and ETW APIs.
 - Add a thread-safe SDK Stats usage foundation that independently emits feature (`type=0`) and instrumentation (`type=1`) masks at the next scheduled long-interval export.
