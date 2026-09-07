@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Allow `IA365EtwLogger<T>.LogInvokeAgent` callers to set the OpenTelemetry span kind and default omitted Invoke Agent span kinds to `Internal` on both the Activity-based and ETW logging paths.
+- Breaking change: replaced signatures of both `IA365EtwLogger<T>.LogInvokeAgent` and `A365EtwLogger<T>.LogInvokeAgent` to add an optional `ActivityKind? spanKind`; consumers must rebuild and update any custom interface implementations. Omitted Invoke Agent kinds default to `Internal` on Activity-based and ETW paths.
 
 - Add extensible, dictionary-backed JSON schema models for `gen_ai.tool.call.arguments` and `gen_ai.tool.call.result`, including `schema_version` on both payloads and typed Execute Tool span and ETW APIs.
 - Add a thread-safe SDK Stats usage foundation that independently emits feature (`type=0`) and instrumentation (`type=1`) masks at the next scheduled long-interval export.
@@ -115,3 +115,4 @@ First stable release of the Microsoft OpenTelemetry distro for .NET.
 - Added API differences section to migration guide with `ChatToolCallExtensions.Trace()` workaround (#37, PR #41)
 - Clarified custom `ActivitySource` name usage for Agent Framework (PR #39)
 - Added Console demo example using `OpenTelemetrySdk.Create()` with Console + OTLP + Azure Monitor exporters (PR #43)
+
