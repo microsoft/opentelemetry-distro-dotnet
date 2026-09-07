@@ -3,7 +3,6 @@
 ## Unreleased
 
 - InvokeAgentScope now defaults omitted span kind to ActivityKind.Internal while preserving explicit overrides.
-
 - Add extensible, dictionary-backed JSON schema models for `gen_ai.tool.call.arguments` and `gen_ai.tool.call.result`, including `schema_version` on both payloads and typed Execute Tool span and ETW APIs.
 - Add a thread-safe SDK Stats usage foundation that independently emits feature (`type=0`) and instrumentation (`type=1`) masks at the next scheduled long-interval export.
 - Shift Microsoft distro Feature SDK Stats flags to bits 8–21, reserving bits 0–7 for existing .NET `Track*` feature mappings and preventing backend bitmap conflicts.
@@ -115,4 +114,3 @@ First stable release of the Microsoft OpenTelemetry distro for .NET.
 - Added API differences section to migration guide with `ChatToolCallExtensions.Trace()` workaround (#37, PR #41)
 - Clarified custom `ActivitySource` name usage for Agent Framework (PR #39)
 - Added Console demo example using `OpenTelemetrySdk.Create()` with Console + OTLP + Azure Monitor exporters (PR #43)
-
