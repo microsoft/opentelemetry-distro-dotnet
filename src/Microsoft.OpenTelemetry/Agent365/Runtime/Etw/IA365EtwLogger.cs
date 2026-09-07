@@ -31,8 +31,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
         /// <param name="traceId">Optional trace ID for distributed tracing.</param>
         /// <param name="error">Optional exception describing a failure; sets an OTel error status and the <c>error.type</c> attribute.</param>
         /// <param name="spanKind">
-        /// Optional OpenTelemetry span kind. When omitted, the exporter defaults Invoke Agent spans to
-        /// <see cref="ActivityKind.Client"/>.
+        /// Optional OpenTelemetry span kind. When omitted, Invoke Agent spans default to
+        /// <see cref="ActivityKind.Internal"/>.
         /// </param>
         public void LogInvokeAgent(
             InvokeAgentScopeDetails invokeAgentScopeDetails,

@@ -101,6 +101,34 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
         }
 
         [TestMethod]
+        public void Build_DefaultsSpanKindToInternal_FromInvokeAgent()
+        {
+            using var listener = new TestEventListener();
+            listener.EnableEvents(EtwEventSource.Log, EventLevel.Informational);
+            using var provider = BuildProvider();
+            var logger = provider.GetRequiredService<IA365EtwLogger<EtwLoggingBuilderTests>>();
+            var agentDetails = new AgentDetails("agent-id", agentName: "agent-name");
+            var scopeDetails = new InvokeAgentScopeDetails(
+                endpoint: new Uri("https://example.com/agent"));
+
+            logger.LogInvokeAgent(
+                scopeDetails,
+                agentDetails,
+                "conv-default-span-kind");
+
+            var evt = listener.Events.Find(e => e.EventId == 2000);
+            Assert.IsNotNull(evt);
+            Assert.IsNotNull(evt.Payload);
+            var payload = evt.Payload[0] as string;
+            Assert.IsNotNull(payload);
+
+            var root = JsonDocument.Parse(payload).RootElement;
+            Assert.AreEqual(
+                ActivityKind.Internal.ToString(),
+                root.GetProperty("Kind").GetString());
+        }
+
+        [TestMethod]
         public void Build_AddsEtwLogProcessor_AndWritesExpectedAttributes_FromInferenceCall()
         {
             // Arrange

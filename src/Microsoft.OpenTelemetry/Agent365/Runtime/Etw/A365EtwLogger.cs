@@ -107,7 +107,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
                 endTime,
                 spanId,
                 parentSpanId,
-                spanKind: spanKind?.ToString(),
+                spanKind: (spanKind ?? ActivityKind.Internal).ToString(),
                 traceId: traceId,
                 error: error);
 
