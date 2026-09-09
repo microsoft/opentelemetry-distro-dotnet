@@ -75,37 +75,48 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      - name: Compute local package version
-        id: package-version
+      # Only the smoke packages get a unique CI version. The release packages that are uploaded as
+      # artifacts keep the repository version (A365ObservabilityPackageVersion in Directory.Build.props)
+      # so the artifacts are exactly what would be published.
+      - name: Compute smoke package version
+        id: smoke-version
         shell: bash
-        run: echo "version=1.2.0-ci.${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+        run: echo "version=1.2.0-ci.${{ github.run_id }}.${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore
         run: dotnet restore Microsoft.OpenTelemetry.slnx
 
       - name: Build
-        run: dotnet build Microsoft.OpenTelemetry.slnx --no-restore --configuration Release -p:Version=${{ steps.package-version.outputs.version }}
+        run: dotnet build Microsoft.OpenTelemetry.slnx --no-restore --configuration Release
 
-      - name: Pack
+      - name: Pack release packages
         run: |
-          dotnet pack src/Microsoft.Agents.A365.Observability.Contracts/Microsoft.Agents.A365.Observability.Contracts.csproj --no-build --configuration Release --output ./packages -p:Version=${{ steps.package-version.outputs.version }}
-          dotnet pack src/Microsoft.Agents.A365.Observability.Etw/Microsoft.Agents.A365.Observability.Etw.csproj --no-build --configuration Release --output ./packages -p:Version=${{ steps.package-version.outputs.version }}
-          dotnet pack src/Microsoft.OpenTelemetry/Microsoft.OpenTelemetry.csproj --no-build --configuration Release --output ./packages -p:Version=${{ steps.package-version.outputs.version }}
+          dotnet pack src/Microsoft.Agents.A365.Observability.Contracts/Microsoft.Agents.A365.Observability.Contracts.csproj --no-build --configuration Release --output ./packages
+          dotnet pack src/Microsoft.Agents.A365.Observability.Etw/Microsoft.Agents.A365.Observability.Etw.csproj --no-build --configuration Release --output ./packages
+          dotnet pack src/Microsoft.OpenTelemetry/Microsoft.OpenTelemetry.csproj --no-build --configuration Release --output ./packages
+
+      # Repack the same build output into a separate directory under a unique prerelease version. The
+      # smoke consumers restore only from ./smoke-packages at that exact version, so the validation can
+      # never silently resolve an already-published package from nuget.org.
+      - name: Pack smoke packages
+        run: |
+          dotnet pack src/Microsoft.Agents.A365.Observability.Contracts/Microsoft.Agents.A365.Observability.Contracts.csproj --no-build --configuration Release --output ./smoke-packages -p:Version=${{ steps.smoke-version.outputs.version }}
+          dotnet pack src/Microsoft.Agents.A365.Observability.Etw/Microsoft.Agents.A365.Observability.Etw.csproj --no-build --configuration Release --output ./smoke-packages -p:Version=${{ steps.smoke-version.outputs.version }}
+          dotnet pack src/Microsoft.OpenTelemetry/Microsoft.OpenTelemetry.csproj --no-build --configuration Release --output ./smoke-packages -p:Version=${{ steps.smoke-version.outputs.version }}
 
       # Restore the smoke consumers against the exact version that was just packed locally, with the
-      # NuGet HTTP cache bypassed, so the validation can never silently resolve an already-published
-      # package from nuget.org. nuget.org stays in the source list for the external dependencies.
+      # NuGet HTTP cache bypassed. nuget.org stays in the source list for the external dependencies.
       - name: Validate package consumers
         run: |
-          dotnet restore test/package-smoke/StandaloneEtwConsumer/StandaloneEtwConsumer.csproj --source ./packages --source https://api.nuget.org/v3/index.json --no-cache -p:SmokePackageVersion=${{ steps.package-version.outputs.version }}
-          dotnet build test/package-smoke/StandaloneEtwConsumer/StandaloneEtwConsumer.csproj --no-restore --configuration Release -p:SmokePackageVersion=${{ steps.package-version.outputs.version }}
-          dotnet restore test/package-smoke/DistroConsumer/DistroConsumer.csproj --source ./packages --source https://api.nuget.org/v3/index.json --no-cache -p:SmokePackageVersion=${{ steps.package-version.outputs.version }}
-          dotnet build test/package-smoke/DistroConsumer/DistroConsumer.csproj --no-restore --configuration Release -p:SmokePackageVersion=${{ steps.package-version.outputs.version }}
+          dotnet restore test/package-smoke/StandaloneEtwConsumer/StandaloneEtwConsumer.csproj --source ./smoke-packages --source https://api.nuget.org/v3/index.json --no-cache -p:SmokePackageVersion=${{ steps.smoke-version.outputs.version }}
+          dotnet build test/package-smoke/StandaloneEtwConsumer/StandaloneEtwConsumer.csproj --no-restore --configuration Release -p:SmokePackageVersion=${{ steps.smoke-version.outputs.version }}
+          dotnet restore test/package-smoke/DistroConsumer/DistroConsumer.csproj --source ./smoke-packages --source https://api.nuget.org/v3/index.json --no-cache -p:SmokePackageVersion=${{ steps.smoke-version.outputs.version }}
+          dotnet build test/package-smoke/DistroConsumer/DistroConsumer.csproj --no-restore --configuration Release -p:SmokePackageVersion=${{ steps.smoke-version.outputs.version }}
 
       - name: Assert package consumer outputs
         shell: pwsh
         env:
-          SMOKE_PACKAGE_VERSION: ${{ steps.package-version.outputs.version }}
+          SMOKE_PACKAGE_VERSION: ${{ steps.smoke-version.outputs.version }}
         run: |
           function Assert-ResolvedPackageVersion {
             param(

@@ -2,7 +2,4 @@
 Microsoft.Agents.A365.Observability.Runtime.Etw.EtwEventSource
 Microsoft.Agents.A365.Observability.Runtime.Etw.EtwEventSource.LogJson(string! message) -> void
 Microsoft.Agents.A365.Observability.Runtime.Etw.EtwEventSource.SpanStop(string! name, string! spanId, string! traceId, string! parentSpanId, string! content) -> void
-Microsoft.Agents.A365.Observability.Runtime.Etw.EtwExportFormatter
-Microsoft.Agents.A365.Observability.Runtime.Etw.EtwExportFormatter.EtwExportFormatter() -> void
-Microsoft.Agents.A365.Observability.Runtime.Etw.EtwExportFormatter.FormatLogData(System.Collections.Generic.IDictionary<string!, object?>! data) -> string!
 static readonly Microsoft.Agents.A365.Observability.Runtime.Etw.EtwEventSource.Log -> Microsoft.Agents.A365.Observability.Runtime.Etw.EtwEventSource!

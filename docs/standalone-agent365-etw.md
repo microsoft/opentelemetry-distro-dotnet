@@ -71,29 +71,39 @@ BotDesigner only needs the standalone ETW package.
 
 ## Local smoke validation
 
-The three packages ship as a coordinated version set (see [Package version coupling](#package-version-coupling)). Pack them with a unique local prerelease version so the smoke consumers cannot silently resolve an already-published package from nuget.org, then restore with that exact version:
+The three packages ship as a coordinated version set (see [Package version coupling](#package-version-coupling)).
+
+A **release pack** produces the artifacts that would actually be published, at the repository version (`A365ObservabilityPackageVersion`, currently `1.2.0`):
 
 ```powershell
-$version = "1.2.0-local.$(Get-Date -Format yyyyMMddHHmmss)"
-
-dotnet build Microsoft.OpenTelemetry.slnx --configuration Release -p:Version=$version
-dotnet pack src\Microsoft.Agents.A365.Observability.Contracts\Microsoft.Agents.A365.Observability.Contracts.csproj --no-build --configuration Release --output .\packages -p:Version=$version
-dotnet pack src\Microsoft.Agents.A365.Observability.Etw\Microsoft.Agents.A365.Observability.Etw.csproj --no-build --configuration Release --output .\packages -p:Version=$version
-dotnet pack src\Microsoft.OpenTelemetry\Microsoft.OpenTelemetry.csproj --no-build --configuration Release --output .\packages -p:Version=$version
-
-dotnet restore test\package-smoke\StandaloneEtwConsumer\StandaloneEtwConsumer.csproj --source .\packages --source https://api.nuget.org/v3/index.json --no-cache -p:SmokePackageVersion=$version
-dotnet build test\package-smoke\StandaloneEtwConsumer\StandaloneEtwConsumer.csproj --no-restore --configuration Release -p:SmokePackageVersion=$version
-dotnet restore test\package-smoke\DistroConsumer\DistroConsumer.csproj --source .\packages --source https://api.nuget.org/v3/index.json --no-cache -p:SmokePackageVersion=$version
-dotnet build test\package-smoke\DistroConsumer\DistroConsumer.csproj --no-restore --configuration Release -p:SmokePackageVersion=$version
+dotnet build Microsoft.OpenTelemetry.slnx --configuration Release
+dotnet pack src\Microsoft.Agents.A365.Observability.Contracts\Microsoft.Agents.A365.Observability.Contracts.csproj --no-build --configuration Release --output .\packages
+dotnet pack src\Microsoft.Agents.A365.Observability.Etw\Microsoft.Agents.A365.Observability.Etw.csproj --no-build --configuration Release --output .\packages
+dotnet pack src\Microsoft.OpenTelemetry\Microsoft.OpenTelemetry.csproj --no-build --configuration Release --output .\packages
 ```
 
-The smoke projects pin an exact version range (`[$(SmokePackageVersion)]`), and `SmokePackageVersion` defaults to the repo's `A365ObservabilityPackageVersion`. nuget.org stays in the source list so external transitive dependencies still resolve.
+A **smoke pack** repacks the same build output into a *separate* directory under a unique local prerelease version, so the smoke consumers cannot silently resolve an already-published package from nuget.org. Restore the consumers only from that directory, at that exact version:
+
+```powershell
+$smokeVersion = "1.2.0-local.$(Get-Date -Format yyyyMMddHHmmss)"
+
+dotnet pack src\Microsoft.Agents.A365.Observability.Contracts\Microsoft.Agents.A365.Observability.Contracts.csproj --no-build --configuration Release --output .\smoke-packages -p:Version=$smokeVersion
+dotnet pack src\Microsoft.Agents.A365.Observability.Etw\Microsoft.Agents.A365.Observability.Etw.csproj --no-build --configuration Release --output .\smoke-packages -p:Version=$smokeVersion
+dotnet pack src\Microsoft.OpenTelemetry\Microsoft.OpenTelemetry.csproj --no-build --configuration Release --output .\smoke-packages -p:Version=$smokeVersion
+
+dotnet restore test\package-smoke\StandaloneEtwConsumer\StandaloneEtwConsumer.csproj --source .\smoke-packages --source https://api.nuget.org/v3/index.json --no-cache -p:SmokePackageVersion=$smokeVersion
+dotnet build test\package-smoke\StandaloneEtwConsumer\StandaloneEtwConsumer.csproj --no-restore --configuration Release -p:SmokePackageVersion=$smokeVersion
+dotnet restore test\package-smoke\DistroConsumer\DistroConsumer.csproj --source .\smoke-packages --source https://api.nuget.org/v3/index.json --no-cache -p:SmokePackageVersion=$smokeVersion
+dotnet build test\package-smoke\DistroConsumer\DistroConsumer.csproj --no-restore --configuration Release -p:SmokePackageVersion=$smokeVersion
+```
+
+The smoke projects pin an exact version range (`[$(SmokePackageVersion)]`), and `SmokePackageVersion` defaults to the repo's `A365ObservabilityPackageVersion`. nuget.org stays in the source list so external transitive dependencies still resolve. CI follows the same split: `./packages` holds the release-version artifacts that are uploaded, and `./smoke-packages` holds throwaway `1.2.0-ci.<run_id>.<run_attempt>` packages that only the smoke consumers see.
 
 Expected results:
 
 - `StandaloneEtwConsumer` builds with `Microsoft.Agents.A365.Observability.Etw` plus the transitive Contracts assembly, without a `Microsoft.OpenTelemetry.dll` dependency.
 - `DistroConsumer` builds with only the `Microsoft.OpenTelemetry` package reference while still resolving `EtwEventSource` through the distro's type forwards.
-- Both `project.assets.json` files resolve the Agent365 observability packages at exactly the locally packed version.
+- Both `project.assets.json` files resolve the Agent365 observability packages at exactly the smoke-packed version.
 
 ## Package version coupling
 
@@ -102,6 +112,6 @@ Expected results:
 The repository handles this by treating the three packages as one coordinated version set:
 
 - `A365ObservabilityPackageVersion` in `Directory.Build.props` drives the version of all three packages, so they always pack in lockstep from the same commit.
-- CI packs and validates them together with a single version override.
+- CI packs and validates them together: the release-version artifacts go to `./packages`, and a parallel smoke pack of the same build output goes to `./smoke-packages` under a unique CI prerelease version that the smoke consumers restore at exactly.
 
-Publish the three packages together and at the same version. Making the shared internals public purely to express an exact dependency range would expand the supported public API surface, so this coupling is documented and tracked as a follow-up instead.
+Publish the three packages together and at the same version. On `netstandard2.0`/.NET Framework consumers, forcing these packages out of lockstep can additionally require `bindingRedirect` entries in `app.config`/`web.config`, because .NET Framework binds strong-named assemblies by exact version rather than rolling forward. Making the shared internals public purely to express an exact dependency range would expand the supported public API surface, so this coupling is documented and tracked as a follow-up instead.
