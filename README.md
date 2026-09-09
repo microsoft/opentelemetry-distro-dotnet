@@ -284,6 +284,7 @@ builder.Services.AddLogging(logging => logging.AddConsole());
 - [Customization Guide](docs/customization.md) — Resource configuration, enrichment, filtering, and OTLP exporter tuning
 - [Agent 365 Getting Started](docs/agent365-getting-started.md) — Add Agent365 observability using the distro
 - [Agent 365 Migration Guide](docs/agent365-migration.md) — Migrate from the standalone Agent365 SDK to the distro
+- [Standalone Agent365 ETW Package](docs/standalone-agent365-etw.md) — Use the ETW-only package and apply the exact BotDesigner migration path
 - [Agent 365 Migration Testing](docs/testing-agent365.md) — Detailed migration checklist with auto-instrumentation, env vars, and span comparison
 - [Fabric Getting Started](docs/fabric-getting-started.md) — Send telemetry to Microsoft Fabric / Azure Data Explorer via OTLP + OTel Collector
 - [Aspire Dashboard](docs/aspire-dashboard-getting-started.md) — Validate telemetry locally with the .NET Aspire Dashboard
