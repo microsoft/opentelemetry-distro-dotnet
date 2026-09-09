@@ -32,7 +32,9 @@ dotnet run --project .\Microsoft.OpenTelemetry.Agent365.S2S.Demo.csproj
 
 The console exporter prints all four spans. The Agent365 exporter prints an
 HTTP success or failure status and the `x-ms-correlation-id` when returned.
-Tokens and secrets are never printed.
+Tokens and secrets are never printed. Each execution timestamps the sample
+trace from the current UTC time; tests inject a fixed `TimeProvider` only for
+deterministic assertions.
 
 ## Authentication flow
 

@@ -10,8 +10,6 @@ internal static class SampleScenario
 {
     private static readonly Uri AgentEndpoint = new("https://weather-agent.contoso.com");
     private static readonly Uri ToolEndpoint = new("https://weather-api.contoso.com");
-    private static readonly DateTimeOffset ScenarioStartTime =
-        new(2026, 9, 9, 18, 0, 0, TimeSpan.Zero);
 
     private const string SessionId = "session-s2s-123";
     private const string ConversationId = "conversation-s2s-789";
@@ -32,11 +30,13 @@ internal static class SampleScenario
     internal static async Task RunAsync(
         SampleOptions options,
         Func<TimeSpan, CancellationToken, Task>? delay = null,
+        TimeProvider? timeProvider = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(options);
 
         delay ??= SimulateDelayAsync;
+        timeProvider ??= TimeProvider.System;
         cancellationToken.ThrowIfCancellationRequested();
 
         var agent = new AgentDetails(
@@ -53,7 +53,7 @@ internal static class SampleScenario
             channel: new Channel(ChannelName),
             conversationId: ConversationId,
             operationSource: ServiceName);
-        var clock = new ScenarioClock(ScenarioStartTime);
+        var clock = new ScenarioClock(timeProvider.GetUtcNow());
 
         using var baggageBoundary = new AgenticUserBaggageBoundary();
         using var baggage = new BaggageBuilder()

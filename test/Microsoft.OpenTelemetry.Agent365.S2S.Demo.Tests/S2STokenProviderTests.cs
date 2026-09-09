@@ -192,12 +192,4 @@ public sealed class S2STokenProviderTests
         }
     }
 
-    private sealed class TestTimeProvider(DateTimeOffset utcNow) : TimeProvider
-    {
-        private DateTimeOffset _utcNow = utcNow;
-
-        public override DateTimeOffset GetUtcNow() => _utcNow;
-
-        internal void Advance(TimeSpan duration) => _utcNow += duration;
-    }
 }

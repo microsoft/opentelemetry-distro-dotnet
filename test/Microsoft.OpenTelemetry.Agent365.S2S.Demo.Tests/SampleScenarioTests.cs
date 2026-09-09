@@ -51,6 +51,79 @@ public sealed class SampleScenarioTests
     private const string AgentName = "Weather Agent";
     private const string AgentDescription = "Answers current Seattle weather questions.";
     private const string FinalAnswer = "It is currently 62°F and partly cloudy in Seattle.";
+    private static readonly TimeSpan FirstInferenceDuration = TimeSpan.FromMilliseconds(40);
+    private static readonly TimeSpan ToolDuration = TimeSpan.FromMilliseconds(15);
+    private static readonly TimeSpan FinalInferenceDuration = TimeSpan.FromMilliseconds(30);
+    private static readonly DateTimeOffset FixedScenarioStartTime =
+        new(2027, 1, 2, 3, 4, 5, TimeSpan.Zero);
+
+    [TestMethod]
+    public async Task RunAsync_AcceptsInjectedTimeProvider_AndKeepsRelativeSpanTimeline()
+    {
+        AppContext.SetSwitch(EnableOpenTelemetrySwitch, true);
+
+        var stopped = new List<Activity>();
+        using var tracerProvider = Sdk.CreateTracerProviderBuilder()
+            .AddSource(SourceName)
+            .AddProcessor(new ActivityProcessor())
+            .Build();
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == SourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
+                ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = activity => stopped.Add(activity),
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        var delays = new List<TimeSpan>();
+        var options = TestData.CreateOptions();
+        var timeProvider = new TestTimeProvider(FixedScenarioStartTime);
+
+        await SampleScenario.RunAsync(
+            options,
+            (duration, cancellationToken) =>
+            {
+                delays.Add(duration);
+                cancellationToken.ThrowIfCancellationRequested();
+                return Task.CompletedTask;
+            },
+            timeProvider);
+
+        delays.Should().Equal(FirstInferenceDuration, ToolDuration, FinalInferenceDuration);
+        stopped.Should().HaveCount(4);
+
+        var invoke = stopped.Single(
+            activity => Equals(
+                activity.GetTagItem(GenAiOperationNameKey),
+                InvokeAgentOperationName));
+        var inferenceSpans = stopped.Where(
+            activity => Equals(
+                activity.GetTagItem(GenAiOperationNameKey),
+                nameof(InferenceOperationType.Chat))).ToArray();
+        var tool = stopped.Single(
+            activity => Equals(
+                activity.GetTagItem(GenAiOperationNameKey),
+                ExecuteToolOperationName));
+
+        invoke.StartTimeUtc.Should().Be(FixedScenarioStartTime.UtcDateTime);
+        invoke.Duration.Should().Be(
+            FirstInferenceDuration + ToolDuration + FinalInferenceDuration);
+
+        inferenceSpans[0].StartTimeUtc.Should().Be(FixedScenarioStartTime.UtcDateTime);
+        inferenceSpans[0].Duration.Should().Be(FirstInferenceDuration);
+
+        tool.StartTimeUtc.Should().Be(inferenceSpans[0].StartTimeUtc + inferenceSpans[0].Duration);
+        tool.Duration.Should().Be(ToolDuration);
+
+        inferenceSpans[1].StartTimeUtc.Should().Be(tool.StartTimeUtc + tool.Duration);
+        inferenceSpans[1].Duration.Should().Be(FinalInferenceDuration);
+
+        invoke.StartTimeUtc.Should().BeBefore(tool.StartTimeUtc);
+        tool.StartTimeUtc.Should().BeBefore(inferenceSpans[1].StartTimeUtc);
+        invoke.StartTimeUtc.Add(invoke.Duration).Should().Be(
+            inferenceSpans[1].StartTimeUtc + inferenceSpans[1].Duration);
+    }
 
     [TestMethod]
     public async Task RunAsync_EmitsExpectedAgent365SpanSequence()
@@ -73,6 +146,7 @@ public sealed class SampleScenarioTests
 
         var delays = new List<TimeSpan>();
         var options = TestData.CreateOptions();
+        var timeProvider = new TestTimeProvider(FixedScenarioStartTime);
 
         await SampleScenario.RunAsync(
             options,
@@ -81,12 +155,10 @@ public sealed class SampleScenarioTests
                 delays.Add(duration);
                 cancellationToken.ThrowIfCancellationRequested();
                 return Task.CompletedTask;
-            });
+            },
+            timeProvider);
 
-        delays.Should().Equal(
-            TimeSpan.FromMilliseconds(40),
-            TimeSpan.FromMilliseconds(15),
-            TimeSpan.FromMilliseconds(30));
+        delays.Should().Equal(FirstInferenceDuration, ToolDuration, FinalInferenceDuration);
 
         stopped.Should().HaveCount(4);
         stopped.Select(static activity => activity.GetTagItem(GenAiOperationNameKey))
@@ -194,7 +266,8 @@ public sealed class SampleScenarioTests
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     return Task.CompletedTask;
-                });
+                },
+                new TestTimeProvider(FixedScenarioStartTime));
 
             stopped.Should().HaveCount(4);
 
