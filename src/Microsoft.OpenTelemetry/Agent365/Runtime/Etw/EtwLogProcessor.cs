@@ -1,3 +1,4 @@
+#pragma warning disable RS0026 // Multiple overloads with optional parameters — compatibility overload retained by design
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 using Microsoft.Agents.A365.Observability.Runtime.Common;
@@ -26,6 +27,19 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
             _formatter = formatter;
             _logger = logger;
         }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EtwLogProcessor"/> class.
+        /// </summary>
+        /// <param name="formatter">The compatibility formatter retained for source compatibility.</param>
+        /// <param name="logger">The logger used to log messages.</param>
+        [Obsolete("Use EtwLogProcessor(EtwExportFormatter formatter, ILogger<EtwLogProcessor>? logger = null) instead.")]
+        public EtwLogProcessor(ExportFormatter formatter, ILogger<EtwLogProcessor>? logger = null)
+            : this(new EtwExportFormatter(), logger)
+        {
+            _ = formatter;
+        }
+
         /// <summary>
         /// Emits an ETW event with log details.
         /// </summary>
@@ -47,3 +61,4 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
         }
     }
 }
+#pragma warning restore RS0026
