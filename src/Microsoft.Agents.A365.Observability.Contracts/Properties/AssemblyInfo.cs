@@ -4,9 +4,13 @@
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo(
-    "Microsoft.Agents.A365.Observability.Contracts.Tests, PublicKey=" + AssemblyInfo.PublicKey)]
+    "Microsoft.Agents.A365.Observability.Contracts.Tests, PublicKey=" + ContractsAssemblyInfo.PublicKey)]
+[assembly: InternalsVisibleTo(
+    "Microsoft.OpenTelemetry, PublicKey=" + ContractsAssemblyInfo.PublicKey)]
+[assembly: InternalsVisibleTo(
+    "Microsoft.OpenTelemetry.Agent365.Tests, PublicKey=" + ContractsAssemblyInfo.PublicKey)]
 
-internal static class AssemblyInfo
+internal static class ContractsAssemblyInfo
 {
 #if PUBLIC_RELEASE
     // Public key from 35MSSharedLib1024.snk; assemblies are delay signed.
