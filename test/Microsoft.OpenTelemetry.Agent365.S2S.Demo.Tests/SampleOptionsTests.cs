@@ -39,6 +39,20 @@ public sealed class SampleOptionsTests
     }
 
     [TestMethod]
+    public void Load_AuthorityEndpointAlreadyContainsTenantPath_ThrowsWithConfigurationKey()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Connections:ServiceConnection:Settings:AuthorityEndpoint"] = "https://login.microsoftonline.com/already-has-tenant",
+        });
+
+        var action = () => SampleOptions.Load(configuration);
+
+        action.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Connections:ServiceConnection:Settings:AuthorityEndpoint*");
+    }
+
+    [TestMethod]
     public void Load_UnchangedPlaceholder_ThrowsWithConfigurationKey()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
@@ -63,6 +77,14 @@ public sealed class SampleOptionsTests
         var options = SampleOptions.Load(configuration);
 
         options.AgentId.Should().Be(options.AgentAppInstanceId);
+    }
+
+    [TestMethod]
+    public void ToString_DoesNotExposeClientSecret()
+    {
+        var options = TestData.CreateOptions();
+
+        options.ToString().Should().NotContain("sample-secret");
     }
 
     private static IConfiguration BuildConfiguration(

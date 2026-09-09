@@ -2,15 +2,40 @@ using Microsoft.Extensions.Configuration;
 
 namespace Microsoft.OpenTelemetry.Agent365.S2S.Demo;
 
-internal sealed record SampleOptions(
-    Uri Authority,
-    string ClientId,
-    string ClientSecret,
-    string TenantId,
-    string AgentAppInstanceId,
-    string AgentId,
-    string ClusterCategory)
+internal sealed class SampleOptions
 {
+    internal SampleOptions(
+        Uri authority,
+        string clientId,
+        string clientSecret,
+        string tenantId,
+        string agentAppInstanceId,
+        string agentId,
+        string clusterCategory)
+    {
+        this.Authority = authority;
+        this.ClientId = clientId;
+        this.ClientSecret = clientSecret;
+        this.TenantId = tenantId;
+        this.AgentAppInstanceId = agentAppInstanceId;
+        this.AgentId = agentId;
+        this.ClusterCategory = clusterCategory;
+    }
+
+    internal Uri Authority { get; }
+
+    internal string ClientId { get; }
+
+    internal string ClientSecret { get; }
+
+    internal string TenantId { get; }
+
+    internal string AgentAppInstanceId { get; }
+
+    internal string AgentId { get; }
+
+    internal string ClusterCategory { get; }
+
     internal static SampleOptions Load(IConfiguration configuration)
     {
         var authorityText = Required(
@@ -18,10 +43,13 @@ internal sealed record SampleOptions(
             "Connections:ServiceConnection:Settings:AuthorityEndpoint");
 
         if (!Uri.TryCreate(authorityText, UriKind.Absolute, out var authority)
-            || authority.Scheme != Uri.UriSchemeHttps)
+            || authority.Scheme != Uri.UriSchemeHttps
+            || authority.AbsolutePath != "/"
+            || !string.IsNullOrEmpty(authority.Query)
+            || !string.IsNullOrEmpty(authority.Fragment))
         {
             throw new InvalidOperationException(
-                "Configuration key 'Connections:ServiceConnection:Settings:AuthorityEndpoint' must be an absolute HTTPS URI.");
+                "Configuration key 'Connections:ServiceConnection:Settings:AuthorityEndpoint' must be an absolute HTTPS authority root without a tenant path, query, or fragment.");
         }
 
         var clientId = Required(
@@ -92,4 +120,7 @@ internal sealed record SampleOptions(
 
         return value;
     }
+
+    public override string ToString() =>
+        $"{nameof(SampleOptions)} {{ {nameof(this.Authority)} = {this.Authority}, {nameof(this.ClientId)} = {this.ClientId}, {nameof(this.ClientSecret)} = [REDACTED], {nameof(this.TenantId)} = {this.TenantId}, {nameof(this.AgentAppInstanceId)} = {this.AgentAppInstanceId}, {nameof(this.AgentId)} = {this.AgentId}, {nameof(this.ClusterCategory)} = {this.ClusterCategory} }}";
 }
