@@ -112,9 +112,6 @@ Microsoft.Agents.A365.Observability.Runtime.Common.PowerPlatformApiDiscovery.Get
 Microsoft.Agents.A365.Observability.Runtime.Common.PowerPlatformApiDiscovery.PowerPlatformApiDiscovery(string! clusterCategory) -> void
 Microsoft.Agents.A365.Observability.Runtime.Etw.A365EtwLogger<T>
 Microsoft.Agents.A365.Observability.Runtime.Etw.A365EtwLogger<T>.A365EtwLogger(Microsoft.Extensions.Logging.ILoggerFactory! factory) -> void
-Microsoft.Agents.A365.Observability.Runtime.Etw.EtwEventSource
-Microsoft.Agents.A365.Observability.Runtime.Etw.EtwEventSource.LogJson(string! message) -> void
-Microsoft.Agents.A365.Observability.Runtime.Etw.EtwEventSource.SpanStop(string! name, string! spanId, string! traceId, string! parentSpanId, string! content) -> void
 Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLoggingBuilder
 Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLoggingBuilder.Build() -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLogProcessor
@@ -293,7 +290,6 @@ static Microsoft.OpenTelemetry.MicrosoftOpenTelemetryBuilderExtensions.UseMicros
 static Microsoft.OpenTelemetry.MicrosoftOpenTelemetryBuilderExtensions.UseMicrosoftOpenTelemetry<TBuilder>(this TBuilder builder, System.Action<Microsoft.OpenTelemetry.MicrosoftOpenTelemetryOptions!>! configure) -> TBuilder
 static readonly Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenCache.DefaultCleanupInterval -> System.TimeSpan
 static readonly Microsoft.Agents.A365.Observability.Hosting.Caching.ServiceTokenCache.DefaultCleanupInterval -> System.TimeSpan
-static readonly Microsoft.Agents.A365.Observability.Runtime.Etw.EtwEventSource.Log -> Microsoft.Agents.A365.Observability.Runtime.Etw.EtwEventSource!
 virtual Microsoft.Agents.A365.Observability.Hosting.Caching.AgenticTokenCache.Dispose(bool disposing) -> void
 virtual Microsoft.Agents.A365.Observability.Hosting.Caching.ServiceTokenCache.Dispose(bool disposing) -> void
 virtual Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.BaseExporterAsync<T>.Dispose() -> void

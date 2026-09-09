@@ -63,6 +63,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Microsoft.Agents.A365.Observability.Contracts\Microsoft.Agents.A365.Observability.Contracts.csproj" />
+    <ProjectReference Include="..\Microsoft.Agents.A365.Observability.Etw\Microsoft.Agents.A365.Observability.Etw.csproj" />
   </ItemGroup>
 
 </Project>

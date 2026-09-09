@@ -6,6 +6,8 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo(
     "Microsoft.Agents.A365.Observability.Contracts.Tests, PublicKey=" + ContractsAssemblyInfo.PublicKey)]
 [assembly: InternalsVisibleTo(
+    "Microsoft.Agents.A365.Observability.Etw, PublicKey=" + ContractsAssemblyInfo.PublicKey)]
+[assembly: InternalsVisibleTo(
     "Microsoft.OpenTelemetry, PublicKey=" + ContractsAssemblyInfo.PublicKey)]
 [assembly: InternalsVisibleTo(
     "Microsoft.OpenTelemetry.Agent365.Tests, PublicKey=" + ContractsAssemblyInfo.PublicKey)]
