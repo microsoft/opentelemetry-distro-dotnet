@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Ship the Agent365 ETW surface as standalone packages: `Microsoft.Agents.A365.Observability.Contracts` (event contracts, DTOs, and builders) and `Microsoft.Agents.A365.Observability.Etw` (`EtwEventSource` plus the new `EtwExportFormatter`). Both target `netstandard2.0` and `net8.0` and carry no OpenTelemetry SDK, hosting, or exporter dependencies, so ETW-only consumers no longer need the full distro. See [docs/standalone-agent365-etw.md](docs/standalone-agent365-etw.md).
+- `Microsoft.OpenTelemetry` keeps its existing Agent365 API surface: the moved types are re-exposed with `[TypeForwardedTo]`, so already-compiled consumers keep binding without recompiling, and the umbrella package now brings the Contracts and ETW packages as dependencies. A guard test asserts the forwarded type set against `Assembly.GetForwardedTypes()`.
+- Obsolete `ExportFormatter.FormatLogData(IDictionary<string, object?>)` in favor of `EtwExportFormatter.FormatLogData`; the obsolete overload delegates to the new formatter so payloads are unchanged. `AddLoggingWithEtw()` now registers `EtwExportFormatter` and continues to register `ExportFormatter`, so existing container resolutions still work.
+- Obsolete the `EtwLogProcessor(ExportFormatter, ILogger<EtwLogProcessor>?)` constructor in favor of `EtwLogProcessor(EtwExportFormatter, ILogger<EtwLogProcessor>?)`. The obsolete constructor is retained for source compatibility and emits the same ETW JSON.
+- The three packages ship as a coordinated version set (`A365ObservabilityPackageVersion`): `Microsoft.OpenTelemetry` and the ETW package compile against Contracts internals, so publish all three together at the same version. Package-smoke validation in CI now packs a unique local prerelease version and restores the smoke consumers against that exact version with `--no-cache`.
+- `SpanStatusBuilder.FromError` detects `Azure.RequestFailedException` by reflection (the Contracts package does not depend on Azure.Core) and walks the exception's base types, so exceptions derived from `RequestFailedException` keep reporting the HTTP status as `error.type`, matching `OpenTelemetryScope.RecordError`.
+
 ## 1.1.0 - 2026-09-08
 
 - InvokeAgentScope now defaults omitted span kind to ActivityKind.Internal while preserving explicit overrides.
