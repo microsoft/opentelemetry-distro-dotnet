@@ -78,6 +78,30 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
         }
 
         [TestMethod]
+        public void Build_StillRegistersExportFormatterAsSingleton_ForCompatibility()
+        {
+            using var provider = BuildProvider();
+
+            var first = provider.GetRequiredService<ExportFormatter>();
+            var second = provider.GetRequiredService<ExportFormatter>();
+
+            first.Should().NotBeNull();
+            first.Should().BeSameAs(second);
+        }
+
+        [TestMethod]
+        public void Build_RegistersBothFormatters_AsDistinctServices()
+        {
+            using var provider = BuildProvider();
+
+            var exportFormatter = provider.GetRequiredService<ExportFormatter>();
+            var etwExportFormatter = provider.GetRequiredService<EtwExportFormatter>();
+
+            exportFormatter.Should().BeOfType<ExportFormatter>();
+            etwExportFormatter.Should().BeOfType<EtwExportFormatter>();
+        }
+
+        [TestMethod]
         public void EtwLogProcessor_Constructor_ConsumesEtwExportFormatter()
         {
             var constructor = typeof(EtwLogProcessor).GetConstructor(new[]

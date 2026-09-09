@@ -44,6 +44,14 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
             _services
                 .AddSingleton(typeof(IA365EtwLogger<>), typeof(A365EtwLogger<>))
                 .AddSingleton<EtwExportFormatter>()
+                // Compatibility: existing consumers resolve ExportFormatter from the container after
+                // AddLoggingWithEtw(). Keep the registration even though the ETW pipeline now uses
+                // EtwExportFormatter.
+                .AddSingleton<ExportFormatter>(sp =>
+                {
+                    var logger = sp.GetService<ILogger<ExportFormatter>>() ?? NullLoggerFactory.Instance.CreateLogger<ExportFormatter>();
+                    return new ExportFormatter(logger);
+                })
                 .AddLogging(logging =>
                 {
                     logging.AddOpenTelemetry(otelLogging =>
