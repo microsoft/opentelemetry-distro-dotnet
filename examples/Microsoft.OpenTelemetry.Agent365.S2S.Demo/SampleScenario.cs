@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
@@ -8,7 +9,7 @@ namespace Microsoft.OpenTelemetry.Agent365.S2S.Demo;
 
 internal static class SampleScenario
 {
-    private static readonly Uri AgentEndpoint = new("https://weather-agent.contoso.com");
+    private static readonly Uri AgentEndpoint = new("https://weather-agent.contoso.com:8443");
     private static readonly Uri ToolEndpoint = new("https://weather-api.contoso.com");
 
     private const string SessionId = "session-s2s-123";
@@ -21,8 +22,12 @@ internal static class SampleScenario
     private const string AgentName = "Weather Agent";
     private const string AgentDescription = "Answers current Seattle weather questions.";
     private const string ModelName = "gpt-4o-mini";
-    private const string AgentAuidKey = "microsoft.agent.user.id";
-    private const string AgentEmailKey = "microsoft.agent.user.email";
+    private const string PublishingAgenticUserId = "11111111-1111-1111-1111-111111111111";
+    private const string PublishingAgenticUserEmail = "sample-agent@example.invalid";
+    private const string PublishingUserId = "22222222-2222-2222-2222-222222222222";
+    private const string PublishingUserName = "Sample User";
+    private const string PublishingUserEmail = "sample-user@example.invalid";
+    private static readonly IPAddress PublishingClientAddress = IPAddress.Parse("192.0.2.1");
     private static readonly TimeSpan FirstInferenceDuration = TimeSpan.FromMilliseconds(40);
     private static readonly TimeSpan ToolDuration = TimeSpan.FromMilliseconds(15);
     private static readonly TimeSpan FinalInferenceDuration = TimeSpan.FromMilliseconds(30);
@@ -43,6 +48,8 @@ internal static class SampleScenario
             agentId: options.AgentId,
             agentName: AgentName,
             agentDescription: AgentDescription,
+            agenticUserId: PublishingAgenticUserId,
+            agenticUserEmail: PublishingAgenticUserEmail,
             agentBlueprintId: options.ClientId,
             tenantId: options.TenantId,
             providerName: "openai",
@@ -55,13 +62,18 @@ internal static class SampleScenario
             operationSource: ServiceName);
         var clock = new ScenarioClock(timeProvider.GetUtcNow());
 
-        using var baggageBoundary = new AgenticUserBaggageBoundary();
         using var baggage = new BaggageBuilder()
             .TenantId(options.TenantId)
             .AgentId(options.AgentId)
             .AgentName(AgentName)
             .AgentDescription(AgentDescription)
+            .AgenticUserId(PublishingAgenticUserId)
+            .AgenticUserEmail(PublishingAgenticUserEmail)
             .AgentBlueprintId(options.ClientId)
+            .UserId(PublishingUserId)
+            .UserName(PublishingUserName)
+            .UserEmail(PublishingUserEmail)
+            .UserClientIp(PublishingClientAddress)
             .ChannelName(ChannelName)
             .ConversationId(ConversationId)
             .SessionId(SessionId)
@@ -188,38 +200,4 @@ internal static class SampleScenario
         internal void Advance(TimeSpan duration) => Current += duration;
     }
 
-    private sealed class AgenticUserBaggageBoundary : IDisposable
-    {
-        private readonly Baggage previous = Baggage.Current;
-        private bool disposed;
-
-        internal AgenticUserBaggageBoundary()
-        {
-            var filtered = default(Baggage);
-
-            foreach (var item in Baggage.Current)
-            {
-                if (string.Equals(item.Key, AgentAuidKey, StringComparison.Ordinal)
-                    || string.Equals(item.Key, AgentEmailKey, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                filtered = filtered.SetBaggage(item.Key, item.Value);
-            }
-
-            Baggage.Current = filtered;
-        }
-
-        public void Dispose()
-        {
-            if (disposed)
-            {
-                return;
-            }
-
-            Baggage.Current = previous;
-            disposed = true;
-        }
-    }
 }

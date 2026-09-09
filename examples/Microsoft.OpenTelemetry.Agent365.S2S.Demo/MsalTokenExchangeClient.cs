@@ -24,7 +24,7 @@ internal sealed class MsalTokenExchangeClient : ITokenExchangeClient
 
             var result = await application
                 .AcquireTokenForClient(TokenExchangeScopes)
-                .WithFmiPath(options.AgentAppInstanceId)
+                .WithFmiPath(options.AgentId)
                 .ExecuteAsync(cancellationToken)
                 .ConfigureAwait(false);
 
@@ -46,7 +46,7 @@ internal sealed class MsalTokenExchangeClient : ITokenExchangeClient
         try
         {
             var application = ConfidentialClientApplicationBuilder
-                .Create(options.AgentAppInstanceId)
+                .Create(options.AgentId)
                 .WithClientAssertion(
                     (Func<AssertionRequestOptions, Task<string>>)(_ => Task.FromResult(clientAssertion)))
                 .WithAuthority(BuildAuthority(options))

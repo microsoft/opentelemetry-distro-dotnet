@@ -9,7 +9,6 @@ internal sealed class SampleOptions
         string clientId,
         string clientSecret,
         string tenantId,
-        string agentAppInstanceId,
         string agentId,
         string clusterCategory)
     {
@@ -17,7 +16,6 @@ internal sealed class SampleOptions
         this.ClientId = clientId;
         this.ClientSecret = clientSecret;
         this.TenantId = tenantId;
-        this.AgentAppInstanceId = agentAppInstanceId;
         this.AgentId = agentId;
         this.ClusterCategory = clusterCategory;
     }
@@ -29,8 +27,6 @@ internal sealed class SampleOptions
     internal string ClientSecret { get; }
 
     internal string TenantId { get; }
-
-    internal string AgentAppInstanceId { get; }
 
     internal string AgentId { get; }
 
@@ -61,14 +57,9 @@ internal sealed class SampleOptions
         var tenantId = RequiredGuid(
             configuration,
             "Connections:ServiceConnection:Settings:TenantId");
-        var instanceId = RequiredGuid(
+        var agentId = RequiredGuid(
             configuration,
-            "Agent365:AgentAppInstanceId");
-
-        var configuredAgentId = configuration["Agent365:AgentId"]?.Trim();
-        var agentId = string.IsNullOrWhiteSpace(configuredAgentId)
-            ? instanceId
-            : RejectPlaceholder("Agent365:AgentId", configuredAgentId);
+            "Agent365:AgentId");
 
         var clusterCategory = configuration["Agent365:ClusterCategory"]?.Trim();
         if (string.IsNullOrWhiteSpace(clusterCategory))
@@ -81,7 +72,6 @@ internal sealed class SampleOptions
             clientId,
             clientSecret,
             tenantId,
-            instanceId,
             agentId,
             clusterCategory);
     }
@@ -122,5 +112,5 @@ internal sealed class SampleOptions
     }
 
     public override string ToString() =>
-        $"{nameof(SampleOptions)} {{ {nameof(this.Authority)} = {this.Authority}, {nameof(this.ClientId)} = {this.ClientId}, {nameof(this.ClientSecret)} = [REDACTED], {nameof(this.TenantId)} = {this.TenantId}, {nameof(this.AgentAppInstanceId)} = {this.AgentAppInstanceId}, {nameof(this.AgentId)} = {this.AgentId}, {nameof(this.ClusterCategory)} = {this.ClusterCategory} }}";
+        $"{nameof(SampleOptions)} {{ {nameof(this.Authority)} = {this.Authority}, {nameof(this.ClientId)} = {this.ClientId}, {nameof(this.ClientSecret)} = [REDACTED], {nameof(this.TenantId)} = {this.TenantId}, {nameof(this.AgentId)} = {this.AgentId}, {nameof(this.ClusterCategory)} = {this.ClusterCategory} }}";
 }
