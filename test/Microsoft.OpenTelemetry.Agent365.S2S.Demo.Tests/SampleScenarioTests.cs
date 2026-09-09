@@ -42,6 +42,7 @@ public sealed class SampleScenarioTests
     private const string GenAiToolCallIdKey = "gen_ai.tool.call.id";
     private const string GenAiToolArgumentsKey = "gen_ai.tool.call.arguments";
     private const string GenAiToolCallResultKey = "gen_ai.tool.call.result";
+    private const string PreservedAmbientKey = "contoso.preserved";
 
     private const string SessionId = "session-s2s-123";
     private const string ConversationId = "conversation-s2s-789";
@@ -156,6 +157,60 @@ public sealed class SampleScenarioTests
             .Should()
             .Contain("partly cloudy in Seattle.")
             .And.Contain("62\\u00B0F");
+    }
+
+    [TestMethod]
+    public async Task RunAsync_OmitsAmbientAgenticUserTags_AndRestoresCallerBaggage()
+    {
+        AppContext.SetSwitch(EnableOpenTelemetrySwitch, true);
+
+        var stopped = new List<Activity>();
+        using var tracerProvider = Sdk.CreateTracerProviderBuilder()
+            .AddSource(SourceName)
+            .AddProcessor(new ActivityProcessor())
+            .Build();
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == SourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
+                ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = activity => stopped.Add(activity),
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        var options = TestData.CreateOptions();
+        var previous = Baggage.Current;
+
+        try
+        {
+            Baggage.Current = Baggage.Current
+                .SetBaggage(AgentAuidKey, "ambient-agent-user-id")
+                .SetBaggage(AgentEmailKey, "ambient-user@contoso.com")
+                .SetBaggage(PreservedAmbientKey, "preserved-value");
+
+            await SampleScenario.RunAsync(
+                options,
+                static (_, cancellationToken) =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return Task.CompletedTask;
+                });
+
+            stopped.Should().HaveCount(4);
+
+            foreach (var activity in stopped)
+            {
+                AssertCommonCertificationTags(activity, options);
+            }
+
+            Baggage.Current.GetBaggage(AgentAuidKey).Should().Be("ambient-agent-user-id");
+            Baggage.Current.GetBaggage(AgentEmailKey).Should().Be("ambient-user@contoso.com");
+            Baggage.Current.GetBaggage(PreservedAmbientKey).Should().Be("preserved-value");
+        }
+        finally
+        {
+            Baggage.Current = previous;
+        }
     }
 
     private static void AssertCommonCertificationTags(Activity activity, SampleOptions options)

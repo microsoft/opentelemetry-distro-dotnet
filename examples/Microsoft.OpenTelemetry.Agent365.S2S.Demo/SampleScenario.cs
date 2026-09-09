@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
+using OpenTelemetry;
 
 namespace Microsoft.OpenTelemetry.Agent365.S2S.Demo;
 
@@ -22,6 +23,8 @@ internal static class SampleScenario
     private const string AgentName = "Weather Agent";
     private const string AgentDescription = "Answers current Seattle weather questions.";
     private const string ModelName = "gpt-4o-mini";
+    private const string AgentAuidKey = "microsoft.agent.user.id";
+    private const string AgentEmailKey = "microsoft.agent.user.email";
     private static readonly TimeSpan FirstInferenceDuration = TimeSpan.FromMilliseconds(40);
     private static readonly TimeSpan ToolDuration = TimeSpan.FromMilliseconds(15);
     private static readonly TimeSpan FinalInferenceDuration = TimeSpan.FromMilliseconds(30);
@@ -52,6 +55,7 @@ internal static class SampleScenario
             operationSource: ServiceName);
         var clock = new ScenarioClock(ScenarioStartTime);
 
+        using var baggageBoundary = new AgenticUserBaggageBoundary();
         using var baggage = new BaggageBuilder()
             .TenantId(options.TenantId)
             .AgentId(options.AgentId)
@@ -182,5 +186,40 @@ internal static class SampleScenario
         internal DateTimeOffset Current { get; private set; } = current;
 
         internal void Advance(TimeSpan duration) => Current += duration;
+    }
+
+    private sealed class AgenticUserBaggageBoundary : IDisposable
+    {
+        private readonly Baggage previous = Baggage.Current;
+        private bool disposed;
+
+        internal AgenticUserBaggageBoundary()
+        {
+            var filtered = default(Baggage);
+
+            foreach (var item in Baggage.Current)
+            {
+                if (string.Equals(item.Key, AgentAuidKey, StringComparison.Ordinal)
+                    || string.Equals(item.Key, AgentEmailKey, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                filtered = filtered.SetBaggage(item.Key, item.Value);
+            }
+
+            Baggage.Current = filtered;
+        }
+
+        public void Dispose()
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            Baggage.Current = previous;
+            disposed = true;
+        }
     }
 }
