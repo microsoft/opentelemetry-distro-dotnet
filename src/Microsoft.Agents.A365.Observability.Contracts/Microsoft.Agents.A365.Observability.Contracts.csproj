@@ -6,7 +6,7 @@
     <AssemblyName>Microsoft.Agents.A365.Observability.Contracts</AssemblyName>
     <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
     <PackageId>Microsoft.Agents.A365.Observability.Contracts</PackageId>
-    <Version>1.1.0</Version>
+    <Version>$(A365ObservabilityPackageVersion)</Version>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageProjectUrl>https://github.com/microsoft/opentelemetry-distro-dotnet</PackageProjectUrl>

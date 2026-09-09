@@ -17,6 +17,14 @@
     <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)target\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
   </PropertyGroup>
 
+  <!-- Agent365 observability packages (Contracts, Etw, and the Microsoft.OpenTelemetry umbrella) are a
+       coordinated version set: the umbrella and the ETW package compile against Contracts internals, so
+       all three must be built from the same commit and packed with the same version. CI overrides this
+       with a global -p:Version=<unique prerelease> for package-smoke validation. -->
+  <PropertyGroup>
+    <A365ObservabilityPackageVersion>1.2.0</A365ObservabilityPackageVersion>
+  </PropertyGroup>
+
   <!-- Source Link & deterministic builds -->
   <PropertyGroup>
     <Deterministic>true</Deterministic>

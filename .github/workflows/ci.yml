@@ -75,28 +75,58 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Compute local package version
+        id: package-version
+        shell: bash
+        run: echo "version=1.2.0-ci.${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+
       - name: Restore
         run: dotnet restore Microsoft.OpenTelemetry.slnx
 
       - name: Build
-        run: dotnet build Microsoft.OpenTelemetry.slnx --no-restore --configuration Release
+        run: dotnet build Microsoft.OpenTelemetry.slnx --no-restore --configuration Release -p:Version=${{ steps.package-version.outputs.version }}
 
       - name: Pack
         run: |
-          dotnet pack src/Microsoft.Agents.A365.Observability.Contracts/Microsoft.Agents.A365.Observability.Contracts.csproj --no-build --configuration Release --output ./packages
-          dotnet pack src/Microsoft.Agents.A365.Observability.Etw/Microsoft.Agents.A365.Observability.Etw.csproj --no-build --configuration Release --output ./packages
-          dotnet pack src/Microsoft.OpenTelemetry/Microsoft.OpenTelemetry.csproj --no-build --configuration Release --output ./packages
+          dotnet pack src/Microsoft.Agents.A365.Observability.Contracts/Microsoft.Agents.A365.Observability.Contracts.csproj --no-build --configuration Release --output ./packages -p:Version=${{ steps.package-version.outputs.version }}
+          dotnet pack src/Microsoft.Agents.A365.Observability.Etw/Microsoft.Agents.A365.Observability.Etw.csproj --no-build --configuration Release --output ./packages -p:Version=${{ steps.package-version.outputs.version }}
+          dotnet pack src/Microsoft.OpenTelemetry/Microsoft.OpenTelemetry.csproj --no-build --configuration Release --output ./packages -p:Version=${{ steps.package-version.outputs.version }}
 
+      # Restore the smoke consumers against the exact version that was just packed locally, with the
+      # NuGet HTTP cache bypassed, so the validation can never silently resolve an already-published
+      # package from nuget.org. nuget.org stays in the source list for the external dependencies.
       - name: Validate package consumers
         run: |
-          dotnet restore test/package-smoke/StandaloneEtwConsumer/StandaloneEtwConsumer.csproj --source ./packages --source https://api.nuget.org/v3/index.json
-          dotnet build test/package-smoke/StandaloneEtwConsumer/StandaloneEtwConsumer.csproj --no-restore --configuration Release
-          dotnet restore test/package-smoke/DistroConsumer/DistroConsumer.csproj --source ./packages --source https://api.nuget.org/v3/index.json
-          dotnet build test/package-smoke/DistroConsumer/DistroConsumer.csproj --no-restore --configuration Release
+          dotnet restore test/package-smoke/StandaloneEtwConsumer/StandaloneEtwConsumer.csproj --source ./packages --source https://api.nuget.org/v3/index.json --no-cache -p:SmokePackageVersion=${{ steps.package-version.outputs.version }}
+          dotnet build test/package-smoke/StandaloneEtwConsumer/StandaloneEtwConsumer.csproj --no-restore --configuration Release -p:SmokePackageVersion=${{ steps.package-version.outputs.version }}
+          dotnet restore test/package-smoke/DistroConsumer/DistroConsumer.csproj --source ./packages --source https://api.nuget.org/v3/index.json --no-cache -p:SmokePackageVersion=${{ steps.package-version.outputs.version }}
+          dotnet build test/package-smoke/DistroConsumer/DistroConsumer.csproj --no-restore --configuration Release -p:SmokePackageVersion=${{ steps.package-version.outputs.version }}
 
       - name: Assert package consumer outputs
         shell: pwsh
+        env:
+          SMOKE_PACKAGE_VERSION: ${{ steps.package-version.outputs.version }}
         run: |
+          function Assert-ResolvedPackageVersion {
+            param(
+              [string] $ProjectName,
+              [string] $PackageId
+            )
+
+            $assetsPath = Join-Path $env:GITHUB_WORKSPACE "target/obj/$ProjectName/project.assets.json"
+            if (-not (Test-Path -LiteralPath $assetsPath -PathType Leaf)) {
+              throw "Expected restore assets file was not created: $assetsPath"
+            }
+
+            $assets = Get-Content -LiteralPath $assetsPath -Raw | ConvertFrom-Json
+            $libraryIds = $assets.libraries.PSObject.Properties.Name
+            $expected = "$PackageId/$env:SMOKE_PACKAGE_VERSION"
+            if ($libraryIds -notcontains $expected) {
+              $actual = $libraryIds | Where-Object { $_ -like "$PackageId/*" }
+              throw "Expected '$expected' in $assetsPath. Found: $($actual -join ', ')"
+            }
+          }
+
           function Assert-ConsumerOutput {
             param(
               [string] $ProjectName,
@@ -123,6 +153,12 @@ jobs:
               }
             }
           }
+
+          Assert-ResolvedPackageVersion -ProjectName StandaloneEtwConsumer -PackageId 'Microsoft.Agents.A365.Observability.Etw'
+          Assert-ResolvedPackageVersion -ProjectName StandaloneEtwConsumer -PackageId 'Microsoft.Agents.A365.Observability.Contracts'
+          Assert-ResolvedPackageVersion -ProjectName DistroConsumer -PackageId 'Microsoft.OpenTelemetry'
+          Assert-ResolvedPackageVersion -ProjectName DistroConsumer -PackageId 'Microsoft.Agents.A365.Observability.Etw'
+          Assert-ResolvedPackageVersion -ProjectName DistroConsumer -PackageId 'Microsoft.Agents.A365.Observability.Contracts'
 
           Assert-ConsumerOutput `
             -ProjectName StandaloneEtwConsumer `
