@@ -15,9 +15,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// Initializes a new instance of the <see cref="SpanDetails"/> class.
         /// </summary>
         /// <param name="spanKind">Optional span kind override.</param>
-        /// <param name="parentContext">Optional parent <see cref="ActivityContext"/> used to link this span to an upstream operation.
-        /// Use <see cref="Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.TraceContextHelper.ExtractContextFromHeaders"/>
-        /// to obtain an <see cref="ActivityContext"/> from HTTP headers containing a W3C traceparent.</param>
+        /// <param name="parentContext">Optional parent <see cref="ActivityContext"/> used to link this span to an upstream operation.</param>
         /// <param name="startTime">Optional explicit start time as a <see cref="DateTimeOffset"/>.</param>
         /// <param name="endTime">Optional explicit end time as a <see cref="DateTimeOffset"/>.</param>
         /// <param name="spanLinks">Optional span links to associate with this span, establishing causal

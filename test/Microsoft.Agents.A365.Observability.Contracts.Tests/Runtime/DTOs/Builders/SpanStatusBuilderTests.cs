@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using Azure;
 using FluentAssertions;
 using Microsoft.Agents.A365.Observability.Runtime.DTOs;
 using Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders;
@@ -69,7 +68,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
         public void FromError_RequestFailedException_UsesHttpStatusAsErrorType()
         {
             var attributes = new Dictionary<string, object?>();
-            var error = new RequestFailedException(404, "not found");
+            var error = new Azure.RequestFailedException(404, "not found");
 
             var status = SpanStatusBuilder.FromError(error, attributes);
 
@@ -84,5 +83,19 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
 
             act.Should().NotThrow();
         }
+    }
+}
+
+namespace Azure
+{
+    internal sealed class RequestFailedException : Exception
+    {
+        public RequestFailedException(int status, string message)
+            : base(message)
+        {
+            Status = status;
+        }
+
+        public int Status { get; }
     }
 }

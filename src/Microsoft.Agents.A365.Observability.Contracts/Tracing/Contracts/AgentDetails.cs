@@ -28,7 +28,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// <param name="agentVersion">Optional version of the agent (e.g., "1.0.0", "2025-05-01").</param>
         /// <remarks>
         /// <para>
-        /// <b>Certification Requirements:</b> The following parameters must be set for the agent to pass certification requirements, and these values override any of the same values specified in the <see cref="Microsoft.Agents.A365.Observability.Runtime.Common.BaggageBuilder"/> class:
+        /// <b>Certification Requirements:</b> The following parameters must be set for the agent to pass certification requirements, and these values override any of the same values supplied through runtime baggage helpers:
         /// <list type="bullet">
         ///   <item><paramref name="agentId"/></item>
         ///   <item><paramref name="agentName"/></item>

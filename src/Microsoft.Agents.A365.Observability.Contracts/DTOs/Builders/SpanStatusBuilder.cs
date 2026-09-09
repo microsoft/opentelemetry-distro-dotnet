@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using Azure;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
@@ -14,7 +13,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
     /// </summary>
     /// <remarks>
     /// Centralizes the exception-to-status mapping so that the ETW DTO logging path stays consistent
-    /// with the Activity-based scope path (<see cref="OpenTelemetryScope.RecordError(Exception)"/>).
+    /// with the Activity-based scope path.
     /// </remarks>
     public static class SpanStatusBuilder
     {
@@ -44,10 +43,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
                 return new SpanStatus(SpanStatusCode.Unset);
             }
 
-            // Mirrors OpenTelemetryScope.RecordError: prefer the HTTP status from a RequestFailedException,
+            // Prefer the HTTP status from a request-failed exception,
             // otherwise fall back to the exception's full type name.
-            var errorType = error is RequestFailedException requestFailed && requestFailed.Status != 0
-                ? requestFailed.Status.ToString()
+            var errorType = TryGetRequestFailedStatus(error, out var requestStatus)
+                ? requestStatus.ToString()
                 : error.GetType().FullName ?? "error";
 
             if (attributes != null)
@@ -56,6 +55,31 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             }
 
             return new SpanStatus(SpanStatusCode.Error, error.Message);
+        }
+
+        private static bool TryGetRequestFailedStatus(Exception error, out int status)
+        {
+            status = 0;
+
+            if (!string.Equals(error.GetType().FullName, "Azure.RequestFailedException", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var statusProperty = error.GetType().GetProperty("Status");
+            if (statusProperty?.PropertyType != typeof(int))
+            {
+                return false;
+            }
+
+            var value = (int?)statusProperty.GetValue(error);
+            if (!value.HasValue || value.Value == 0)
+            {
+                return false;
+            }
+
+            status = value.Value;
+            return true;
         }
     }
 }
