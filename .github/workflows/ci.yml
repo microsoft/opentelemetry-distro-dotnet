@@ -94,6 +94,53 @@ jobs:
           dotnet restore test/package-smoke/DistroConsumer/DistroConsumer.csproj --source ./packages --source https://api.nuget.org/v3/index.json
           dotnet build test/package-smoke/DistroConsumer/DistroConsumer.csproj --no-restore --configuration Release
 
+      - name: Assert package consumer outputs
+        shell: pwsh
+        run: |
+          function Assert-ConsumerOutput {
+            param(
+              [string] $ProjectName,
+              [string[]] $MustContain,
+              [string[]] $MustNotContain
+            )
+
+            $outputPath = Join-Path $env:GITHUB_WORKSPACE "target/bin/$ProjectName/Release/net8.0"
+            if (-not (Test-Path -LiteralPath $outputPath -PathType Container)) {
+              throw "Expected consumer output directory was not created: $outputPath"
+            }
+
+            $outputFiles = Get-ChildItem -LiteralPath $outputPath -File | Select-Object -ExpandProperty Name
+
+            foreach ($fileName in $MustContain) {
+              if ($fileName -notin $outputFiles) {
+                throw "Expected '$fileName' in $outputPath. Found: $($outputFiles -join ', ')"
+              }
+            }
+
+            foreach ($fileName in $MustNotContain) {
+              if ($fileName -in $outputFiles) {
+                throw "Did not expect '$fileName' in $outputPath. Found: $($outputFiles -join ', ')"
+              }
+            }
+          }
+
+          Assert-ConsumerOutput `
+            -ProjectName StandaloneEtwConsumer `
+            -MustContain @(
+              'Microsoft.Agents.A365.Observability.Etw.dll',
+              'Microsoft.Agents.A365.Observability.Contracts.dll'
+            ) `
+            -MustNotContain @('Microsoft.OpenTelemetry.dll')
+
+          Assert-ConsumerOutput `
+            -ProjectName DistroConsumer `
+            -MustContain @(
+              'Microsoft.Agents.A365.Observability.Etw.dll',
+              'Microsoft.Agents.A365.Observability.Contracts.dll',
+              'Microsoft.OpenTelemetry.dll'
+            ) `
+            -MustNotContain @()
+
       - name: Upload NuGet package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

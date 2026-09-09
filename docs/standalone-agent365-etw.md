@@ -52,13 +52,13 @@ EtwEventSource.Log.LogJson(jsonContent);
 
 BotDesigner only needs the standalone ETW package.
 
-1. In `/src/Infrastructure/Common/Microsoft.CCI.Common/Microsoft.CCI.Common.csproj`, replace the observability runtime package reference with:
+1. In `/src/Infrastructure/Common/Microsoft.CCI.Common/Microsoft.CCI.Common.csproj`, replace `Microsoft.Agents.A365.Observability.Runtime` with `Microsoft.Agents.A365.Observability.Etw`:
 
    ```xml
    <PackageReference Include="Microsoft.Agents.A365.Observability.Etw" Version="<latest>" />
    ```
 
-2. In `/src/Infrastructure/Common/Microsoft.CCI.Common/Logging/A365Observability/A365ObservabilityEtwLogger.cs`, replace the formatter field with:
+2. In `/src/Infrastructure/Common/Microsoft.CCI.Common/Logging/A365Observability/A365ObservabilityEtwLogger.cs`, replace `ExportFormatter` with `EtwExportFormatter` so the formatter field becomes:
 
    ```csharp
    private readonly EtwExportFormatter _exportFormatter = new();
