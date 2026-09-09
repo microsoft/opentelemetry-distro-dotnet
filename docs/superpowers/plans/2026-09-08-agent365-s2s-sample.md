@@ -682,7 +682,7 @@ namespace Microsoft.OpenTelemetry.Agent365.S2S.Demo;
 internal sealed class MsalTokenExchangeClient : ITokenExchangeClient
 {
     private static readonly string[] TokenExchangeScopes =
-        ["api://AzureAdTokenExchange/.default"];
+        ["api://AzureADTokenExchange/.default"];
 
     private static readonly string[] ObservabilityScopes =
         ["api://9b975845-388f-4429-889e-eab1ef63949c/.default"];

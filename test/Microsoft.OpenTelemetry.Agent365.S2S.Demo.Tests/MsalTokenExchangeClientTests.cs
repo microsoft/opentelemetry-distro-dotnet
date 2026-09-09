@@ -25,7 +25,24 @@ public sealed class MsalTokenExchangeClientTests
     }
 
     [TestMethod]
-    public void CreateExchangeFailure_PreservesInnerException()
+    public void CreateExchangeFailure_ToStringExcludesSensitiveResponseContent()
+    {
+        const string MarkerSecret = "contains marker-secret-value and response-body-contents";
+        var exception = new MsalServiceException(
+            "invalid_scope",
+            MarkerSecret);
+
+        var result = MsalTokenExchangeClient.CreateExchangeFailure(
+            "The Agent365 observability token exchange",
+            exception);
+
+        result.ToString().Should().NotContain(MarkerSecret);
+        result.ToString().Should().NotContain("marker-secret-value");
+        result.ToString().Should().NotContain("response-body-contents");
+    }
+
+    [TestMethod]
+    public void CreateExchangeFailure_InnerExceptionRetainsErrorCodeWithoutRawException()
     {
         var exception = new MsalServiceException(
             "invalid_scope",
@@ -35,6 +52,16 @@ public sealed class MsalTokenExchangeClientTests
             "The Agent365 observability token exchange",
             exception);
 
-        result.InnerException.Should().BeSameAs(exception);
+        result.InnerException.Should().NotBeNull();
+        result.InnerException.Should().NotBeSameAs(exception);
+        result.InnerException!.Message.Should().Contain("invalid_scope");
+        result.InnerException!.Message.Should().NotContain("observability-token");
+    }
+
+    [TestMethod]
+    public void TokenExchangeScopes_UsesCanonicalAzureADTokenExchangeResource()
+    {
+        MsalTokenExchangeClient.TokenExchangeScopes.Should()
+            .ContainSingle(scope => scope == "api://AzureADTokenExchange/.default");
     }
 }

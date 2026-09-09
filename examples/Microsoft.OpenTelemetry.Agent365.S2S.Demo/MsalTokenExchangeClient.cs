@@ -4,8 +4,8 @@ namespace Microsoft.OpenTelemetry.Agent365.S2S.Demo;
 
 internal sealed class MsalTokenExchangeClient : ITokenExchangeClient
 {
-    private static readonly string[] TokenExchangeScopes =
-        ["api://AzureAdTokenExchange/.default"];
+    internal static readonly string[] TokenExchangeScopes =
+        ["api://AzureADTokenExchange/.default"];
 
     private static readonly string[] ObservabilityScopes =
         ["api://9b975845-388f-4429-889e-eab1ef63949c/.default"];
@@ -72,8 +72,16 @@ internal sealed class MsalTokenExchangeClient : ITokenExchangeClient
         MsalException exception) =>
         new(
             $"{stage} failed ({exception.ErrorCode}).",
-            exception);
+            new SanitizedMsalException(exception.ErrorCode));
 
     private static string BuildAuthority(SampleOptions options) =>
         $"{options.Authority.AbsoluteUri.TrimEnd('/')}/{options.TenantId}";
+
+    /// <summary>
+    /// Wraps an MSAL error code without the original exception's message or
+    /// response body, which may contain sensitive request/response content
+    /// that should never be surfaced through exception logging.
+    /// </summary>
+    private sealed class SanitizedMsalException(string errorCode)
+        : Exception($"MSAL error code: {errorCode}");
 }
