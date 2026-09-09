@@ -28,11 +28,14 @@ internal static class Program
                 otel.Services.AddLogging(logging =>
                 {
                     logging.ClearProviders();
-                    logging.AddSimpleConsole(console =>
-                    {
-                        console.SingleLine = true;
-                        console.TimestampFormat = "HH:mm:ss ";
-                    });
+
+                    // Use a sample-local safe console provider instead of AddSimpleConsole:
+                    // AddSimpleConsole renders full exception chains (message, type, stack
+                    // trace, inner exceptions) for calls such as
+                    // Agent365ExporterCore.LogError(ex, ...), which can surface sensitive
+                    // authentication failure details. SafeConsoleLoggerProvider formats the
+                    // log state/arguments but always discards the exception object.
+                    logging.AddProvider(new SafeConsoleLoggerProvider(Console.Out, LogLevel.Information));
                     logging.SetMinimumLevel(LogLevel.Information);
                 });
 
