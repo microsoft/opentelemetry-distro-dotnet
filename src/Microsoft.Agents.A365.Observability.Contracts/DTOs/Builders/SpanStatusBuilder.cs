@@ -13,10 +13,14 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
     /// </summary>
     /// <remarks>
     /// Centralizes the exception-to-status mapping so that the ETW DTO logging path stays consistent
-    /// with the Activity-based scope path.
+    /// with the Activity-based scope path (<c>OpenTelemetryScope.RecordError(Exception)</c> in the
+    /// <c>Microsoft.OpenTelemetry</c> distro). The distro type cannot be referenced with a
+    /// <c>see cref</c> here because this contracts assembly must not depend on the distro.
     /// </remarks>
     public static class SpanStatusBuilder
     {
+        private const string RequestFailedExceptionTypeName = "Azure.RequestFailedException";
+
         /// <summary>
         /// Creates a <see cref="SpanStatus"/> from an optional exception.
         /// </summary>
@@ -43,8 +47,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
                 return new SpanStatus(SpanStatusCode.Unset);
             }
 
-            // Prefer the HTTP status from a request-failed exception,
-            // otherwise fall back to the exception's full type name.
+            // Mirrors OpenTelemetryScope.RecordError: prefer the HTTP status from an
+            // Azure.RequestFailedException (or any exception derived from it), otherwise fall back to
+            // the exception's full type name.
             var errorType = TryGetRequestFailedStatus(error, out var requestStatus)
                 ? requestStatus.ToString()
                 : error.GetType().FullName ?? "error";
@@ -61,12 +66,15 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
         {
             status = 0;
 
-            if (!string.Equals(error.GetType().FullName, "Azure.RequestFailedException", StringComparison.Ordinal))
+            var requestFailedType = FindRequestFailedExceptionType(error.GetType());
+            if (requestFailedType == null)
             {
                 return false;
             }
 
-            var statusProperty = error.GetType().GetProperty("Status");
+            // Read the property off Azure.RequestFailedException itself, mirroring how the compile-time
+            // `requestFailed.Status` access binds to the base declaration even for derived exceptions.
+            var statusProperty = requestFailedType.GetProperty("Status");
             if (statusProperty?.PropertyType != typeof(int))
             {
                 return false;
@@ -80,6 +88,25 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
 
             status = value.Value;
             return true;
+        }
+
+        /// <summary>
+        /// Walks the exception's type hierarchy so exceptions derived from
+        /// <c>Azure.RequestFailedException</c> keep the HTTP-status behavior of the compile-time
+        /// <c>error is RequestFailedException</c> check this reflection shim replaced.
+        /// </summary>
+        /// <returns>The <c>Azure.RequestFailedException</c> type in the hierarchy, or <c>null</c>.</returns>
+        private static Type? FindRequestFailedExceptionType(Type? type)
+        {
+            for (var current = type; current != null; current = current.BaseType)
+            {
+                if (string.Equals(current.FullName, RequestFailedExceptionTypeName, StringComparison.Ordinal))
+                {
+                    return current;
+                }
+            }
+
+            return null;
         }
     }
 }
