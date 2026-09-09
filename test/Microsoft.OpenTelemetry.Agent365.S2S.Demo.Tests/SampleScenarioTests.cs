@@ -49,7 +49,6 @@ public sealed class SampleScenarioTests
     private const string ServiceName = "Microsoft.OpenTelemetry.Agent365.S2S.Demo";
     private const string AgentName = "Weather Agent";
     private const string AgentDescription = "Answers current Seattle weather questions.";
-    private const string AgenticUserEmail = "weather-agent@contoso.com";
     private const string FinalAnswer = "It is currently 62°F and partly cloudy in Seattle.";
 
     [TestMethod]
@@ -165,8 +164,8 @@ public sealed class SampleScenarioTests
         activity.GetTagItem(GenAiAgentIdKey).Should().Be(options.AgentId);
         activity.GetTagItem(GenAiAgentNameKey).Should().Be(AgentName);
         activity.GetTagItem(GenAiAgentDescriptionKey).Should().Be(AgentDescription);
-        activity.GetTagItem(AgentAuidKey).Should().Be(options.AgentAppInstanceId);
-        activity.GetTagItem(AgentEmailKey).Should().Be(AgenticUserEmail);
+        activity.GetTagItem(AgentAuidKey).Should().BeNull();
+        activity.GetTagItem(AgentEmailKey).Should().BeNull();
         activity.GetTagItem(AgentBlueprintIdKey).Should().Be(options.ClientId);
         activity.GetTagItem(ChannelNameKey).Should().Be(ChannelName);
         activity.GetTagItem(SessionIdKey).Should().Be(SessionId);

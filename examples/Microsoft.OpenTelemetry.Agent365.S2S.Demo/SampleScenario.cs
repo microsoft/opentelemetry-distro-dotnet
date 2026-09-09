@@ -21,7 +21,6 @@ internal static class SampleScenario
     private const string FinalAnswer = "It is currently 62°F and partly cloudy in Seattle.";
     private const string AgentName = "Weather Agent";
     private const string AgentDescription = "Answers current Seattle weather questions.";
-    private const string AgenticUserEmail = "weather-agent@contoso.com";
     private const string ModelName = "gpt-4o-mini";
     private static readonly TimeSpan FirstInferenceDuration = TimeSpan.FromMilliseconds(40);
     private static readonly TimeSpan ToolDuration = TimeSpan.FromMilliseconds(15);
@@ -41,8 +40,6 @@ internal static class SampleScenario
             agentId: options.AgentId,
             agentName: AgentName,
             agentDescription: AgentDescription,
-            agenticUserId: options.AgentAppInstanceId,
-            agenticUserEmail: AgenticUserEmail,
             agentBlueprintId: options.ClientId,
             tenantId: options.TenantId,
             providerName: "openai",
@@ -60,8 +57,6 @@ internal static class SampleScenario
             .AgentId(options.AgentId)
             .AgentName(AgentName)
             .AgentDescription(AgentDescription)
-            .AgenticUserId(options.AgentAppInstanceId)
-            .AgenticUserEmail(AgenticUserEmail)
             .AgentBlueprintId(options.ClientId)
             .ChannelName(ChannelName)
             .ConversationId(ConversationId)
