@@ -13,7 +13,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
     /// </summary>
     public class EtwLogProcessor : BaseProcessor<LogRecord>
     {
-        private readonly ExportFormatter _formatter;
+        private readonly EtwExportFormatter _formatter;
         private readonly ILogger<EtwLogProcessor>? _logger;
 
         /// <summary>
@@ -21,7 +21,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
         /// </summary>
         /// <param name="formatter">The formatter used to format log data.</param>
         /// <param name="logger">The logger used to log messages.</param>
-        public EtwLogProcessor(ExportFormatter formatter, ILogger<EtwLogProcessor>? logger = null)
+        public EtwLogProcessor(EtwExportFormatter formatter, ILogger<EtwLogProcessor>? logger = null)
         {
             _formatter = formatter;
             _logger = logger;

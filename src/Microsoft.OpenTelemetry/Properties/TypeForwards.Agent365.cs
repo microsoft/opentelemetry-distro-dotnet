@@ -1,11 +1,85 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using Microsoft.Agents.A365.Observability.Runtime.DTOs;
+using Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders;
 using Microsoft.Agents.A365.Observability.Runtime.Etw;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
 using System.Runtime.CompilerServices;
 
 // PublicApiAnalyzers do not model forwarded symbols correctly; keep the forward local and
 // track the concrete API on the owning assembly instead.
-#pragma warning disable RS0016, RS0017
+#pragma warning disable RS0016, RS0017, RS0026, RS0027
+[assembly: TypeForwardedTo(typeof(BaseData))]
+[assembly: TypeForwardedTo(typeof(InvokeAgentData))]
+[assembly: TypeForwardedTo(typeof(ExecuteInferenceData))]
+[assembly: TypeForwardedTo(typeof(ExecuteToolData))]
+[assembly: TypeForwardedTo(typeof(OutputData))]
+[assembly: TypeForwardedTo(typeof(ApplyGuardrailData))]
+[assembly: TypeForwardedTo(typeof(SpanStatus))]
+[assembly: TypeForwardedTo(typeof(SpanStatusCode))]
+[assembly: TypeForwardedTo(typeof(InvokeAgentDataBuilder))]
+[assembly: TypeForwardedTo(typeof(ExecuteInferenceDataBuilder))]
+[assembly: TypeForwardedTo(typeof(ExecuteToolDataBuilder))]
+[assembly: TypeForwardedTo(typeof(OutputDataBuilder))]
+[assembly: TypeForwardedTo(typeof(ApplyGuardrailDataBuilder))]
+[assembly: TypeForwardedTo(typeof(SpanStatusBuilder))]
+[assembly: TypeForwardedTo(typeof(BaseDataBuilder<>))]
 [assembly: TypeForwardedTo(typeof(EtwEventSource))]
-#pragma warning restore RS0016, RS0017
+[assembly: TypeForwardedTo(typeof(AgentDetails))]
+[assembly: TypeForwardedTo(typeof(AgentType))]
+[assembly: TypeForwardedTo(typeof(CallerDetails))]
+[assembly: TypeForwardedTo(typeof(GenAiRequestParameters))]
+[assembly: TypeForwardedTo(typeof(GenAiResponseParameters))]
+[assembly: TypeForwardedTo(typeof(GuardrailDecisionType))]
+[assembly: TypeForwardedTo(typeof(GuardrailDetails))]
+[assembly: TypeForwardedTo(typeof(GuardrailFinding))]
+[assembly: TypeForwardedTo(typeof(GuardrailRiskSeverity))]
+[assembly: TypeForwardedTo(typeof(GuardrailTargetType))]
+[assembly: TypeForwardedTo(typeof(InferenceCallDetails))]
+[assembly: TypeForwardedTo(typeof(InferenceOperationType))]
+[assembly: TypeForwardedTo(typeof(InvokeAgentScopeDetails))]
+[assembly: TypeForwardedTo(typeof(OperationSource))]
+[assembly: TypeForwardedTo(typeof(Channel))]
+[assembly: TypeForwardedTo(typeof(Request))]
+[assembly: TypeForwardedTo(typeof(Response))]
+[assembly: TypeForwardedTo(typeof(SpanDetails))]
+[assembly: TypeForwardedTo(typeof(ThreatDiagnosticsSummary))]
+[assembly: TypeForwardedTo(typeof(ToolCallDetails))]
+[assembly: TypeForwardedTo(typeof(ToolType))]
+[assembly: TypeForwardedTo(typeof(UserDetails))]
+[assembly: TypeForwardedTo(typeof(MessageRole))]
+[assembly: TypeForwardedTo(typeof(FinishReason))]
+[assembly: TypeForwardedTo(typeof(Modality))]
+[assembly: TypeForwardedTo(typeof(IMessagePart))]
+[assembly: TypeForwardedTo(typeof(TextPart))]
+[assembly: TypeForwardedTo(typeof(ToolCallRequestPart))]
+[assembly: TypeForwardedTo(typeof(ToolCallResponsePart))]
+[assembly: TypeForwardedTo(typeof(ReasoningPart))]
+[assembly: TypeForwardedTo(typeof(BlobPart))]
+[assembly: TypeForwardedTo(typeof(FilePart))]
+[assembly: TypeForwardedTo(typeof(UriPart))]
+[assembly: TypeForwardedTo(typeof(ServerToolCallPart))]
+[assembly: TypeForwardedTo(typeof(ServerToolCallResponsePart))]
+[assembly: TypeForwardedTo(typeof(GenericPart))]
+[assembly: TypeForwardedTo(typeof(ChatMessage))]
+[assembly: TypeForwardedTo(typeof(OutputMessage))]
+[assembly: TypeForwardedTo(typeof(InputMessages))]
+[assembly: TypeForwardedTo(typeof(OutputMessages))]
+[assembly: TypeForwardedTo(typeof(ToolCallAction))]
+[assembly: TypeForwardedTo(typeof(ExecuteToolCallArguments))]
+[assembly: TypeForwardedTo(typeof(ToolCallResource))]
+[assembly: TypeForwardedTo(typeof(ToolCallIdentifier))]
+[assembly: TypeForwardedTo(typeof(ToolCallContainer))]
+[assembly: TypeForwardedTo(typeof(ToolCallOutcomeStatus))]
+[assembly: TypeForwardedTo(typeof(ToolPolicyDecision))]
+[assembly: TypeForwardedTo(typeof(ExecuteToolCallResult))]
+[assembly: TypeForwardedTo(typeof(ToolCallResultResource))]
+[assembly: TypeForwardedTo(typeof(ToolCallResultOutcome))]
+[assembly: TypeForwardedTo(typeof(ToolCallResultSensitivity))]
+[assembly: TypeForwardedTo(typeof(ToolCallResultPolicy))]
+[assembly: TypeForwardedTo(typeof(ToolCallResultSecurity))]
+[assembly: TypeForwardedTo(typeof(ToolCallResultPagination))]
+#pragma warning restore RS0016, RS0017, RS0026, RS0027

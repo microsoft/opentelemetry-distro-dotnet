@@ -31,6 +31,26 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
         private ServiceProvider BuildProvider() => new ServiceCollection().AddLoggingWithEtw().BuildServiceProvider();
 
         [TestMethod]
+        public void Build_RegistersEtwExportFormatterAsSingleton()
+        {
+            using var provider = BuildProvider();
+
+            var first = provider.GetRequiredService<EtwExportFormatter>();
+            var second = provider.GetRequiredService<EtwExportFormatter>();
+
+            first.Should().BeSameAs(second);
+        }
+
+        [TestMethod]
+        public void EtwLogProcessor_Constructor_ConsumesEtwExportFormatter()
+        {
+            var constructor = typeof(EtwLogProcessor).GetConstructors().Single();
+
+            constructor.GetParameters().Select(parameter => parameter.ParameterType)
+                .Should().Contain(typeof(EtwExportFormatter));
+        }
+
+        [TestMethod]
         public void Build_AddsEtwLogProcessor_AndWritesExpectedAttributes_FromInvokeAgent()
         {
             // Arrange

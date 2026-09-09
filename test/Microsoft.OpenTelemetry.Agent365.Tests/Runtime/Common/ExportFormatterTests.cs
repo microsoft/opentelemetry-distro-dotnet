@@ -10,6 +10,7 @@ using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Agents.A365.Observability.Tests.Tracing;
 using Microsoft.Agents.A365.Observability.Tests.Tracing.Scopes;
 using Microsoft.Agents.A365.Observability.Runtime.DTOs;
+using Microsoft.Agents.A365.Observability.Runtime.Etw;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using global::OpenTelemetry.Resources;
@@ -446,7 +447,9 @@ public partial class ExportFormatterTests : ActivityTest
         var formatter = CreateFormatter();
 
         // Act
+#pragma warning disable CS0618
         var json = formatter.FormatLogData(data.ToDictionary());
+#pragma warning restore CS0618
 
         // Assert
         json.Should().NotBeNullOrWhiteSpace();
@@ -486,7 +489,9 @@ public partial class ExportFormatterTests : ActivityTest
         var formatter = CreateFormatter();
 
         // Act
+#pragma warning disable CS0618
         var json = formatter.FormatLogData(data.ToDictionary());
+#pragma warning restore CS0618
 
         // Assert
         json.Should().NotBeNullOrWhiteSpace();
@@ -506,6 +511,35 @@ public partial class ExportFormatterTests : ActivityTest
 
         var attrs = root.GetProperty("Attributes");
         attrs.GetProperty("key").GetString().Should().Be("val");
+    }
+
+    [TestMethod]
+    public void FormatLogData_ForwardsToEtwFormatter()
+    {
+        var data = new InvokeAgentData(
+            new Dictionary<string, object?> { ["key"] = "value" },
+            spanId: "span");
+
+#pragma warning disable CS0618
+        var compatibilityJson = CreateFormatter().FormatLogData(data.ToDictionary());
+#pragma warning restore CS0618
+        var etwJson = new EtwExportFormatter().FormatLogData(data.ToDictionary());
+
+        compatibilityJson.Should().Be(etwJson);
+    }
+
+    [TestMethod]
+    public void FormatLogData_IsObsoleteAndPointsToEtwFormatter()
+    {
+        var method = typeof(ExportFormatter).GetMethod(nameof(ExportFormatter.FormatLogData));
+
+        method.Should().NotBeNull();
+        var obsoleteAttribute = method!.GetCustomAttributes(typeof(ObsoleteAttribute), inherit: false)
+            .Cast<ObsoleteAttribute>()
+            .Single();
+
+        obsoleteAttribute.Message.Should().Be(
+            "Use Microsoft.Agents.A365.Observability.Runtime.Etw.EtwExportFormatter.FormatLogData instead.");
     }
 
 #region ExportFormatter FormatMany Truncation Tests

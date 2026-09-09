@@ -115,7 +115,7 @@ Microsoft.Agents.A365.Observability.Runtime.Etw.A365EtwLogger<T>.A365EtwLogger(M
 Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLoggingBuilder
 Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLoggingBuilder.Build() -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLogProcessor
-Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLogProcessor.EtwLogProcessor(Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter! formatter, Microsoft.Extensions.Logging.ILogger<Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLogProcessor!>? logger = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLogProcessor.EtwLogProcessor(Microsoft.Agents.A365.Observability.Runtime.Etw.EtwExportFormatter! formatter, Microsoft.Extensions.Logging.ILogger<Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLogProcessor!>? logger = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Etw.EtwScopeEventProcessor
 Microsoft.Agents.A365.Observability.Runtime.Etw.EtwScopeEventProcessor.EtwScopeEventProcessor(Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter! formatter, OpenTelemetry.Resources.Resource? resource = null, Microsoft.Extensions.Logging.ILogger<Microsoft.Agents.A365.Observability.Runtime.Etw.EtwScopeEventProcessor!>? logger = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Etw.EtwServiceCollectionExtensions
