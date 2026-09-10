@@ -6,6 +6,7 @@
   <Project Path="test/Microsoft.Agents.A365.Observability.Etw.Tests/Microsoft.Agents.A365.Observability.Etw.Tests.csproj" />
   <Project Path="test/Microsoft.OpenTelemetry.Agent365.Tests/Microsoft.OpenTelemetry.Agent365.Tests.csproj" />
   <Project Path="test/Microsoft.OpenTelemetry.AzureMonitor.Tests/Microsoft.OpenTelemetry.AzureMonitor.Tests.csproj" />
+  <Project Path="test/Microsoft.OpenTelemetry.Package.Tests/Microsoft.OpenTelemetry.Package.Tests.csproj" />
   <Project Path="examples/Microsoft.OpenTelemetry.Console.Demo/Microsoft.OpenTelemetry.Console.Demo.csproj" />
   <Project Path="src/Microsoft.Agents.A365.Observability.Contracts/Microsoft.Agents.A365.Observability.Contracts.csproj" />
   <Project Path="src/Microsoft.Agents.A365.Observability.Etw/Microsoft.Agents.A365.Observability.Etw.csproj" />

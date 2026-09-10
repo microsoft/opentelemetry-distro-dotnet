@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Microsoft.OpenTelemetry.Package.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <MicrosoftOpenTelemetryPackageVersion>1.2.0-validation</MicrosoftOpenTelemetryPackageVersion>
+    <Agent365EtwSdkPackageVersion>1.2.0-validation</Agent365EtwSdkPackageVersion>
+    <PackageValidationArtifactsPath>$(BaseIntermediateOutputPath)package-validation\$(Configuration)\</PackageValidationArtifactsPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="MSTest.TestAdapter" />
+    <PackageReference Include="MSTest.TestFramework" />
+    <PackageReference Include="FluentAssertions" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <ContractsProjectPath>$(MSBuildProjectDirectory)\..\..\src\Microsoft.Agents.A365.Observability.Contracts\Microsoft.Agents.A365.Observability.Contracts.csproj</ContractsProjectPath>
+    <EtwProjectPath>$(MSBuildProjectDirectory)\..\..\src\Microsoft.Agents.A365.Observability.Etw\Microsoft.Agents.A365.Observability.Etw.csproj</EtwProjectPath>
+    <DistroProjectPath>$(MSBuildProjectDirectory)\..\..\src\Microsoft.OpenTelemetry\Microsoft.OpenTelemetry.csproj</DistroProjectPath>
+  </PropertyGroup>
+
+  <Target Name="PreparePackageValidationArtifacts" BeforeTargets="VSTest">
+    <RemoveDir Directories="$(PackageValidationArtifactsPath)" />
+    <MakeDir Directories="$(PackageValidationArtifactsPath)" />
+
+    <MSBuild
+      Projects="$(ContractsProjectPath)"
+      Targets="Restore;Pack"
+      BuildInParallel="false"
+      RemoveProperties="TargetFramework;RuntimeIdentifier;SelfContained"
+      Properties="Configuration=$(Configuration);PackageOutputPath=$(PackageValidationArtifactsPath);Version=$(Agent365EtwSdkPackageVersion);A365ObservabilityPackageVersion=$(Agent365EtwSdkPackageVersion);Agent365EtwSdkPackageVersion=$(Agent365EtwSdkPackageVersion)" />
+    <MSBuild
+      Projects="$(EtwProjectPath)"
+      Targets="Restore;Pack"
+      BuildInParallel="false"
+      RemoveProperties="TargetFramework;RuntimeIdentifier;SelfContained"
+      Properties="Configuration=$(Configuration);PackageOutputPath=$(PackageValidationArtifactsPath);Version=$(Agent365EtwSdkPackageVersion);A365ObservabilityPackageVersion=$(Agent365EtwSdkPackageVersion);Agent365EtwSdkPackageVersion=$(Agent365EtwSdkPackageVersion)" />
+    <MSBuild
+      Projects="$(DistroProjectPath)"
+      Targets="Restore;Pack"
+      BuildInParallel="false"
+      RemoveProperties="TargetFramework;RuntimeIdentifier;SelfContained"
+      Properties="Configuration=$(Configuration);PackageOutputPath=$(PackageValidationArtifactsPath);Version=$(MicrosoftOpenTelemetryPackageVersion);A365ObservabilityPackageVersion=$(MicrosoftOpenTelemetryPackageVersion);MicrosoftOpenTelemetryPackageVersion=$(MicrosoftOpenTelemetryPackageVersion)" />
+
+    <WriteLinesToFile
+      File="$(OutDir)package-validation-path.txt"
+      Lines="$(PackageValidationArtifactsPath)"
+      Overwrite="true" />
+  </Target>
+</Project>
