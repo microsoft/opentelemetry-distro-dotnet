@@ -602,23 +602,28 @@ scope.RecordOutputMessages(new[] { "Here is the response." });
 Track tool execution with telemetry for monitoring and auditing.
 
 ```csharp
+var sourceAgentDetails = agentDetails;
+
 var toolCallDetails = new ToolCallDetails(
-    toolName: "summarize",
-    arguments: "{\"text\": \"...\"}",
-    toolCallId: "tc-001",
-    description: "Summarize provided text",
-    toolType: "function",
-    endpoint: new Uri("https://tools.contoso.com:8080"));
+    toolName: "handoff",
+    transferDetails: new TransferDetails(
+        mode: TransferMode.ReturnToCaller,
+        targetName: "weather-agent",
+        targetType: TransferTargetType.Agent));
 
 using var scope = ExecuteToolScope.Start(
     request: request,
     details: toolCallDetails,
-    agentDetails: agentDetails);
+    agentDetails: sourceAgentDetails);
 
 // ... your tool logic here ...
 
 scope.RecordResponse("{\"summary\": \"The text was summarized.\"}");
 ```
+
+`agentDetails` identifies the source agent executing the tool. `TransferDetails`
+describes an explicitly exposed transfer and target. The SDK does not infer
+transfer semantics for ordinary tool calls.
 
 **Available methods:**
 
@@ -839,6 +844,9 @@ Received HTTP response headers after *ms - 200
     "gen_ai.tool.description": "Optional",
     "gen_ai.tool.name": "Required",
     "gen_ai.tool.type": "Required",
+    "microsoft.a365.transfer.mode": "Optional",
+    "microsoft.a365.transfer.target.name": "Optional",
+    "microsoft.a365.transfer.target.type": "Optional",
     "server.address": "Optional",
     "server.port": "Optional",
     "microsoft.session.id": "Optional",
