@@ -158,6 +158,43 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
         }
 
         [TestMethod]
+        public void Build_WithTransferDetails_IncludesExplicitTransferAttributes()
+        {
+            var tool = new ToolCallDetails(
+                "handoff",
+                new TransferDetails(
+                    TransferMode.PassControl,
+                    "support-workflow",
+                    TransferTargetType.Workflow));
+
+            var data = ExecuteToolDataBuilder.Build(
+                tool,
+                new AgentDetails("source-agent"),
+                "conversation-1");
+
+            data.Attributes[OpenTelemetryConstants.TransferModeKey].Should().Be("pass_control");
+            data.Attributes[OpenTelemetryConstants.TransferTargetNameKey].Should().Be("support-workflow");
+            data.Attributes[OpenTelemetryConstants.TransferTargetTypeKey].Should().Be("workflow");
+        }
+
+        [TestMethod]
+        public void Build_WithModeOnly_OmitsOptionalTargetAttributes()
+        {
+            var tool = new ToolCallDetails(
+                "handoff",
+                new TransferDetails(TransferMode.ReturnToCaller));
+
+            var data = ExecuteToolDataBuilder.Build(
+                tool,
+                new AgentDetails("source-agent"),
+                "conversation-1");
+
+            data.Attributes[OpenTelemetryConstants.TransferModeKey].Should().Be("return_to_caller");
+            data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetNameKey);
+            data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetTypeKey);
+        }
+
+        [TestMethod]
         public void Build_SetsTimingInformation_WhenProvided()
         {
             // Arrange

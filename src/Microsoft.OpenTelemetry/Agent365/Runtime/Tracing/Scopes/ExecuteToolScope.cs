@@ -84,6 +84,14 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             SetTagMaybe(OpenTelemetryConstants.GenAiToolTypeKey, toolType);
             SetTagMaybe(OpenTelemetryConstants.GenAiToolCallIdKey, toolCallId);
             SetTagMaybe(OpenTelemetryConstants.GenAiToolDescriptionKey, description);
+            var transferDetails = details.TransferDetails;
+            if (transferDetails != null)
+            {
+                SetTagMaybe(OpenTelemetryConstants.TransferModeKey, transferDetails.ModeValue);
+                SetTagMaybe(OpenTelemetryConstants.TransferTargetNameKey, transferDetails.TargetName);
+                SetTagMaybe(OpenTelemetryConstants.TransferTargetTypeKey, transferDetails.TargetTypeValue);
+            }
+
             SetTagMaybe(OpenTelemetryConstants.ThreatDiagnosticsSummaryKey, threatDiagnosticsSummary?.ToJson());
             SetTagMaybe(OpenTelemetryConstants.GenAiConversationIdKey, request?.ConversationId);
             SetTagMaybe(OpenTelemetryConstants.SessionIdKey, request?.SessionId);

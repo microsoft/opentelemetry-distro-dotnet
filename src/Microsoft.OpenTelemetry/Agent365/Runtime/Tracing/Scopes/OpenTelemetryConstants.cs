@@ -208,6 +208,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// The GenAI tool call result key.
         /// </summary>
         public const string GenAiToolCallResultKey = "gen_ai.tool.call.result";
+
+        public const string TransferModeKey = "microsoft.a365.transfer.mode";
+        public const string TransferTargetNameKey = "microsoft.a365.transfer.target.name";
+        public const string TransferTargetTypeKey = "microsoft.a365.transfer.target.type";
         #endregion
 
         /// <summary>

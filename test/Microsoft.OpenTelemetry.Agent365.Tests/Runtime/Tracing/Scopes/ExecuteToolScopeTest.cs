@@ -133,6 +133,43 @@ public sealed class ExecuteToolScopeTest : ActivityTest
     }
 
     [TestMethod]
+    public void Start_WithTransferDetails_SetsExplicitTransferAttributes()
+    {
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails(
+                    "handoff",
+                    new TransferDetails(
+                        TransferMode.ReturnToCaller,
+                        "weather-agent",
+                        TransferTargetType.Agent)),
+                Util.GetAgentDetails());
+        });
+
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferModeKey, "return_to_caller");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetNameKey, "weather-agent");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetTypeKey, "agent");
+    }
+
+    [TestMethod]
+    public void Start_WithoutTransferDetails_OmitsTransferAttributes()
+    {
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails("ordinary-tool", (string?)null),
+                Util.GetAgentDetails());
+        });
+
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferModeKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetNameKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetTypeKey);
+    }
+
+    [TestMethod]
     public void ThreatDiagnosticsSummary_IsSetCorrectly_WhenProvided()
     {
         // Arrange

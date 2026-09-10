@@ -213,6 +213,14 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
                     AddIfNotNull(attributes, OpenTelemetryConstants.ServerPortKey, endpoint.Port.ToString());
                 }
             }
+
+            var transferDetails = toolCallDetails.TransferDetails;
+            if (transferDetails != null)
+            {
+                AddIfNotNull(attributes, OpenTelemetryConstants.TransferModeKey, transferDetails.ModeValue);
+                AddIfNotNull(attributes, OpenTelemetryConstants.TransferTargetNameKey, transferDetails.TargetName);
+                AddIfNotNull(attributes, OpenTelemetryConstants.TransferTargetTypeKey, transferDetails.TargetTypeValue);
+            }
         }
     }
 }
