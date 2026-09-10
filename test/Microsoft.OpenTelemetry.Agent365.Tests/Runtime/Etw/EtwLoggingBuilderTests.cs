@@ -104,11 +104,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
         [TestMethod]
         public void EtwLogProcessor_Constructor_ConsumesEtwExportFormatter()
         {
-            var constructor = typeof(EtwLogProcessor).GetConstructor(new[]
-            {
-                typeof(EtwExportFormatter),
-                typeof(ILogger<EtwLogProcessor>),
-            });
+            var constructor = typeof(EtwLogProcessor).GetConstructors()
+                .Single(candidate => candidate.GetParameters()[0].ParameterType == typeof(EtwExportFormatter));
 
             constructor.Should().NotBeNull();
             constructor!.GetParameters().Select(parameter => parameter.ParameterType)
@@ -130,6 +127,18 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
                 .Cast<ObsoleteAttribute>()
                 .Should()
                 .ContainSingle();
+        }
+
+        [TestMethod]
+        public void Build_AllowsEtwLogProcessorToBeResolvedFromDependencyInjection()
+        {
+            var services = new ServiceCollection()
+                .AddLoggingWithEtw()
+                .AddTransient<EtwLogProcessor>();
+
+            using var provider = services.BuildServiceProvider();
+
+            provider.GetRequiredService<EtwLogProcessor>().Should().NotBeNull();
         }
 
         [TestMethod]

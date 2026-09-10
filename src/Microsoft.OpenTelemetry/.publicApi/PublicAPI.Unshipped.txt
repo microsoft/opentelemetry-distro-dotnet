@@ -1,5 +1,5 @@
 #nullable enable
-Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLogProcessor.EtwLogProcessor(Microsoft.Agents.A365.Observability.Runtime.Etw.EtwExportFormatter! formatter, Microsoft.Extensions.Logging.ILogger<Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLogProcessor!>? logger = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLogProcessor.EtwLogProcessor(Microsoft.Agents.A365.Observability.Runtime.Etw.EtwExportFormatter! formatter, Microsoft.Extensions.Logging.ILogger<Microsoft.Agents.A365.Observability.Runtime.Etw.EtwLogProcessor!>? logger = null, Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter? compatibilityFormatter = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.DisableOfflineStorage.get -> bool
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.DisableOfflineStorage.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.StorageDirectory.get -> string?

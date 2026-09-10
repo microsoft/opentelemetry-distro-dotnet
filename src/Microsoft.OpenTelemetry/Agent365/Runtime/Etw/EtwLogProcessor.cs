@@ -22,10 +22,12 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
         /// </summary>
         /// <param name="formatter">The formatter used to format log data.</param>
         /// <param name="logger">The logger used to log messages.</param>
-        public EtwLogProcessor(EtwExportFormatter formatter, ILogger<EtwLogProcessor>? logger = null)
+        /// <param name="compatibilityFormatter">The legacy formatter registration used to disambiguate dependency injection activation.</param>
+        public EtwLogProcessor(EtwExportFormatter formatter, ILogger<EtwLogProcessor>? logger = null, ExportFormatter? compatibilityFormatter = null)
         {
             _formatter = formatter;
             _logger = logger;
+            _ = compatibilityFormatter;
         }
 
         /// <summary>
@@ -33,9 +35,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
         /// </summary>
         /// <param name="formatter">The compatibility formatter retained for source compatibility.</param>
         /// <param name="logger">The logger used to log messages.</param>
-        [Obsolete("Use EtwLogProcessor(EtwExportFormatter formatter, ILogger<EtwLogProcessor>? logger = null) instead.")]
+        [Obsolete("Use the EtwLogProcessor overload that accepts EtwExportFormatter instead.")]
         public EtwLogProcessor(ExportFormatter formatter, ILogger<EtwLogProcessor>? logger = null)
-            : this(new EtwExportFormatter(), logger)
+            : this(new EtwExportFormatter(), logger, compatibilityFormatter: formatter)
         {
             _ = formatter;
         }
