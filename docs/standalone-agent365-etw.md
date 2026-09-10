@@ -71,9 +71,9 @@ BotDesigner only needs the standalone ETW package.
 
 ## Local smoke validation
 
-The three packages ship as a coordinated version set (see [Package version coupling](#package-version-coupling)).
+The ETW and Contracts packages share a standalone SDK version. The distro has an independent package version and embeds the ETW and Contracts outputs built from the same commit (see [Package version coupling](#package-version-coupling)).
 
-A **release pack** produces the artifacts that would actually be published, at the repository version (`A365ObservabilityPackageVersion`, currently `1.2.0`):
+A **release pack** produces the artifacts that would actually be published, at the repository versions (`Agent365EtwSdkPackageVersion` for ETW and Contracts, and `MicrosoftOpenTelemetryPackageVersion` for the distro; both are currently `1.2.0`):
 
 ```powershell
 dotnet build Microsoft.OpenTelemetry.slnx --configuration Release
@@ -97,7 +97,7 @@ dotnet restore test\package-smoke\DistroConsumer\DistroConsumer.csproj --source 
 dotnet build test\package-smoke\DistroConsumer\DistroConsumer.csproj --no-restore --configuration Release -p:SmokePackageVersion=$smokeVersion
 ```
 
-The smoke projects pin an exact version range (`[$(SmokePackageVersion)]`), and `SmokePackageVersion` defaults to the repo's `A365ObservabilityPackageVersion`. nuget.org stays in the source list so external transitive dependencies still resolve.
+The smoke projects pin an exact version range (`[$(SmokePackageVersion)]`). `StandaloneEtwConsumer` defaults to `Agent365EtwSdkPackageVersion`, while `DistroConsumer` defaults to `MicrosoftOpenTelemetryPackageVersion`. nuget.org stays in the source list so external transitive dependencies still resolve.
 
 Expected results:
 
@@ -107,11 +107,12 @@ Expected results:
 
 ## Package version coupling
 
-`Microsoft.OpenTelemetry` and `Microsoft.Agents.A365.Observability.Etw` compile against `internal` members of `Microsoft.Agents.A365.Observability.Contracts` (for example `OpenTelemetryConstants`, `AutoInstrumentationConstants`, `MessageUtils`, and `SpanKindConstants`), granted through `InternalsVisibleTo`. `ProjectReference`-based packing emits an inclusive-minimum dependency (`>= <version>`) rather than an exact range, so a consumer could in principle float Contracts ahead of the assembly that was compiled against it.
+`Microsoft.OpenTelemetry` and `Microsoft.Agents.A365.Observability.Etw` compile against `internal` members of `Microsoft.Agents.A365.Observability.Contracts` (for example `OpenTelemetryConstants`, `AutoInstrumentationConstants`, `MessageUtils`, and `SpanKindConstants`), granted through `InternalsVisibleTo`. The standalone ETW package retains its Contracts package dependency, while the distro marks both project references private and embeds their build outputs instead of exposing internal package dependencies.
 
-The repository handles this by treating the three packages as one coordinated version set:
+The repository handles this with two independently overrideable version properties:
 
-- `A365ObservabilityPackageVersion` in `Directory.Build.props` drives the version of all three packages, so they always pack in lockstep from the same commit.
+- `Agent365EtwSdkPackageVersion` drives the ETW and Contracts packages, which remain versioned together.
+- `MicrosoftOpenTelemetryPackageVersion` independently drives the distro package.
 - Package and validate them together using the release and smoke-pack commands above.
 
-Publish the three packages together and at the same version. On `netstandard2.0`/.NET Framework consumers, forcing these packages out of lockstep can additionally require `bindingRedirect` entries in `app.config`/`web.config`, because .NET Framework binds strong-named assemblies by exact version rather than rolling forward. Making the shared internals public purely to express an exact dependency range would expand the supported public API surface, so this coupling is documented and tracked as a follow-up instead.
+Publish the ETW and Contracts packages together at the same standalone SDK version. On `netstandard2.0`/.NET Framework consumers, forcing those packages out of lockstep can additionally require `bindingRedirect` entries in `app.config`/`web.config`, because .NET Framework binds strong-named assemblies by exact version rather than rolling forward. Making the shared internals public purely to express an exact dependency range would expand the supported public API surface, so this coupling remains documented instead.
