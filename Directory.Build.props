@@ -19,9 +19,7 @@
 
   <!-- Agent365 observability packages (Contracts, Etw, and the Microsoft.OpenTelemetry umbrella) are a
        coordinated version set: the umbrella and the ETW package compile against Contracts internals, so
-       all three must be built from the same commit and packed with the same version. Release packs use
-       this version as-is; only the CI package-smoke pack repacks the same build output into a separate
-       directory under a unique prerelease version (-p:Version=1.2.0-ci.<run_id>.<run_attempt>). -->
+       all three must be built from the same commit and packed with the same version. -->
   <PropertyGroup>
     <A365ObservabilityPackageVersion>1.2.0</A365ObservabilityPackageVersion>
   </PropertyGroup>

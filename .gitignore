@@ -214,7 +214,7 @@ PublishScripts/
 *.snupkg
 # The packages folder can be ignored because of Package Restore
 **/[Pp]ackages/*
-# Local/CI package-smoke pack output (unique prerelease version, never published)
+# Local package-smoke pack output (unique prerelease version, never published)
 smoke-packages/
 # except build/, which is used as an MSBuild target.
 !**/[Pp]ackages/build/

@@ -2,12 +2,9 @@
 
 ## Unreleased
 
-- Ship the Agent365 ETW surface as standalone packages: `Microsoft.Agents.A365.Observability.Contracts` (event contracts, DTOs, and builders) and `Microsoft.Agents.A365.Observability.Etw` (`EtwEventSource` plus the new `EtwExportFormatter`). Both target `netstandard2.0` and `net8.0` and carry no OpenTelemetry SDK, hosting, or exporter dependencies, so ETW-only consumers no longer need the full distro. See [docs/standalone-agent365-etw.md](docs/standalone-agent365-etw.md).
-- `Microsoft.OpenTelemetry` keeps its existing Agent365 API surface: the moved types are re-exposed with `[TypeForwardedTo]`, so already-compiled consumers keep binding without recompiling, and the umbrella package now brings the Contracts and ETW packages as dependencies. A guard test asserts the forwarded type set against `Assembly.GetForwardedTypes()`.
-- Obsolete `ExportFormatter.FormatLogData(IDictionary<string, object?>)` in favor of `EtwExportFormatter.FormatLogData`; the obsolete overload delegates to the new formatter so payloads are unchanged. `AddLoggingWithEtw()` now registers `EtwExportFormatter` and continues to register `ExportFormatter`, so existing container resolutions still work.
-- Obsolete the `EtwLogProcessor(ExportFormatter, ILogger<EtwLogProcessor>?)` constructor in favor of `EtwLogProcessor(EtwExportFormatter, ILogger<EtwLogProcessor>?)`. The obsolete constructor is retained for source compatibility and emits the same ETW JSON.
-- The three packages ship as a coordinated version set (`A365ObservabilityPackageVersion`): `Microsoft.OpenTelemetry` and the ETW package compile against Contracts internals, so publish all three together at the same version. Package-smoke validation in CI repacks the same build output into a separate `./smoke-packages` directory under a unique CI prerelease version and restores the smoke consumers only from there with `--no-cache`, while the uploaded `./packages` artifacts keep the release version.
-- `SpanStatusBuilder.FromError` detects `Azure.RequestFailedException` by reflection (the Contracts package does not depend on Azure.Core) and walks the exception's base types, so exceptions derived from `RequestFailedException` keep reporting the HTTP status as `error.type`, matching `OpenTelemetryScope.RecordError`.
+- Add a self-contained Agent365 service-to-service sample that uses app-only MSAL authentication and emits manual Invoke Agent, Inference, and Execute Tool spans without the Agents Framework ([#155](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/155))
+- Log successful Agent365 export responses with the HTTP status code and correlation ID ([#155](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/155))
+- Added standalone Agent365 Contracts and ETW packages while preserving compatibility through `Microsoft.OpenTelemetry`. See [docs/standalone-agent365-etw.md](docs/standalone-agent365-etw.md).
 
 ## 1.1.0 - 2026-09-08
 

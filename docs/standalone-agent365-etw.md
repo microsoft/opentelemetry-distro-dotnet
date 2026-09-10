@@ -97,7 +97,7 @@ dotnet restore test\package-smoke\DistroConsumer\DistroConsumer.csproj --source 
 dotnet build test\package-smoke\DistroConsumer\DistroConsumer.csproj --no-restore --configuration Release -p:SmokePackageVersion=$smokeVersion
 ```
 
-The smoke projects pin an exact version range (`[$(SmokePackageVersion)]`), and `SmokePackageVersion` defaults to the repo's `A365ObservabilityPackageVersion`. nuget.org stays in the source list so external transitive dependencies still resolve. CI follows the same split: `./packages` holds the release-version artifacts that are uploaded, and `./smoke-packages` holds throwaway `1.2.0-ci.<run_id>.<run_attempt>` packages that only the smoke consumers see.
+The smoke projects pin an exact version range (`[$(SmokePackageVersion)]`), and `SmokePackageVersion` defaults to the repo's `A365ObservabilityPackageVersion`. nuget.org stays in the source list so external transitive dependencies still resolve.
 
 Expected results:
 
@@ -112,6 +112,6 @@ Expected results:
 The repository handles this by treating the three packages as one coordinated version set:
 
 - `A365ObservabilityPackageVersion` in `Directory.Build.props` drives the version of all three packages, so they always pack in lockstep from the same commit.
-- CI packs and validates them together: the release-version artifacts go to `./packages`, and a parallel smoke pack of the same build output goes to `./smoke-packages` under a unique CI prerelease version that the smoke consumers restore at exactly.
+- Package and validate them together using the release and smoke-pack commands above.
 
 Publish the three packages together and at the same version. On `netstandard2.0`/.NET Framework consumers, forcing these packages out of lockstep can additionally require `bindingRedirect` entries in `app.config`/`web.config`, because .NET Framework binds strong-named assemblies by exact version rather than rolling forward. Making the shared internals public purely to express an exact dependency range would expand the supported public API surface, so this coupling is documented and tracked as a follow-up instead.
