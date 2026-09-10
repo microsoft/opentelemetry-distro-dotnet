@@ -2,19 +2,21 @@
 
 ## Goal
 
-Add typed support for the agent-to-agent transfer attributes introduced by
-OpenTelemetry semantic-conventions-genai PR 447. The change is limited to
-`execute_tool` telemetry. It does not change `InvokeAgentScope` or invoke-agent
-attributes.
+Add typed support for the agent-to-agent transfer semantics introduced by
+OpenTelemetry semantic-conventions-genai PR 447. Because that proposal is not
+yet merged, the SDK uses provisional `microsoft.a365.*` attribute names rather
+than publishing the proposed `gen_ai.transfer.*` names. The change is limited
+to `execute_tool` telemetry. It does not change `InvokeAgentScope` or
+invoke-agent attributes.
 
 ## Semantic model
 
 On an `execute_tool` span:
 
 - `gen_ai.agent.*` continues to identify the source agent executing the tool.
-- `gen_ai.transfer.mode` describes how control passes to the target.
-- `gen_ai.transfer.target.name` identifies the target when available.
-- `gen_ai.transfer.target.type` identifies whether the target is an agent,
+- `microsoft.a365.transfer.mode` describes how control passes to the target.
+- `microsoft.a365.transfer.target.name` identifies the target when available.
+- `microsoft.a365.transfer.target.type` identifies whether the target is an agent,
   human, workflow, or a future custom value.
 
 Transfer attributes are emitted only when the caller explicitly supplies
@@ -45,9 +47,9 @@ compatibility patterns without changing `ExecuteToolScope.Start`.
 
 Add constants for:
 
-- `gen_ai.transfer.mode`
-- `gen_ai.transfer.target.name`
-- `gen_ai.transfer.target.type`
+- `microsoft.a365.transfer.mode`
+- `microsoft.a365.transfer.target.name`
+- `microsoft.a365.transfer.target.type`
 
 Wire the values through both execute-tool emission paths:
 
@@ -64,6 +66,7 @@ The change must not:
 
 - Modify invoke-agent contracts, spans, or attributes.
 - Replace or reinterpret `gen_ai.agent.*`.
+- Emit the unmerged `gen_ai.transfer.*` attribute names.
 - Emit transfer attributes for ordinary tool executions.
 - Infer transfer semantics.
 - Break existing `ToolCallDetails` constructors, deconstruction, equality, or
