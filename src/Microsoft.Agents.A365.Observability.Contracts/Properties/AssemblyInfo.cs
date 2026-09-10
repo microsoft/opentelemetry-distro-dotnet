@@ -3,15 +3,9 @@
 
 using System.Runtime.CompilerServices;
 
-// Coordinated-version coupling (known follow-up):
-// Microsoft.OpenTelemetry and Microsoft.Agents.A365.Observability.Etw compile against internal members
-// of this assembly (OpenTelemetryConstants, AutoInstrumentationConstants, MessageUtils,
-// SpanKindConstants, ThreatDiagnosticsSummary.ToJson). ProjectReference-based packing emits an
-// inclusive-minimum dependency (>= version) rather than an exact range, so those packages must be
-// built, versioned, and published together. Directory.Build.props drives all three from
-// A365ObservabilityPackageVersion to enforce this. Promoting these members to public purely to express
-// an exact dependency range would permanently expand the supported public API surface, so the coupling
-// is documented instead. See docs/standalone-agent365-etw.md#package-version-coupling.
+// Microsoft.Agents.A365.Observability.Etw compiles against internal members of this assembly.
+// Contracts and ETW therefore share Agent365EtwSdkPackageVersion and must be published together.
+// Microsoft.OpenTelemetry has an independent package version and embeds both build outputs.
 [assembly: InternalsVisibleTo(
     "Microsoft.Agents.A365.Observability.Contracts.Tests, PublicKey=" + ContractsAssemblyInfo.PublicKey)]
 [assembly: InternalsVisibleTo(
