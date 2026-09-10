@@ -12,7 +12,26 @@ override Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365E
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.OnForceFlush(int timeoutMilliseconds) -> bool
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.OnShutdown(int timeoutMilliseconds) -> bool
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallArguments.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.TransferDetails.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallDetails(string! toolName, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails! transferDetails, string? arguments = null, string? toolCallId = null, string? description = null, string? toolType = null, System.Uri? endpoint = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallDetails(string! toolName, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails! transferDetails, System.Collections.Generic.IDictionary<string!, object!>! argumentsObject, string? toolCallId = null, string? description = null, string? toolType = null, System.Uri? endpoint = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallDetails(string! toolName, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails! transferDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments! toolCallArguments, string? toolCallId = null, string? description = null, string? toolType = null, System.Uri? endpoint = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallDetails(string! toolName, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments! toolCallArguments, string? toolCallId = null, string? description = null, string? toolType = null, System.Uri? endpoint = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails.Equals(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails? other) -> bool
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails.Mode.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferMode
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails.TransferDetails(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferMode mode, string? targetName = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferTargetType? targetType = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails.TargetName.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails.TargetType.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferTargetType?
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails.Equals(object? obj) -> bool
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails.GetHashCode() -> int
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferMode
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferMode.ReturnToCaller = 0 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferMode
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferMode.PassControl = 1 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferMode
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferTargetType
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferTargetType.Agent = 0 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferTargetType
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferTargetType.Human = 1 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferTargetType
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferTargetType.Workflow = 2 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferTargetType
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments.AdditionalProperties.get -> System.Collections.Generic.IDictionary<string!, object?>!
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments.AdditionalProperties.set -> void
