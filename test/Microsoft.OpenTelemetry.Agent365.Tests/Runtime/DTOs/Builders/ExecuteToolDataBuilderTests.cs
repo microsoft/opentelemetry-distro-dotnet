@@ -169,9 +169,12 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
                 agentVersion: "1.2.3");
             var tool = new ToolCallDetails(
                 "handoff",
-                new TransferDetails(
+                (string?)null)
+            {
+                TransferDetails = new TransferDetails(
                     TransferMode.PassControl,
-                    targetAgent));
+                    targetAgent),
+            };
 
             var data = ExecuteToolDataBuilder.Build(
                 tool,
@@ -206,7 +209,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
         {
             var tool = new ToolCallDetails(
                 "handoff",
-                new TransferDetails(TransferMode.ReturnToCaller));
+                (string?)null)
+            {
+                TransferDetails = new TransferDetails(TransferMode.ReturnToCaller),
+            };
 
             var data = ExecuteToolDataBuilder.Build(
                 tool,
@@ -235,11 +241,14 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
         {
             var tool = new ToolCallDetails(
                 "handoff",
-                new TransferDetails(
+                (string?)null)
+            {
+                TransferDetails = new TransferDetails(
                     TransferMode.ReturnToCaller,
                     new AgentDetails(
                         agentId: "support-agent-id",
-                        agentVersion: "9.9.9")));
+                        agentVersion: "9.9.9")),
+            };
 
             var data = ExecuteToolDataBuilder.Build(
                 tool,
@@ -261,9 +270,12 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
             {
                 var tool = new ToolCallDetails(
                     "handoff",
-                    new TransferDetails(
+                    (string?)null)
+                {
+                    TransferDetails = new TransferDetails(
                         TransferMode.PassControl,
-                        targetType));
+                        targetType),
+                };
 
                 var data = ExecuteToolDataBuilder.Build(
                     tool,

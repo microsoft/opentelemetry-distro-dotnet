@@ -149,9 +149,12 @@ public sealed class ExecuteToolScopeTest : ActivityTest
                 Util.GetDefaultRequest(),
                 new ToolCallDetails(
                     "handoff",
-                    new TransferDetails(
+                    (string?)null)
+                {
+                    TransferDetails = new TransferDetails(
                         TransferMode.ReturnToCaller,
-                        targetAgent)),
+                        targetAgent),
+                },
                 sourceAgent);
         });
 
@@ -209,7 +212,10 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         {
             using var scope = ExecuteToolScope.Start(
                 Util.GetDefaultRequest(),
-                new ToolCallDetails("handoff", new TransferDetails(TransferMode.PassControl)),
+                new ToolCallDetails("handoff", (string?)null)
+                {
+                    TransferDetails = new TransferDetails(TransferMode.PassControl),
+                },
                 Util.GetAgentDetails());
         });
 
@@ -243,11 +249,14 @@ public sealed class ExecuteToolScopeTest : ActivityTest
                 Util.GetDefaultRequest(),
                 new ToolCallDetails(
                     "handoff",
-                    new TransferDetails(
+                    (string?)null)
+                {
+                    TransferDetails = new TransferDetails(
                         TransferMode.ReturnToCaller,
                         new AgentDetails(
                             agentId: "weather-agent-id",
-                            agentVersion: "2026.09.11"))),
+                            agentVersion: "2026.09.11")),
+                },
                 Util.GetAgentDetails());
         });
 
@@ -270,9 +279,12 @@ public sealed class ExecuteToolScopeTest : ActivityTest
                     Util.GetDefaultRequest(),
                     new ToolCallDetails(
                         "handoff",
-                        new TransferDetails(
+                        (string?)null)
+                    {
+                        TransferDetails = new TransferDetails(
                             TransferMode.PassControl,
-                            targetType)),
+                            targetType),
+                    },
                     Util.GetAgentDetails());
             });
 

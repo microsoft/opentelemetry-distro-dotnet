@@ -193,11 +193,13 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
                 agentVersion: "target-version");
             var toolDetails = new ToolCallDetails(
                 "tool-a",
-                new TransferDetails(TransferMode.ReturnToCaller, targetAgentDetails),
                 arguments: @"{ ""arg"": 1 }",
                 toolCallId: "tool-call-1",
                 description: "desc",
-                toolType: "function");
+                toolType: "function")
+            {
+                TransferDetails = new TransferDetails(TransferMode.ReturnToCaller, targetAgentDetails),
+            };
             string conversationId = "conv-tool-1";
             string responseContent = @"{ ""value"": ""result"" }";
             var source = new Channel(name: "ChannelInf", link: "https://channel/inf");

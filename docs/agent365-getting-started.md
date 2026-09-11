@@ -611,14 +611,16 @@ var targetAgentDetails = new AgentDetails(
 
 var toolCallDetails = new ToolCallDetails(
     toolName: "handoff",
-    transferDetails: new TransferDetails(
-        mode: TransferMode.ReturnToCaller,
-        targetAgentDetails: targetAgentDetails),
     arguments: "{\"city\":\"Seattle\",\"units\":\"metric\"}",
     toolCallId: "tc-001",
     description: "Delegate weather lookup to the weather specialist agent",
     toolType: "function",
-    endpoint: new Uri("https://weather-agent.contoso.com"));
+    endpoint: new Uri("https://weather-agent.contoso.com"))
+{
+    TransferDetails = new TransferDetails(
+        mode: TransferMode.ReturnToCaller,
+        targetAgentDetails: targetAgentDetails),
+};
 
 using var scope = ExecuteToolScope.Start(
     request: request,
@@ -649,8 +651,8 @@ identity attributes, and reject `TargetAgentDetails` to avoid contradictory
 telemetry. The SDK never infers target attributes for ordinary tool calls. Keep
 the required tool metadata
 (`arguments`, `toolCallId`, `description`, `toolType`, and `endpoint`) on
-`ToolCallDetails` while using `TransferDetails` for the explicit handoff
-metadata.
+`ToolCallDetails`, then attach `TransferDetails` with an object initializer for
+the explicit handoff metadata.
 
 **Available methods:**
 

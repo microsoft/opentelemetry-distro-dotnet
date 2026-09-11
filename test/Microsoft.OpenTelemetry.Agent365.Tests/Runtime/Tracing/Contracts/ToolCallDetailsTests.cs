@@ -11,7 +11,7 @@ namespace Microsoft.Agents.A365.Observability.Tests.Tracing.Contracts;
 public sealed class ToolCallDetailsTests
 {
     [TestMethod]
-    public void Constructor_WithTransferDetails_ExposesTypedValues()
+    public void ObjectInitializer_WithTransferDetails_ExposesTypedValues()
     {
         var targetAgent = new AgentDetails(
             agentId: "weather-agent-id",
@@ -25,7 +25,10 @@ public sealed class ToolCallDetailsTests
 
         var details = new ToolCallDetails(
             "handoff",
-            transfer);
+            (string?)null)
+        {
+            TransferDetails = transfer,
+        };
 
         details.TransferDetails.Should().BeSameAs(transfer);
         transfer.Mode.Should().Be(TransferMode.ReturnToCaller);
@@ -67,24 +70,30 @@ public sealed class ToolCallDetailsTests
     {
         var left = new ToolCallDetails(
             "handoff",
-            new TransferDetails(
+            (string?)null)
+        {
+            TransferDetails = new TransferDetails(
                 TransferMode.PassControl,
                 new AgentDetails(
                     agentId: "support-agent-id",
                     agentName: "Support Agent",
                     agentBlueprintId: "support-blueprint",
                     agentPlatformId: "support-platform",
-                    agentVersion: "1.2.3")));
+                    agentVersion: "1.2.3")),
+        };
         var right = new ToolCallDetails(
             "handoff",
-            new TransferDetails(
+            (string?)null)
+        {
+            TransferDetails = new TransferDetails(
                 TransferMode.PassControl,
                 new AgentDetails(
                     agentId: "support-agent-id",
                     agentName: "Support Agent",
                     agentBlueprintId: "support-blueprint",
                     agentPlatformId: "support-platform",
-                    agentVersion: "1.2.3")));
+                    agentVersion: "1.2.3")),
+        };
 
         left.Should().Be(right);
         left.GetHashCode().Should().Be(right.GetHashCode());

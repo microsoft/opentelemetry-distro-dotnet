@@ -92,92 +92,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ToolCallDetails"/> class with explicit transfer metadata.
-        /// </summary>
-        /// <param name="toolName">Name of the tool being invoked.</param>
-        /// <param name="transferDetails">Explicit transfer metadata for the tool call.</param>
-        /// <param name="arguments">Optional serialized arguments passed to the tool.</param>
-        /// <param name="toolCallId">Optional identifier for the tool invocation.</param>
-        /// <param name="description">Optional description of the tool call.</param>
-        /// <param name="toolType">Optional type classification for the tool.</param>
-        /// <param name="endpoint">Optional endpoint for remote tool execution.</param>
-        public ToolCallDetails(
-            string toolName,
-            TransferDetails transferDetails,
-            string? arguments = null,
-            string? toolCallId = null,
-            string? description = null,
-            string? toolType = null,
-            Uri? endpoint = null)
-        {
-            ToolName = toolName;
-            TransferDetails = transferDetails ?? throw new ArgumentNullException(nameof(transferDetails));
-            Arguments = arguments;
-            ToolCallId = toolCallId;
-            Description = description;
-            ToolType = toolType;
-            Endpoint = endpoint;
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ToolCallDetails"/> class with structured arguments.
-        /// Per OTEL spec, tool arguments are expected to be an object and SHOULD be recorded in structured form.
-        /// The dictionary is serialized to JSON when setting the span attribute.
-        /// </summary>
-        /// <param name="toolName">Name of the tool being invoked.</param>
-        /// <param name="transferDetails">Explicit transfer metadata for the tool call.</param>
-        /// <param name="argumentsObject">Structured arguments passed to the tool, serialized to JSON.</param>
-        /// <param name="toolCallId">Optional identifier for the tool invocation.</param>
-        /// <param name="description">Optional description of the tool call.</param>
-        /// <param name="toolType">Optional type classification for the tool.</param>
-        /// <param name="endpoint">Optional endpoint for remote tool execution.</param>
-        public ToolCallDetails(
-            string toolName,
-            TransferDetails transferDetails,
-            IDictionary<string, object> argumentsObject,
-            string? toolCallId = null,
-            string? description = null,
-            string? toolType = null,
-            Uri? endpoint = null)
-        {
-            ToolName = toolName;
-            TransferDetails = transferDetails ?? throw new ArgumentNullException(nameof(transferDetails));
-            ArgumentsObject = argumentsObject ?? throw new ArgumentNullException(nameof(argumentsObject));
-            ToolCallId = toolCallId;
-            Description = description;
-            ToolType = toolType;
-            Endpoint = endpoint;
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ToolCallDetails"/> class with typed structured arguments.
-        /// </summary>
-        /// <param name="toolName">Name of the tool being invoked.</param>
-        /// <param name="transferDetails">Explicit transfer metadata for the tool call.</param>
-        /// <param name="toolCallArguments">Typed structured arguments passed to the tool.</param>
-        /// <param name="toolCallId">Optional identifier for the tool invocation.</param>
-        /// <param name="description">Optional description of the tool call.</param>
-        /// <param name="toolType">Optional type classification for the tool.</param>
-        /// <param name="endpoint">Optional endpoint for remote tool execution.</param>
-        public ToolCallDetails(
-            string toolName,
-            TransferDetails transferDetails,
-            ExecuteToolCallArguments toolCallArguments,
-            string? toolCallId = null,
-            string? description = null,
-            string? toolType = null,
-            Uri? endpoint = null)
-        {
-            ToolName = toolName;
-            TransferDetails = transferDetails ?? throw new ArgumentNullException(nameof(transferDetails));
-            ToolCallArguments = toolCallArguments ?? throw new ArgumentNullException(nameof(toolCallArguments));
-            ToolCallId = toolCallId;
-            Description = description;
-            ToolType = toolType;
-            Endpoint = endpoint;
-        }
-
-        /// <summary>
         /// Gets the tool name.
         /// </summary>
         public string ToolName { get; }
@@ -202,7 +116,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// <summary>
         /// Gets the explicit transfer metadata supplied to the tool, when any.
         /// </summary>
-        public TransferDetails? TransferDetails { get; }
+        public TransferDetails? TransferDetails { get; init; }
 
         /// <summary>
         /// Gets the identifier for the tool call, when provided.
