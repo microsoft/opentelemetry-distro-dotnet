@@ -602,8 +602,6 @@ scope.RecordOutputMessages(new[] { "Here is the response." });
 Track tool execution with telemetry for monitoring and auditing.
 
 ```csharp
-var sourceAgentDetails = agentDetails;
-
 var toolCallDetails = new ToolCallDetails(
     toolName: "handoff",
     transferDetails: new TransferDetails(
@@ -614,11 +612,11 @@ var toolCallDetails = new ToolCallDetails(
 using var scope = ExecuteToolScope.Start(
     request: request,
     details: toolCallDetails,
-    agentDetails: sourceAgentDetails);
+    agentDetails: agentDetails);
 
 // ... your tool logic here ...
 
-scope.RecordResponse("{\"summary\": \"The text was summarized.\"}");
+scope.RecordResponse("{\"status\": \"returned_to_caller\", \"target\": \"weather-agent\"}");
 ```
 
 `agentDetails` identifies the source agent executing the tool. `TransferDetails`
