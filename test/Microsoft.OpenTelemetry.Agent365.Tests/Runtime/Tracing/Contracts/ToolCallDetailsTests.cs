@@ -88,6 +88,26 @@ public sealed class ToolCallDetailsTests
     }
 
     [TestMethod]
+    public void TransferDetails_WithUndefinedMode_ThrowsAtConstructionTime()
+    {
+        Action act = () => new TransferDetails((TransferMode)999);
+
+        act.Should().Throw<ArgumentOutOfRangeException>()
+            .WithParameterName("mode");
+    }
+
+    [TestMethod]
+    public void TransferDetails_WithUndefinedTargetType_ThrowsAtConstructionTime()
+    {
+        Action act = () => new TransferDetails(
+            TransferMode.PassControl,
+            targetType: (TransferTargetType)999);
+
+        act.Should().Throw<ArgumentOutOfRangeException>()
+            .WithParameterName("targetType");
+    }
+
+    [TestMethod]
     public void Equals_WithSameTypedArgumentsReference_IsTrueAndHasMatchingHashCode()
     {
         var arguments = new ExecuteToolCallArguments

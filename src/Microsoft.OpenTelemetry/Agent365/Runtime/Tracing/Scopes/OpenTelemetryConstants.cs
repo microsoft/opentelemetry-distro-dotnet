@@ -209,8 +209,19 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// </summary>
         public const string GenAiToolCallResultKey = "gen_ai.tool.call.result";
 
+        /// <summary>
+        /// The explicit transfer mode key for execute-tool spans.
+        /// </summary>
         public const string TransferModeKey = "microsoft.a365.transfer.mode";
+
+        /// <summary>
+        /// The explicit transfer target name key for execute-tool spans.
+        /// </summary>
         public const string TransferTargetNameKey = "microsoft.a365.transfer.target.name";
+
+        /// <summary>
+        /// The explicit transfer target type key for execute-tool spans.
+        /// </summary>
         public const string TransferTargetTypeKey = "microsoft.a365.transfer.target.type";
         #endregion
 

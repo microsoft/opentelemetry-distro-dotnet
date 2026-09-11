@@ -21,6 +21,16 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
             string? targetName = null,
             TransferTargetType? targetType = null)
         {
+            if (!Enum.IsDefined(typeof(TransferMode), mode))
+            {
+                throw new ArgumentOutOfRangeException(nameof(mode), mode, "The transfer mode must be a defined enum value.");
+            }
+
+            if (targetType.HasValue && !Enum.IsDefined(typeof(TransferTargetType), targetType.Value))
+            {
+                throw new ArgumentOutOfRangeException(nameof(targetType), targetType, "The transfer target type must be a defined enum value.");
+            }
+
             Mode = mode;
             TargetName = targetName;
             TargetType = targetType;

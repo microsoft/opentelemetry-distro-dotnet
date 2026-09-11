@@ -607,7 +607,12 @@ var toolCallDetails = new ToolCallDetails(
     transferDetails: new TransferDetails(
         mode: TransferMode.ReturnToCaller,
         targetName: "weather-agent",
-        targetType: TransferTargetType.Agent));
+        targetType: TransferTargetType.Agent),
+    arguments: "{\"city\":\"Seattle\",\"units\":\"metric\"}",
+    toolCallId: "tc-001",
+    description: "Delegate weather lookup to the weather specialist agent",
+    toolType: "function",
+    endpoint: new Uri("https://weather-agent.contoso.com"));
 
 using var scope = ExecuteToolScope.Start(
     request: request,
@@ -620,8 +625,10 @@ scope.RecordResponse("{\"status\": \"returned_to_caller\", \"target\": \"weather
 ```
 
 `agentDetails` identifies the source agent executing the tool. `TransferDetails`
-describes an explicitly exposed transfer and target. The SDK does not infer
-transfer semantics for ordinary tool calls.
+describes the target role exposed by this tool call. The SDK does not infer
+transfer semantics for ordinary tool calls, so keep the required tool metadata
+(`arguments`, `toolCallId`, `description`, `toolType`, and `endpoint`) on
+`ToolCallDetails` while using `TransferDetails` to describe source/target roles.
 
 **Available methods:**
 

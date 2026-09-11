@@ -84,6 +84,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             SetTagMaybe(OpenTelemetryConstants.GenAiToolTypeKey, toolType);
             SetTagMaybe(OpenTelemetryConstants.GenAiToolCallIdKey, toolCallId);
             SetTagMaybe(OpenTelemetryConstants.GenAiToolDescriptionKey, description);
+
             var transferDetails = details.TransferDetails;
             if (transferDetails != null)
             {
