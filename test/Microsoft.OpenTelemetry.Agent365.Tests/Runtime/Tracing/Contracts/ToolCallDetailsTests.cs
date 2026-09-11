@@ -110,6 +110,15 @@ public sealed class ToolCallDetailsTests
     }
 
     [TestMethod]
+    public void TransferDetails_ModeOnlyConstructor_DefaultsTargetTypeToAgent()
+    {
+        var transfer = new TransferDetails(TransferMode.PassControl);
+
+        transfer.TargetType.Should().Be(TransferTargetType.Agent);
+        transfer.TargetAgentDetails.Should().BeNull();
+    }
+
+    [TestMethod]
     public void TransferDetails_MapsAllStandardValues()
     {
         new TransferDetails(TransferMode.PassControl).ModeValue
@@ -142,6 +151,22 @@ public sealed class ToolCallDetailsTests
     {
         var left = new TransferDetails(TransferMode.PassControl, TransferTargetType.Agent);
         var right = new TransferDetails(TransferMode.PassControl, TransferTargetType.Workflow);
+
+        left.Should().NotBe(right);
+    }
+
+    [TestMethod]
+    public void ToolCallDetails_Equals_WithDifferentTransferMode_IsFalse()
+    {
+        var targetAgent = new AgentDetails(agentId: "support-agent");
+        var left = new ToolCallDetails("handoff", arguments: null)
+        {
+            TransferDetails = new TransferDetails(TransferMode.PassControl, targetAgent),
+        };
+        var right = new ToolCallDetails("handoff", arguments: null)
+        {
+            TransferDetails = new TransferDetails(TransferMode.ReturnToCaller, targetAgent),
+        };
 
         left.Should().NotBe(right);
     }
