@@ -1,129 +1,103 @@
-# Execute Tool Transfer Details Implementation Plan
+# Execute Tool Transfer Details Design
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+## Goal
 
-**Goal:** Reconcile PR [#157](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/157) with the repository's Microsoft Agent365 agent identity model by making execute-tool transfer targets agent-specific.
+Update PR [#157](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/157) so execute-tool transfers align with the repository's Microsoft Agent365 agent identity model. The change stays scoped to execute-tool telemetry and leaves invoke-agent behavior and attributes unchanged.
 
-**Architecture:** `ToolCallDetails` continues to own optional `TransferDetails`, but `TransferDetails` now accepts only optional `TargetAgentDetails : AgentDetails`. `ExecuteToolScope` and `ExecuteToolDataBuilder` read the same model and emit only `microsoft.a365.transfer.mode` plus the five `microsoft.a365.transfer.target.agent.*` attributes when explicitly supplied.
+## Semantic model
 
-**Tech Stack:** C#, .NET 8/.NET 10, MSTest, FluentAssertions, PublicApiAnalyzer.
+On an `execute_tool` span:
 
-## Global Constraints
+- `gen_ai.agent.*` continues to identify the source agent passed to `ExecuteToolScope.Start(...)` or `ExecuteToolDataBuilder.Build(...)`.
+- `TransferDetails` remains part of `ToolCallDetails` and carries explicit transfer metadata.
+- `TransferDetails.Mode` serializes exactly as:
+  - `TransferMode.ReturnToCaller` -> `return_to_caller`
+  - `TransferMode.PassControl` -> `pass_control`
+- `TransferDetails.TargetAgentDetails` is the only transfer target model. The earlier generic target name/type idea is removed because the API is still unshipped and this PR only supports agent targets.
 
-- Change only execute-tool transfer behavior.
-- Do not modify invoke-agent behavior or attributes.
-- Keep `gen_ai.agent.*` as the source-agent identity.
-- Keep `TransferDetails` attached to `ToolCallDetails`.
-- Preserve the shipped `ToolCallDetails` constructors that do not take transfer metadata.
-- Preserve the existing six-value `ToolCallDetails` deconstruction shape.
-- Remove the unshipped generic transfer-target name/type API.
-- Emit only these target attributes from `TargetAgentDetails` when non-null: `microsoft.a365.transfer.target.agent.id`, `microsoft.a365.transfer.target.agent.name`, `microsoft.a365.transfer.target.agent.blueprint.id`, `microsoft.a365.transfer.target.agent.platform.id`, `microsoft.a365.transfer.target.agent.version`.
-- Never infer target data.
+The SDK never infers transfer attributes from tool names, endpoints, results, activity hierarchy, or any other source.
 
----
+## Public API
 
-## File Structure
+`ToolCallDetails` keeps the existing transfer-aware constructor overloads and existing six-value deconstruction. `TransferDetails` becomes:
 
-- Modify `test/Microsoft.OpenTelemetry.Agent365.Tests/Runtime/Tracing/Contracts/ToolCallDetailsTests.cs` for transfer contract, serialization, and equality coverage.
-- Modify `test/Microsoft.OpenTelemetry.Agent365.Tests/Runtime/Tracing/Scopes/ExecuteToolScopeTest.cs` for Activity emission coverage.
-- Modify `test/Microsoft.OpenTelemetry.Agent365.Tests/Runtime/DTOs/Builders/ExecuteToolDataBuilderTests.cs` for DTO/ETW emission coverage.
-- Modify `src/Microsoft.OpenTelemetry/Agent365/Runtime/Tracing/Contracts/TransferDetails.cs` for the final target-agent API.
-- Modify `src/Microsoft.OpenTelemetry/Agent365/Runtime/Tracing/Scopes/OpenTelemetryConstants.cs` for the five target-agent constants.
-- Modify `src/Microsoft.OpenTelemetry/Agent365/Runtime/Tracing/Scopes/ExecuteToolScope.cs` and `src/Microsoft.OpenTelemetry/Agent365/Runtime/DTOs/Builders/ExecuteToolDataBuilder.cs` for identical emission logic.
-- Modify `src/Microsoft.OpenTelemetry/.publicApi/PublicAPI.Unshipped.txt` to match the final unshipped public API.
-- Modify `docs/agent365-getting-started.md`, `CHANGELOG.md`, and this plan plus the paired design doc for the final agent-specific model.
+```csharp
+public sealed class TransferDetails
+{
+    public TransferDetails(
+        TransferMode mode,
+        AgentDetails? targetAgentDetails = null);
 
-### Task 1: Write the failing tests first
+    public TransferMode Mode { get; }
 
-**Files:**
-- Modify: `test/Microsoft.OpenTelemetry.Agent365.Tests/Runtime/Tracing/Contracts/ToolCallDetailsTests.cs`
-- Modify: `test/Microsoft.OpenTelemetry.Agent365.Tests/Runtime/Tracing/Scopes/ExecuteToolScopeTest.cs`
-- Modify: `test/Microsoft.OpenTelemetry.Agent365.Tests/Runtime/DTOs/Builders/ExecuteToolDataBuilderTests.cs`
-
-**Interfaces:**
-- Produces: failing expectations for `TargetAgentDetails`, exact mode serialization, null omission, and obsolete-key removal.
-- Preserves: existing ToolCallDetails non-transfer API expectations.
-
-- [ ] Add contract tests asserting `TransferDetails.TargetAgentDetails` holds an `AgentDetails` instance with `AgentId`, `AgentName`, `AgentBlueprintId`, `AgentPlatformId`, and `AgentVersion`.
-- [ ] Add tests asserting `TransferMode.ReturnToCaller` serializes to `return_to_caller` and `TransferMode.PassControl` serializes to `pass_control`.
-- [ ] Add Activity-path tests asserting all five `microsoft.a365.transfer.target.agent.*` attributes, mode-only omission, partial omission, and absence of the removed generic transfer-target attributes.
-- [ ] Add DTO-path tests asserting the same emitted values and omissions.
-- [ ] Run:
-
-```powershell
-dotnet test test\Microsoft.OpenTelemetry.Agent365.Tests\Microsoft.OpenTelemetry.Agent365.Tests.csproj --framework net8.0 --filter "(FullyQualifiedName~ToolCallDetailsTests|FullyQualifiedName~ExecuteToolScopeTest|FullyQualifiedName~ExecuteToolDataBuilderTests)" --no-restore
+    public AgentDetails? TargetAgentDetails { get; }
+}
 ```
 
-Expected RED: compile or test failures against the old generic transfer target API.
+This reuses the shipped `AgentDetails` contract for target identity and avoids introducing a second, partially overlapping identity model.
 
-### Task 2: Implement the final agent-specific transfer model
+## Execute-tool target attributes
 
-**Files:**
-- Modify: `src/Microsoft.OpenTelemetry/Agent365/Runtime/Tracing/Contracts/TransferDetails.cs`
-- Modify: `src/Microsoft.OpenTelemetry/Agent365/Runtime/Tracing/Scopes/OpenTelemetryConstants.cs`
-- Modify: `src/Microsoft.OpenTelemetry/Agent365/Runtime/Tracing/Scopes/ExecuteToolScope.cs`
-- Modify: `src/Microsoft.OpenTelemetry/Agent365/Runtime/DTOs/Builders/ExecuteToolDataBuilder.cs`
-- Modify: `src/Microsoft.OpenTelemetry/.publicApi/PublicAPI.Unshipped.txt`
+When `TransferDetails` is present, always emit `microsoft.a365.transfer.mode`.
 
-**Interfaces:**
-- Produces: `TransferDetails(TransferMode mode, AgentDetails? targetAgentDetails = null)` and `TransferDetails.TargetAgentDetails`.
-- Produces: the five `microsoft.a365.transfer.target.agent.*` attribute constants.
+When `TransferDetails.TargetAgentDetails` is present, emit only the non-null target agent fields below:
 
-- [ ] Replace the removed generic transfer-target members with `TargetAgentDetails` on `TransferDetails`.
-- [ ] Keep `TransferDetails` immutable and keep exact `ModeValue` serialization.
-- [ ] Update equality and hashing to include `TargetAgentDetails`.
-- [ ] Update `ExecuteToolScope` and `ExecuteToolDataBuilder` to emit identical transfer values and omit null target fields.
-- [ ] Update `PublicAPI.Unshipped.txt` to remove the provisional generic target API and record the final unshipped shape.
-- [ ] Re-run the focused net8.0 command above and expect GREEN.
+- `microsoft.a365.transfer.target.agent.id` <- `AgentDetails.AgentId`
+- `microsoft.a365.transfer.target.agent.name` <- `AgentDetails.AgentName`
+- `microsoft.a365.transfer.target.agent.blueprint.id` <- `AgentDetails.AgentBlueprintId`
+- `microsoft.a365.transfer.target.agent.platform.id` <- `AgentDetails.AgentPlatformId`
+- `microsoft.a365.transfer.target.agent.version` <- `AgentDetails.AgentVersion`
 
-### Task 3: Update documentation and release notes
+Do not emit:
 
-**Files:**
-- Modify: `docs/agent365-getting-started.md`
-- Modify: `CHANGELOG.md`
-- Modify: `docs/superpowers/plans/2026-09-10-execute-tool-transfer-details.md`
-- Modify: `docs/superpowers/specs/2026-09-10-execute-tool-transfer-details-design.md`
+- the removed generic transfer-target name/type attributes
+- any `gen_ai.transfer.*` attributes
 
-**Interfaces:**
-- Produces: final user-facing explanation of source-agent vs target-agent identity.
+## Emission paths
 
-- [ ] Update the canonical execute-tool example to construct `targetAgentDetails` with `AgentId`, `AgentName`, `AgentBlueprintId`, `AgentPlatformId`, and `AgentVersion` and pass it into `new TransferDetails(...)`.
-- [ ] Document that `gen_ai.agent.*` continues to describe the source agent.
-- [ ] Document only these execute-tool transfer attributes: `microsoft.a365.transfer.mode`, `microsoft.a365.transfer.target.agent.id`, `microsoft.a365.transfer.target.agent.name`, `microsoft.a365.transfer.target.agent.blueprint.id`, `microsoft.a365.transfer.target.agent.platform.id`, `microsoft.a365.transfer.target.agent.version`.
-- [ ] Keep the PR [#157](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/157) link in the changelog/context docs.
+`ExecuteToolScope` and `ExecuteToolDataBuilder` must serialize identical transfer values from the same `ToolCallDetails.TransferDetails` instance:
 
-### Task 4: Final verification
+1. write the same `microsoft.a365.transfer.mode` string for both mode values;
+2. omit all target agent attributes when `TargetAgentDetails` is null;
+3. omit individual agent attributes when the corresponding `AgentDetails` property is null;
+4. never substitute source-agent values into transfer-target fields.
 
-**Files:**
-- Modify: `.superpowers/sdd/agent-target-revision-report.md`
+## Canonical example
 
-- [ ] Run focused tests on net8.0:
+```csharp
+var targetAgentDetails = new AgentDetails(
+    agentId: "weather-agent-id",
+    agentName: "Weather Agent",
+    agentBlueprintId: "weather-blueprint",
+    agentPlatformId: "weather-platform",
+    agentVersion: "2026.09.10");
 
-```powershell
-dotnet test test\Microsoft.OpenTelemetry.Agent365.Tests\Microsoft.OpenTelemetry.Agent365.Tests.csproj --framework net8.0 --filter "(FullyQualifiedName~ToolCallDetailsTests|FullyQualifiedName~ExecuteToolScopeTest|FullyQualifiedName~ExecuteToolDataBuilderTests)" --no-restore
+var toolCallDetails = new ToolCallDetails(
+    toolName: "handoff",
+    transferDetails: new TransferDetails(
+        mode: TransferMode.ReturnToCaller,
+        targetAgentDetails: targetAgentDetails),
+    arguments: "{\"city\":\"Seattle\",\"units\":\"metric\"}",
+    toolCallId: "tc-001",
+    description: "Delegate weather lookup to the weather specialist agent",
+    toolType: "function",
+    endpoint: new Uri("https://weather-agent.contoso.com"));
+
+using var scope = ExecuteToolScope.Start(
+    request: request,
+    details: toolCallDetails,
+    agentDetails: agentDetails);
 ```
 
-- [ ] Run the full Agent365 test project on net8.0 and net10.0:
+## Testing and validation
 
-```powershell
-dotnet test test\Microsoft.OpenTelemetry.Agent365.Tests\Microsoft.OpenTelemetry.Agent365.Tests.csproj --framework net8.0 --no-restore
-dotnet test test\Microsoft.OpenTelemetry.Agent365.Tests\Microsoft.OpenTelemetry.Agent365.Tests.csproj --framework net10.0 --no-restore
-```
+Tests must cover:
 
-- [ ] Build with warnings as errors:
+- both serialized mode values;
+- all five target agent attributes in Activity and DTO paths;
+- mode-only omission;
+- partial target agent omission;
+- equality and hash code behavior for `TransferDetails`/`ToolCallDetails`;
+- absence of removed generic transfer-target API references.
 
-```powershell
-dotnet build src\Microsoft.OpenTelemetry\Microsoft.OpenTelemetry.csproj --framework net8.0 --no-restore -p:ContinuousIntegrationBuild=true -warnaserror
-```
-
-- [ ] Check whitespace and stale references:
-
-```powershell
-git --no-pager diff --check
-rg "TargetAgentDetails|microsoft\\.a365\\.transfer\\.target\\.agent" src test docs CHANGELOG.md docs\superpowers
-rg "microsoft\.a365\.transfer\.target\.(name|type)" src test docs CHANGELOG.md docs\superpowers
-rg "microsoft\.a365\.transfer\.target\.agent\.(id|name|blueprint\.id|platform\.id|version)" src test docs CHANGELOG.md docs\superpowers
-```
-
-- [ ] Record RED/GREEN evidence and exact outputs in `.superpowers/sdd/agent-target-revision-report.md`.
-- [ ] Commit all changes with the required `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>` trailer.
+Validation must include focused net8.0 tests for `ToolCallDetailsTests`, `ExecuteToolScopeTest`, and `ExecuteToolDataBuilderTests`; full Agent365 test runs on net8.0 and net10.0; a warnings-as-errors build of `Microsoft.OpenTelemetry`; `git diff --check`; and repository searches proving the obsolete generic target API is gone.
