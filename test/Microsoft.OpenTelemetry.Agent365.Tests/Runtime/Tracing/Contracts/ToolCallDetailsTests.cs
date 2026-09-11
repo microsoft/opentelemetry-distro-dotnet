@@ -13,10 +13,15 @@ public sealed class ToolCallDetailsTests
     [TestMethod]
     public void Constructor_WithTransferDetails_ExposesTypedValues()
     {
+        var targetAgent = new AgentDetails(
+            agentId: "weather-agent-id",
+            agentName: "Weather Agent",
+            agentBlueprintId: "weather-blueprint",
+            agentPlatformId: "weather-platform",
+            agentVersion: "2026.09.10");
         var transfer = new TransferDetails(
             TransferMode.ReturnToCaller,
-            targetName: "weather-agent",
-            targetType: TransferTargetType.Agent);
+            targetAgentDetails: targetAgent);
 
         var details = new ToolCallDetails(
             "handoff",
@@ -24,10 +29,13 @@ public sealed class ToolCallDetailsTests
 
         details.TransferDetails.Should().BeSameAs(transfer);
         transfer.Mode.Should().Be(TransferMode.ReturnToCaller);
-        transfer.TargetName.Should().Be("weather-agent");
-        transfer.TargetType.Should().Be(TransferTargetType.Agent);
+        transfer.TargetAgentDetails.Should().BeSameAs(targetAgent);
+        transfer.TargetAgentDetails!.AgentId.Should().Be("weather-agent-id");
+        transfer.TargetAgentDetails.AgentName.Should().Be("Weather Agent");
+        transfer.TargetAgentDetails.AgentBlueprintId.Should().Be("weather-blueprint");
+        transfer.TargetAgentDetails.AgentPlatformId.Should().Be("weather-platform");
+        transfer.TargetAgentDetails.AgentVersion.Should().Be("2026.09.10");
         transfer.ModeValue.Should().Be("return_to_caller");
-        transfer.TargetTypeValue.Should().Be("agent");
     }
 
     [TestMethod]
@@ -59,14 +67,22 @@ public sealed class ToolCallDetailsTests
             "handoff",
             new TransferDetails(
                 TransferMode.PassControl,
-                "support-agent",
-                TransferTargetType.Agent));
+                new AgentDetails(
+                    agentId: "support-agent-id",
+                    agentName: "Support Agent",
+                    agentBlueprintId: "support-blueprint",
+                    agentPlatformId: "support-platform",
+                    agentVersion: "1.2.3")));
         var right = new ToolCallDetails(
             "handoff",
             new TransferDetails(
                 TransferMode.PassControl,
-                "support-agent",
-                TransferTargetType.Agent));
+                new AgentDetails(
+                    agentId: "support-agent-id",
+                    agentName: "Support Agent",
+                    agentBlueprintId: "support-blueprint",
+                    agentPlatformId: "support-platform",
+                    agentVersion: "1.2.3")));
 
         left.Should().Be(right);
         left.GetHashCode().Should().Be(right.GetHashCode());
@@ -79,12 +95,19 @@ public sealed class ToolCallDetailsTests
             .Should().Be("pass_control");
         new TransferDetails(TransferMode.ReturnToCaller).ModeValue
             .Should().Be("return_to_caller");
-        new TransferDetails(TransferMode.PassControl, targetType: TransferTargetType.Agent)
-            .TargetTypeValue.Should().Be("agent");
-        new TransferDetails(TransferMode.PassControl, targetType: TransferTargetType.Human)
-            .TargetTypeValue.Should().Be("human");
-        new TransferDetails(TransferMode.PassControl, targetType: TransferTargetType.Workflow)
-            .TargetTypeValue.Should().Be("workflow");
+    }
+
+    [TestMethod]
+    public void Equals_WithDifferentTargetAgentDetails_IsFalse()
+    {
+        var left = new TransferDetails(
+            TransferMode.PassControl,
+            new AgentDetails(agentId: "agent-a"));
+        var right = new TransferDetails(
+            TransferMode.PassControl,
+            new AgentDetails(agentId: "agent-b"));
+
+        left.Should().NotBe(right);
     }
 
     [TestMethod]
@@ -94,17 +117,6 @@ public sealed class ToolCallDetailsTests
 
         act.Should().Throw<ArgumentOutOfRangeException>()
             .WithParameterName("mode");
-    }
-
-    [TestMethod]
-    public void TransferDetails_WithUndefinedTargetType_ThrowsAtConstructionTime()
-    {
-        Action act = () => new TransferDetails(
-            TransferMode.PassControl,
-            targetType: (TransferTargetType)999);
-
-        act.Should().Throw<ArgumentOutOfRangeException>()
-            .WithParameterName("targetType");
     }
 
     [TestMethod]

@@ -135,6 +135,16 @@ public sealed class ExecuteToolScopeTest : ActivityTest
     [TestMethod]
     public void Start_WithTransferDetails_SetsExplicitTransferAttributes()
     {
+        var obsoleteTransferNameKey = string.Concat("microsoft.a365.transfer.target.", "name");
+        var obsoleteTransferKindKey = string.Concat("microsoft.a365.transfer.target.", "type");
+        var sourceAgent = new AgentDetails(agentId: "source-agent-id", agentName: "Source Agent");
+        var targetAgent = new AgentDetails(
+            agentId: "weather-agent-id",
+            agentName: "Weather Agent",
+            agentBlueprintId: "weather-blueprint",
+            agentPlatformId: "weather-platform",
+            agentVersion: "2026.09.10");
+
         var activity = ListenForActivity(() =>
         {
             using var scope = ExecuteToolScope.Start(
@@ -143,19 +153,26 @@ public sealed class ExecuteToolScopeTest : ActivityTest
                     "handoff",
                     new TransferDetails(
                         TransferMode.ReturnToCaller,
-                        "weather-agent",
-                        TransferTargetType.Agent)),
-                Util.GetAgentDetails());
+                        targetAgent)),
+                sourceAgent);
         });
 
+        activity.ShouldHaveTag(OpenTelemetryConstants.GenAiAgentIdKey, "source-agent-id");
         activity.ShouldHaveTag(OpenTelemetryConstants.TransferModeKey, "return_to_caller");
-        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetNameKey, "weather-agent");
-        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetTypeKey, "agent");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetAgentIdKey, "weather-agent-id");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetAgentNameKey, "Weather Agent");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey, "weather-blueprint");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey, "weather-platform");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetAgentVersionKey, "2026.09.10");
+        activity.Tags.Should().NotContainKey(obsoleteTransferNameKey);
+        activity.Tags.Should().NotContainKey(obsoleteTransferKindKey);
     }
 
     [TestMethod]
     public void Start_WithoutTransferDetails_OmitsTransferAttributes()
     {
+        var obsoleteTransferNameKey = string.Concat("microsoft.a365.transfer.target.", "name");
+        var obsoleteTransferKindKey = string.Concat("microsoft.a365.transfer.target.", "type");
         var activity = ListenForActivity(() =>
         {
             using var scope = ExecuteToolScope.Start(
@@ -165,8 +182,65 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         });
 
         activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferModeKey);
-        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetNameKey);
-        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetTypeKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentIdKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentNameKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentVersionKey);
+        activity.Tags.Should().NotContainKey(obsoleteTransferNameKey);
+        activity.Tags.Should().NotContainKey(obsoleteTransferKindKey);
+    }
+
+    [TestMethod]
+    public void Start_WithTransferModeOnly_OmitsAllTargetAgentAttributes()
+    {
+        var obsoleteTransferNameKey = string.Concat("microsoft.a365.transfer.target.", "name");
+        var obsoleteTransferKindKey = string.Concat("microsoft.a365.transfer.target.", "type");
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails("handoff", new TransferDetails(TransferMode.PassControl)),
+                Util.GetAgentDetails());
+        });
+
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferModeKey, "pass_control");
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentIdKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentNameKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentVersionKey);
+        activity.Tags.Should().NotContainKey(obsoleteTransferNameKey);
+        activity.Tags.Should().NotContainKey(obsoleteTransferKindKey);
+    }
+
+    [TestMethod]
+    public void Start_WithPartialTargetAgentDetails_OmitsNullTargetAgentAttributes()
+    {
+        var obsoleteTransferNameKey = string.Concat("microsoft.a365.transfer.target.", "name");
+        var obsoleteTransferKindKey = string.Concat("microsoft.a365.transfer.target.", "type");
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails(
+                    "handoff",
+                    new TransferDetails(
+                        TransferMode.ReturnToCaller,
+                        new AgentDetails(
+                            agentId: "weather-agent-id",
+                            agentVersion: "2026.09.11"))),
+                Util.GetAgentDetails());
+        });
+
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferModeKey, "return_to_caller");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetAgentIdKey, "weather-agent-id");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetAgentVersionKey, "2026.09.11");
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentNameKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey);
+        activity.Tags.Should().NotContainKey(obsoleteTransferNameKey);
+        activity.Tags.Should().NotContainKey(obsoleteTransferKindKey);
     }
 
     [TestMethod]

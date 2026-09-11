@@ -215,14 +215,29 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         public const string TransferModeKey = "microsoft.a365.transfer.mode";
 
         /// <summary>
-        /// The explicit transfer target name key for execute-tool spans.
+        /// The explicit transfer target agent ID key for execute-tool spans.
         /// </summary>
-        public const string TransferTargetNameKey = "microsoft.a365.transfer.target.name";
+        public const string TransferTargetAgentIdKey = "microsoft.a365.transfer.target.agent.id";
 
         /// <summary>
-        /// The explicit transfer target type key for execute-tool spans.
+        /// The explicit transfer target agent name key for execute-tool spans.
         /// </summary>
-        public const string TransferTargetTypeKey = "microsoft.a365.transfer.target.type";
+        public const string TransferTargetAgentNameKey = "microsoft.a365.transfer.target.agent.name";
+
+        /// <summary>
+        /// The explicit transfer target agent blueprint ID key for execute-tool spans.
+        /// </summary>
+        public const string TransferTargetAgentBlueprintIdKey = "microsoft.a365.transfer.target.agent.blueprint.id";
+
+        /// <summary>
+        /// The explicit transfer target agent platform ID key for execute-tool spans.
+        /// </summary>
+        public const string TransferTargetAgentPlatformIdKey = "microsoft.a365.transfer.target.agent.platform.id";
+
+        /// <summary>
+        /// The explicit transfer target agent version key for execute-tool spans.
+        /// </summary>
+        public const string TransferTargetAgentVersionKey = "microsoft.a365.transfer.target.agent.version";
         #endregion
 
         /// <summary>

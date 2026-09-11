@@ -160,26 +160,42 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
         [TestMethod]
         public void Build_WithTransferDetails_IncludesExplicitTransferAttributes()
         {
+            var obsoleteTransferNameKey = string.Concat("microsoft.a365.transfer.target.", "name");
+            var obsoleteTransferKindKey = string.Concat("microsoft.a365.transfer.target.", "type");
+            var sourceAgent = new AgentDetails(agentId: "source-agent-id", agentName: "Source Agent");
+            var targetAgent = new AgentDetails(
+                agentId: "support-agent-id",
+                agentName: "Support Agent",
+                agentBlueprintId: "support-blueprint",
+                agentPlatformId: "support-platform",
+                agentVersion: "1.2.3");
             var tool = new ToolCallDetails(
                 "handoff",
                 new TransferDetails(
                     TransferMode.PassControl,
-                    "support-workflow",
-                    TransferTargetType.Workflow));
+                    targetAgent));
 
             var data = ExecuteToolDataBuilder.Build(
                 tool,
-                new AgentDetails("source-agent"),
+                sourceAgent,
                 "conversation-1");
 
+            data.Attributes[OpenTelemetryConstants.GenAiAgentIdKey].Should().Be("source-agent-id");
             data.Attributes[OpenTelemetryConstants.TransferModeKey].Should().Be("pass_control");
-            data.Attributes[OpenTelemetryConstants.TransferTargetNameKey].Should().Be("support-workflow");
-            data.Attributes[OpenTelemetryConstants.TransferTargetTypeKey].Should().Be("workflow");
+            data.Attributes[OpenTelemetryConstants.TransferTargetAgentIdKey].Should().Be("support-agent-id");
+            data.Attributes[OpenTelemetryConstants.TransferTargetAgentNameKey].Should().Be("Support Agent");
+            data.Attributes[OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey].Should().Be("support-blueprint");
+            data.Attributes[OpenTelemetryConstants.TransferTargetAgentPlatformIdKey].Should().Be("support-platform");
+            data.Attributes[OpenTelemetryConstants.TransferTargetAgentVersionKey].Should().Be("1.2.3");
+            data.Attributes.Should().NotContainKey(obsoleteTransferNameKey);
+            data.Attributes.Should().NotContainKey(obsoleteTransferKindKey);
         }
 
         [TestMethod]
         public void Build_WithModeOnly_OmitsOptionalTargetAttributes()
         {
+            var obsoleteTransferNameKey = string.Concat("microsoft.a365.transfer.target.", "name");
+            var obsoleteTransferKindKey = string.Concat("microsoft.a365.transfer.target.", "type");
             var tool = new ToolCallDetails(
                 "handoff",
                 new TransferDetails(TransferMode.ReturnToCaller));
@@ -190,8 +206,41 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
                 "conversation-1");
 
             data.Attributes[OpenTelemetryConstants.TransferModeKey].Should().Be("return_to_caller");
-            data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetNameKey);
-            data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetTypeKey);
+            data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentIdKey);
+            data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentNameKey);
+            data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey);
+            data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey);
+            data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentVersionKey);
+            data.Attributes.Should().NotContainKey(obsoleteTransferNameKey);
+            data.Attributes.Should().NotContainKey(obsoleteTransferKindKey);
+        }
+
+        [TestMethod]
+        public void Build_WithPartialTargetAgentDetails_OmitsNullTargetAgentAttributes()
+        {
+            var obsoleteTransferNameKey = string.Concat("microsoft.a365.transfer.target.", "name");
+            var obsoleteTransferKindKey = string.Concat("microsoft.a365.transfer.target.", "type");
+            var tool = new ToolCallDetails(
+                "handoff",
+                new TransferDetails(
+                    TransferMode.ReturnToCaller,
+                    new AgentDetails(
+                        agentId: "support-agent-id",
+                        agentVersion: "9.9.9")));
+
+            var data = ExecuteToolDataBuilder.Build(
+                tool,
+                new AgentDetails("source-agent"),
+                "conversation-1");
+
+            data.Attributes[OpenTelemetryConstants.TransferModeKey].Should().Be("return_to_caller");
+            data.Attributes[OpenTelemetryConstants.TransferTargetAgentIdKey].Should().Be("support-agent-id");
+            data.Attributes[OpenTelemetryConstants.TransferTargetAgentVersionKey].Should().Be("9.9.9");
+            data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentNameKey);
+            data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey);
+            data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey);
+            data.Attributes.Should().NotContainKey(obsoleteTransferNameKey);
+            data.Attributes.Should().NotContainKey(obsoleteTransferKindKey);
         }
 
         [TestMethod]

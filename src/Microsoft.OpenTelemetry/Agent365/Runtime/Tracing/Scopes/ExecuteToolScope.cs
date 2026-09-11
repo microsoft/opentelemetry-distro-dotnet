@@ -89,8 +89,16 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             if (transferDetails != null)
             {
                 SetTagMaybe(OpenTelemetryConstants.TransferModeKey, transferDetails.ModeValue);
-                SetTagMaybe(OpenTelemetryConstants.TransferTargetNameKey, transferDetails.TargetName);
-                SetTagMaybe(OpenTelemetryConstants.TransferTargetTypeKey, transferDetails.TargetTypeValue);
+
+                var targetAgentDetails = transferDetails.TargetAgentDetails;
+                if (targetAgentDetails != null)
+                {
+                    SetTagMaybe(OpenTelemetryConstants.TransferTargetAgentIdKey, targetAgentDetails.AgentId);
+                    SetTagMaybe(OpenTelemetryConstants.TransferTargetAgentNameKey, targetAgentDetails.AgentName);
+                    SetTagMaybe(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey, targetAgentDetails.AgentBlueprintId);
+                    SetTagMaybe(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey, targetAgentDetails.AgentPlatformId);
+                    SetTagMaybe(OpenTelemetryConstants.TransferTargetAgentVersionKey, targetAgentDetails.AgentVersion);
+                }
             }
 
             SetTagMaybe(OpenTelemetryConstants.ThreatDiagnosticsSummaryKey, threatDiagnosticsSummary?.ToJson());

@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
 {
@@ -14,26 +15,18 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// Initializes a new instance of the <see cref="TransferDetails"/> class.
         /// </summary>
         /// <param name="mode">How control passes to the target.</param>
-        /// <param name="targetName">Optional human-readable target name.</param>
-        /// <param name="targetType">Optional target classification.</param>
+        /// <param name="targetAgentDetails">Optional details for the target agent that receives control.</param>
         public TransferDetails(
             TransferMode mode,
-            string? targetName = null,
-            TransferTargetType? targetType = null)
+            AgentDetails? targetAgentDetails = null)
         {
             if (!Enum.IsDefined(typeof(TransferMode), mode))
             {
                 throw new ArgumentOutOfRangeException(nameof(mode), mode, "The transfer mode must be a defined enum value.");
             }
 
-            if (targetType.HasValue && !Enum.IsDefined(typeof(TransferTargetType), targetType.Value))
-            {
-                throw new ArgumentOutOfRangeException(nameof(targetType), targetType, "The transfer target type must be a defined enum value.");
-            }
-
             Mode = mode;
-            TargetName = targetName;
-            TargetType = targetType;
+            TargetAgentDetails = targetAgentDetails;
         }
 
         /// <summary>
@@ -42,14 +35,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         public TransferMode Mode { get; }
 
         /// <summary>
-        /// Gets the optional human-readable target name.
+        /// Gets the optional target agent details.
         /// </summary>
-        public string? TargetName { get; }
-
-        /// <summary>
-        /// Gets the optional target classification.
-        /// </summary>
-        public TransferTargetType? TargetType { get; }
+        public AgentDetails? TargetAgentDetails { get; }
 
         internal string ModeValue => Mode switch
         {
@@ -58,21 +46,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
             _ => throw new ArgumentOutOfRangeException(nameof(Mode)),
         };
 
-        internal string? TargetTypeValue => TargetType switch
-        {
-            TransferTargetType.Agent => "agent",
-            TransferTargetType.Human => "human",
-            TransferTargetType.Workflow => "workflow",
-            null => null,
-            _ => throw new ArgumentOutOfRangeException(nameof(TargetType)),
-        };
-
         /// <inheritdoc/>
         public bool Equals(TransferDetails? other) =>
             other is not null &&
             Mode == other.Mode &&
-            string.Equals(TargetName, other.TargetName, StringComparison.Ordinal) &&
-            TargetType == other.TargetType;
+            EqualityComparer<AgentDetails?>.Default.Equals(TargetAgentDetails, other.TargetAgentDetails);
 
         /// <inheritdoc/>
         public override bool Equals(object? obj) => Equals(obj as TransferDetails);
@@ -84,8 +62,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
             {
                 var hash = 17;
                 hash = (hash * 31) + Mode.GetHashCode();
-                hash = (hash * 31) + (TargetName == null ? 0 : StringComparer.Ordinal.GetHashCode(TargetName));
-                hash = (hash * 31) + TargetType.GetHashCode();
+                hash = (hash * 31) + (TargetAgentDetails?.GetHashCode() ?? 0);
                 return hash;
             }
         }
@@ -105,26 +82,5 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// The target assumes control of the remaining work.
         /// </summary>
         PassControl,
-    }
-
-    /// <summary>
-    /// Describes the type of transfer target.
-    /// </summary>
-    public enum TransferTargetType
-    {
-        /// <summary>
-        /// Another agent.
-        /// </summary>
-        Agent,
-
-        /// <summary>
-        /// A human participant.
-        /// </summary>
-        Human,
-
-        /// <summary>
-        /// A workflow.
-        /// </summary>
-        Workflow,
     }
 }

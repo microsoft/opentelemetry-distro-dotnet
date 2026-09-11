@@ -602,12 +602,18 @@ scope.RecordOutputMessages(new[] { "Here is the response." });
 Track tool execution with telemetry for monitoring and auditing.
 
 ```csharp
+var targetAgentDetails = new AgentDetails(
+    agentId: "weather-agent-id",
+    agentName: "Weather Agent",
+    agentBlueprintId: "weather-blueprint",
+    agentPlatformId: "weather-platform",
+    agentVersion: "2026.09.10");
+
 var toolCallDetails = new ToolCallDetails(
     toolName: "handoff",
     transferDetails: new TransferDetails(
         mode: TransferMode.ReturnToCaller,
-        targetName: "weather-agent",
-        targetType: TransferTargetType.Agent),
+        targetAgentDetails: targetAgentDetails),
     arguments: "{\"city\":\"Seattle\",\"units\":\"metric\"}",
     toolCallId: "tc-001",
     description: "Delegate weather lookup to the weather specialist agent",
@@ -625,10 +631,15 @@ scope.RecordResponse("{\"status\": \"returned_to_caller\", \"target\": \"weather
 ```
 
 `agentDetails` identifies the source agent executing the tool. `TransferDetails`
-describes the target role exposed by this tool call. The SDK does not infer
-transfer semantics for ordinary tool calls, so keep the required tool metadata
-(`arguments`, `toolCallId`, `description`, `toolType`, and `endpoint`) on
-`ToolCallDetails` while using `TransferDetails` to describe source/target roles.
+describes the explicit transfer exposed by this tool call. Use
+`TransferDetails.TargetAgentDetails` to supply target agent identity only when
+your application already knows it. The SDK emits
+`microsoft.a365.transfer.mode` plus only the non-null
+`microsoft.a365.transfer.target.agent.*` fields from `TargetAgentDetails`; it
+never infers target attributes for ordinary tool calls. Keep the required tool
+metadata (`arguments`, `toolCallId`, `description`, `toolType`, and
+`endpoint`) on `ToolCallDetails` while using `TransferDetails` for the explicit
+handoff metadata.
 
 **Available methods:**
 
@@ -850,8 +861,11 @@ Received HTTP response headers after *ms - 200
     "gen_ai.tool.name": "Required",
     "gen_ai.tool.type": "Required",
     "microsoft.a365.transfer.mode": "Optional",
-    "microsoft.a365.transfer.target.name": "Optional",
-    "microsoft.a365.transfer.target.type": "Optional",
+    "microsoft.a365.transfer.target.agent.id": "Optional",
+    "microsoft.a365.transfer.target.agent.name": "Optional",
+    "microsoft.a365.transfer.target.agent.blueprint.id": "Optional",
+    "microsoft.a365.transfer.target.agent.platform.id": "Optional",
+    "microsoft.a365.transfer.target.agent.version": "Optional",
     "server.address": "Optional",
     "server.port": "Optional",
     "microsoft.session.id": "Optional",

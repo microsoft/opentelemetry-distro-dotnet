@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Add typed execute-tool transfer details and emit provisional `microsoft.a365.transfer.*` attributes for explicitly reported agent, human, and workflow transfers, aligned with the semantics proposed in OpenTelemetry semantic-conventions-genai PR 447 ([#157](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/157)).
+- Add agent-specific execute-tool transfer details and emit `microsoft.a365.transfer.mode` plus the five `microsoft.a365.transfer.target.agent.*` attributes for explicitly reported target agents, aligned with PR 157's Microsoft Agent365 identity model ([#157](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/157)).
 - Add a self-contained Agent365 service-to-service sample that uses app-only MSAL authentication and emits manual Invoke Agent, Inference, and Execute Tool spans without the Agents Framework ([#155](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/155))
 - Log successful Agent365 export responses with the HTTP status code and correlation ID ([#155](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/155))
 
