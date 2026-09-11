@@ -135,8 +135,6 @@ public sealed class ExecuteToolScopeTest : ActivityTest
     [TestMethod]
     public void Start_WithTransferDetails_SetsExplicitTransferAttributes()
     {
-        var obsoleteTransferNameKey = string.Concat("microsoft.a365.transfer.target.", "name");
-        var obsoleteTransferKindKey = string.Concat("microsoft.a365.transfer.target.", "type");
         var sourceAgent = new AgentDetails(agentId: "source-agent-id", agentName: "Source Agent");
         var targetAgent = new AgentDetails(
             agentId: "weather-agent-id",
@@ -164,15 +162,23 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey, "weather-blueprint");
         activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey, "weather-platform");
         activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetAgentVersionKey, "2026.09.10");
-        activity.Tags.Should().NotContainKey(obsoleteTransferNameKey);
-        activity.Tags.Should().NotContainKey(obsoleteTransferKindKey);
+        activity.Tags
+            .Where(tag => tag.Key.StartsWith("microsoft.a365.transfer.target.", StringComparison.Ordinal))
+            .Select(tag => tag.Key)
+            .Should()
+            .BeEquivalentTo(new[]
+            {
+                OpenTelemetryConstants.TransferTargetAgentIdKey,
+                OpenTelemetryConstants.TransferTargetAgentNameKey,
+                OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey,
+                OpenTelemetryConstants.TransferTargetAgentPlatformIdKey,
+                OpenTelemetryConstants.TransferTargetAgentVersionKey,
+            });
     }
 
     [TestMethod]
     public void Start_WithoutTransferDetails_OmitsTransferAttributes()
     {
-        var obsoleteTransferNameKey = string.Concat("microsoft.a365.transfer.target.", "name");
-        var obsoleteTransferKindKey = string.Concat("microsoft.a365.transfer.target.", "type");
         var activity = ListenForActivity(() =>
         {
             using var scope = ExecuteToolScope.Start(
@@ -187,15 +193,11 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey);
         activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey);
         activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentVersionKey);
-        activity.Tags.Should().NotContainKey(obsoleteTransferNameKey);
-        activity.Tags.Should().NotContainKey(obsoleteTransferKindKey);
     }
 
     [TestMethod]
     public void Start_WithTransferModeOnly_OmitsAllTargetAgentAttributes()
     {
-        var obsoleteTransferNameKey = string.Concat("microsoft.a365.transfer.target.", "name");
-        var obsoleteTransferKindKey = string.Concat("microsoft.a365.transfer.target.", "type");
         var activity = ListenForActivity(() =>
         {
             using var scope = ExecuteToolScope.Start(
@@ -210,15 +212,11 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey);
         activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey);
         activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentVersionKey);
-        activity.Tags.Should().NotContainKey(obsoleteTransferNameKey);
-        activity.Tags.Should().NotContainKey(obsoleteTransferKindKey);
     }
 
     [TestMethod]
     public void Start_WithPartialTargetAgentDetails_OmitsNullTargetAgentAttributes()
     {
-        var obsoleteTransferNameKey = string.Concat("microsoft.a365.transfer.target.", "name");
-        var obsoleteTransferKindKey = string.Concat("microsoft.a365.transfer.target.", "type");
         var activity = ListenForActivity(() =>
         {
             using var scope = ExecuteToolScope.Start(
@@ -239,8 +237,6 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentNameKey);
         activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey);
         activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey);
-        activity.Tags.Should().NotContainKey(obsoleteTransferNameKey);
-        activity.Tags.Should().NotContainKey(obsoleteTransferKindKey);
     }
 
     [TestMethod]

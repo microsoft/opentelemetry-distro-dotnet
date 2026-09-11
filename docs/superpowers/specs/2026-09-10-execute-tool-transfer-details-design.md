@@ -113,7 +113,7 @@ dotnet test test\Microsoft.OpenTelemetry.Agent365.Tests\Microsoft.OpenTelemetry.
 - [ ] Build with warnings as errors:
 
 ```powershell
-dotnet build src\Microsoft.OpenTelemetry\Microsoft.OpenTelemetry.csproj --framework net8.0 --no-restore -warnaserror
+dotnet build src\Microsoft.OpenTelemetry\Microsoft.OpenTelemetry.csproj --framework net8.0 --no-restore -p:ContinuousIntegrationBuild=true -warnaserror
 ```
 
 - [ ] Check whitespace and stale references:

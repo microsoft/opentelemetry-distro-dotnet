@@ -89,6 +89,16 @@ public sealed class ToolCallDetailsTests
     }
 
     [TestMethod]
+    public void TransferDetails_WithNullTargetAgentDetails_IsEqualAndHasMatchingHashCode()
+    {
+        var left = new TransferDetails(TransferMode.PassControl);
+        var right = new TransferDetails(TransferMode.PassControl, null);
+
+        left.Should().Be(right);
+        left.GetHashCode().Should().Be(right.GetHashCode());
+    }
+
+    [TestMethod]
     public void TransferDetails_MapsAllStandardValues()
     {
         new TransferDetails(TransferMode.PassControl).ModeValue

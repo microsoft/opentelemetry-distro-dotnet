@@ -15,7 +15,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// Initializes a new instance of the <see cref="TransferDetails"/> class.
         /// </summary>
         /// <param name="mode">How control passes to the target.</param>
-        /// <param name="targetAgentDetails">Optional details for the target agent that receives control.</param>
+        /// <param name="targetAgentDetails">Optional target agent identity. Only <see cref="AgentDetails.AgentId"/>, <see cref="AgentDetails.AgentName"/>, <see cref="AgentDetails.AgentBlueprintId"/>, <see cref="AgentDetails.AgentPlatformId"/>, and <see cref="AgentDetails.AgentVersion"/> are emitted for this transfer model. Other <see cref="AgentDetails"/> properties are not emitted.</param>
         public TransferDetails(
             TransferMode mode,
             AgentDetails? targetAgentDetails = null)
@@ -35,7 +35,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         public TransferMode Mode { get; }
 
         /// <summary>
-        /// Gets the optional target agent details.
+        /// Gets the optional target agent identity whose supported fields are emitted for transfers.
         /// </summary>
         public AgentDetails? TargetAgentDetails { get; }
 

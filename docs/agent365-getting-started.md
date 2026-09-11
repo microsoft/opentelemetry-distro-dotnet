@@ -634,12 +634,13 @@ scope.RecordResponse("{\"status\": \"returned_to_caller\", \"target\": \"weather
 describes the explicit transfer exposed by this tool call. Use
 `TransferDetails.TargetAgentDetails` to supply target agent identity only when
 your application already knows it. The SDK emits
-`microsoft.a365.transfer.mode` plus only the non-null
-`microsoft.a365.transfer.target.agent.*` fields from `TargetAgentDetails`; it
-never infers target attributes for ordinary tool calls. Keep the required tool
-metadata (`arguments`, `toolCallId`, `description`, `toolType`, and
-`endpoint`) on `ToolCallDetails` while using `TransferDetails` for the explicit
-handoff metadata.
+`microsoft.a365.transfer.mode` plus only the five supported target-agent fields
+from `TargetAgentDetails` (`AgentId`, `AgentName`, `AgentBlueprintId`,
+`AgentPlatformId`, and `AgentVersion`); other `AgentDetails` properties are not
+emitted for this transfer model. It never infers target attributes for ordinary
+tool calls. Keep the required tool metadata (`arguments`, `toolCallId`,
+`description`, `toolType`, and `endpoint`) on `ToolCallDetails` while using
+`TransferDetails` for the explicit handoff metadata.
 
 **Available methods:**
 

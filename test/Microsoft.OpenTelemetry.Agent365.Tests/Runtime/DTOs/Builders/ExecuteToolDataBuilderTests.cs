@@ -160,8 +160,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
         [TestMethod]
         public void Build_WithTransferDetails_IncludesExplicitTransferAttributes()
         {
-            var obsoleteTransferNameKey = string.Concat("microsoft.a365.transfer.target.", "name");
-            var obsoleteTransferKindKey = string.Concat("microsoft.a365.transfer.target.", "type");
             var sourceAgent = new AgentDetails(agentId: "source-agent-id", agentName: "Source Agent");
             var targetAgent = new AgentDetails(
                 agentId: "support-agent-id",
@@ -187,15 +185,22 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
             data.Attributes[OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey].Should().Be("support-blueprint");
             data.Attributes[OpenTelemetryConstants.TransferTargetAgentPlatformIdKey].Should().Be("support-platform");
             data.Attributes[OpenTelemetryConstants.TransferTargetAgentVersionKey].Should().Be("1.2.3");
-            data.Attributes.Should().NotContainKey(obsoleteTransferNameKey);
-            data.Attributes.Should().NotContainKey(obsoleteTransferKindKey);
+            data.Attributes.Keys
+                .Where(key => key.StartsWith("microsoft.a365.transfer.target.", StringComparison.Ordinal))
+                .Should()
+                .BeEquivalentTo(new[]
+                {
+                    OpenTelemetryConstants.TransferTargetAgentIdKey,
+                    OpenTelemetryConstants.TransferTargetAgentNameKey,
+                    OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey,
+                    OpenTelemetryConstants.TransferTargetAgentPlatformIdKey,
+                    OpenTelemetryConstants.TransferTargetAgentVersionKey,
+                });
         }
 
         [TestMethod]
         public void Build_WithModeOnly_OmitsOptionalTargetAttributes()
         {
-            var obsoleteTransferNameKey = string.Concat("microsoft.a365.transfer.target.", "name");
-            var obsoleteTransferKindKey = string.Concat("microsoft.a365.transfer.target.", "type");
             var tool = new ToolCallDetails(
                 "handoff",
                 new TransferDetails(TransferMode.ReturnToCaller));
@@ -211,15 +216,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
             data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey);
             data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey);
             data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentVersionKey);
-            data.Attributes.Should().NotContainKey(obsoleteTransferNameKey);
-            data.Attributes.Should().NotContainKey(obsoleteTransferKindKey);
         }
 
         [TestMethod]
         public void Build_WithPartialTargetAgentDetails_OmitsNullTargetAgentAttributes()
         {
-            var obsoleteTransferNameKey = string.Concat("microsoft.a365.transfer.target.", "name");
-            var obsoleteTransferKindKey = string.Concat("microsoft.a365.transfer.target.", "type");
             var tool = new ToolCallDetails(
                 "handoff",
                 new TransferDetails(
@@ -239,8 +240,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
             data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentNameKey);
             data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey);
             data.Attributes.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey);
-            data.Attributes.Should().NotContainKey(obsoleteTransferNameKey);
-            data.Attributes.Should().NotContainKey(obsoleteTransferKindKey);
         }
 
         [TestMethod]
