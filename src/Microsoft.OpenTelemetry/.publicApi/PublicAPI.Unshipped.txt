@@ -13,7 +13,7 @@ override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchAct
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.OnShutdown(int timeoutMilliseconds) -> bool
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallArguments.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.TransferDetails.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails?
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.TransferDetails.init -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.TransferDetails.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.ToolCallDetails(string! toolName, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments! toolCallArguments, string? toolCallId = null, string? description = null, string? toolType = null, System.Uri? endpoint = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails.Equals(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails? other) -> bool

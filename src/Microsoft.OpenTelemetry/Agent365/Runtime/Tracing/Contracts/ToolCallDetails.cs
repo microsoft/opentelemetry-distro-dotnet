@@ -116,7 +116,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// <summary>
         /// Gets the explicit transfer metadata supplied to the tool, when any.
         /// </summary>
-        public TransferDetails? TransferDetails { get; init; }
+        public TransferDetails? TransferDetails { get; set; }
 
         /// <summary>
         /// Gets the identifier for the tool call, when provided.
