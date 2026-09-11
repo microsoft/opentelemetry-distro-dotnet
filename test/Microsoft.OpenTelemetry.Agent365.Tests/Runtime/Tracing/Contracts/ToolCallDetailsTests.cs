@@ -25,7 +25,7 @@ public sealed class ToolCallDetailsTests
 
         var details = new ToolCallDetails(
             "handoff",
-            (string?)null)
+            arguments: null)
         {
             TransferDetails = transfer,
         };
@@ -70,7 +70,7 @@ public sealed class ToolCallDetailsTests
     {
         var left = new ToolCallDetails(
             "handoff",
-            (string?)null)
+            arguments: null)
         {
             TransferDetails = new TransferDetails(
                 TransferMode.PassControl,
@@ -83,7 +83,7 @@ public sealed class ToolCallDetailsTests
         };
         var right = new ToolCallDetails(
             "handoff",
-            (string?)null)
+            arguments: null)
         {
             TransferDetails = new TransferDetails(
                 TransferMode.PassControl,

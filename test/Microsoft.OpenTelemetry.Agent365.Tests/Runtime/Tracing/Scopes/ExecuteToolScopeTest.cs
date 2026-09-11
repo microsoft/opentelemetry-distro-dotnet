@@ -149,7 +149,7 @@ public sealed class ExecuteToolScopeTest : ActivityTest
                 Util.GetDefaultRequest(),
                 new ToolCallDetails(
                     "handoff",
-                    (string?)null)
+                    arguments: null)
                 {
                     TransferDetails = new TransferDetails(
                         TransferMode.ReturnToCaller,
@@ -212,7 +212,7 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         {
             using var scope = ExecuteToolScope.Start(
                 Util.GetDefaultRequest(),
-                new ToolCallDetails("handoff", (string?)null)
+                new ToolCallDetails("handoff", arguments: null)
                 {
                     TransferDetails = new TransferDetails(TransferMode.PassControl),
                 },
@@ -249,7 +249,7 @@ public sealed class ExecuteToolScopeTest : ActivityTest
                 Util.GetDefaultRequest(),
                 new ToolCallDetails(
                     "handoff",
-                    (string?)null)
+                    arguments: null)
                 {
                     TransferDetails = new TransferDetails(
                         TransferMode.ReturnToCaller,
@@ -279,7 +279,7 @@ public sealed class ExecuteToolScopeTest : ActivityTest
                     Util.GetDefaultRequest(),
                     new ToolCallDetails(
                         "handoff",
-                        (string?)null)
+                        arguments: null)
                     {
                         TransferDetails = new TransferDetails(
                             TransferMode.PassControl,

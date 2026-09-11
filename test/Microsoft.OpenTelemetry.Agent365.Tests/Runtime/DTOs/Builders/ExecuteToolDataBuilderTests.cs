@@ -169,7 +169,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
                 agentVersion: "1.2.3");
             var tool = new ToolCallDetails(
                 "handoff",
-                (string?)null)
+                arguments: null)
             {
                 TransferDetails = new TransferDetails(
                     TransferMode.PassControl,
@@ -209,7 +209,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
         {
             var tool = new ToolCallDetails(
                 "handoff",
-                (string?)null)
+                arguments: null)
             {
                 TransferDetails = new TransferDetails(TransferMode.ReturnToCaller),
             };
@@ -241,7 +241,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
         {
             var tool = new ToolCallDetails(
                 "handoff",
-                (string?)null)
+                arguments: null)
             {
                 TransferDetails = new TransferDetails(
                     TransferMode.ReturnToCaller,
@@ -270,7 +270,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
             {
                 var tool = new ToolCallDetails(
                     "handoff",
-                    (string?)null)
+                    arguments: null)
                 {
                     TransferDetails = new TransferDetails(
                         TransferMode.PassControl,
