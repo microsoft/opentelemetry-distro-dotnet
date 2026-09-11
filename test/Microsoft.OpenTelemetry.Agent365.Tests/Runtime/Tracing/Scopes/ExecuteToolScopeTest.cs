@@ -194,6 +194,7 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         });
 
         activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferModeKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetTypeKey);
         activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentIdKey);
         activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentNameKey);
         activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey);

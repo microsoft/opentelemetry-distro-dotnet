@@ -644,9 +644,10 @@ the five supported target-agent fields from `TargetAgentDetails` (`AgentId`,
 non-agent handoffs, use the explicit overload such as
 `new TransferDetails(TransferMode.PassControl, TransferTargetType.Human)` or
 `new TransferDetails(TransferMode.PassControl, TransferTargetType.Workflow)`.
-Those transfers emit only `microsoft.a365.transfer.target.type` and reject
-`TargetAgentDetails` to avoid contradictory telemetry. It never infers target
-attributes for ordinary tool calls. Keep the required tool metadata
+Those transfers emit the transfer mode and target type, but no target-agent
+identity attributes, and reject `TargetAgentDetails` to avoid contradictory
+telemetry. The SDK never infers target attributes for ordinary tool calls. Keep
+the required tool metadata
 (`arguments`, `toolCallId`, `description`, `toolType`, and `endpoint`) on
 `ToolCallDetails` while using `TransferDetails` for the explicit handoff
 metadata.
