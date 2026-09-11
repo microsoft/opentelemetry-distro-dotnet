@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Add agent-specific execute-tool transfer details and emit `microsoft.a365.transfer.mode` plus the five `microsoft.a365.transfer.target.agent.*` attributes for explicitly reported target agents, aligned with the Microsoft Agent365 agent identity model ([#157](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/157)).
+- Add public execute-tool transfer target typing via `TransferTargetType`, preserve the ergonomic agent-transfer constructor, and emit `microsoft.a365.transfer.mode`, `microsoft.a365.transfer.target.type`, plus the five `microsoft.a365.transfer.target.agent.*` attributes for agent handoffs aligned with semantic-conventions PR 447 and the Microsoft Agent365 agent identity model ([#157](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/157)).
 - Add a self-contained Agent365 service-to-service sample that uses app-only MSAL authentication and emits manual Invoke Agent, Inference, and Execute Tool spans without the Agents Framework ([#155](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/155))
 - Log successful Agent365 export responses with the HTTP status code and correlation ID ([#155](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/155))
 

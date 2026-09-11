@@ -218,6 +218,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             if (transferDetails != null)
             {
                 AddIfNotNull(attributes, OpenTelemetryConstants.TransferModeKey, transferDetails.ModeValue);
+                AddIfNotNull(attributes, OpenTelemetryConstants.TransferTargetTypeKey, transferDetails.TargetTypeValue);
 
                 var targetAgentDetails = transferDetails.TargetAgentDetails;
                 if (targetAgentDetails != null)

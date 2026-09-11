@@ -631,16 +631,25 @@ scope.RecordResponse("{\"status\": \"returned_to_caller\", \"target\": \"weather
 ```
 
 `agentDetails` identifies the source agent executing the tool. `TransferDetails`
-describes the explicit transfer exposed by this tool call. Use
-`TransferDetails.TargetAgentDetails` to supply target agent identity only when
-your application already knows it. The SDK emits
-`microsoft.a365.transfer.mode` plus only the five supported target-agent fields
-from `TargetAgentDetails` (`AgentId`, `AgentName`, `AgentBlueprintId`,
-`AgentPlatformId`, and `AgentVersion`); other `AgentDetails` properties are not
-emitted for this transfer model. It never infers target attributes for ordinary
-tool calls. Keep the required tool metadata (`arguments`, `toolCallId`,
-`description`, `toolType`, and `endpoint`) on `ToolCallDetails` while using
-`TransferDetails` for the explicit handoff metadata.
+describes the explicit transfer exposed by this tool call. The ergonomic
+constructor (`new TransferDetails(mode, targetAgentDetails)`) defaults
+`TransferDetails.TargetType` to `TransferTargetType.Agent`, so both mode-only
+and target-agent transfers emit `microsoft.a365.transfer.target.type=agent`.
+Use `TransferDetails.TargetAgentDetails` only when your application already
+knows the target agent identity. The SDK emits
+`microsoft.a365.transfer.mode`, `microsoft.a365.transfer.target.type`, and only
+the five supported target-agent fields from `TargetAgentDetails` (`AgentId`,
+`AgentName`, `AgentBlueprintId`, `AgentPlatformId`, and `AgentVersion`); other
+`AgentDetails` properties are not emitted for this transfer model. For future
+non-agent handoffs, use the explicit overload such as
+`new TransferDetails(TransferMode.PassControl, TransferTargetType.Human)` or
+`new TransferDetails(TransferMode.PassControl, TransferTargetType.Workflow)`.
+Those transfers emit only `microsoft.a365.transfer.target.type` and reject
+`TargetAgentDetails` to avoid contradictory telemetry. It never infers target
+attributes for ordinary tool calls. Keep the required tool metadata
+(`arguments`, `toolCallId`, `description`, `toolType`, and `endpoint`) on
+`ToolCallDetails` while using `TransferDetails` for the explicit handoff
+metadata.
 
 **Available methods:**
 
@@ -862,6 +871,7 @@ Received HTTP response headers after *ms - 200
     "gen_ai.tool.name": "Required",
     "gen_ai.tool.type": "Required",
     "microsoft.a365.transfer.mode": "Optional",
+    "microsoft.a365.transfer.target.type": "Optional",
     "microsoft.a365.transfer.target.agent.id": "Optional",
     "microsoft.a365.transfer.target.agent.name": "Optional",
     "microsoft.a365.transfer.target.agent.blueprint.id": "Optional",

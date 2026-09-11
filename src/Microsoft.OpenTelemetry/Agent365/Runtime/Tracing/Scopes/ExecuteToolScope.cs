@@ -89,6 +89,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             if (transferDetails != null)
             {
                 SetTagMaybe(OpenTelemetryConstants.TransferModeKey, transferDetails.ModeValue);
+                SetTagMaybe(OpenTelemetryConstants.TransferTargetTypeKey, transferDetails.TargetTypeValue);
 
                 var targetAgentDetails = transferDetails.TargetAgentDetails;
                 if (targetAgentDetails != null)

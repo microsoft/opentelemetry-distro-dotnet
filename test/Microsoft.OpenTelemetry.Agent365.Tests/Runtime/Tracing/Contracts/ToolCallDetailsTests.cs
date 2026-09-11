@@ -29,6 +29,7 @@ public sealed class ToolCallDetailsTests
 
         details.TransferDetails.Should().BeSameAs(transfer);
         transfer.Mode.Should().Be(TransferMode.ReturnToCaller);
+        transfer.TargetType.Should().Be(TransferTargetType.Agent);
         transfer.TargetAgentDetails.Should().BeSameAs(targetAgent);
         transfer.TargetAgentDetails!.AgentId.Should().Be("weather-agent-id");
         transfer.TargetAgentDetails.AgentName.Should().Be("Weather Agent");
@@ -36,6 +37,7 @@ public sealed class ToolCallDetailsTests
         transfer.TargetAgentDetails.AgentPlatformId.Should().Be("weather-platform");
         transfer.TargetAgentDetails.AgentVersion.Should().Be("2026.09.10");
         transfer.ModeValue.Should().Be("return_to_caller");
+        transfer.TargetTypeValue.Should().Be("agent");
     }
 
     [TestMethod]
@@ -92,7 +94,7 @@ public sealed class ToolCallDetailsTests
     public void TransferDetails_WithNullTargetAgentDetails_IsEqualAndHasMatchingHashCode()
     {
         var left = new TransferDetails(TransferMode.PassControl);
-        var right = new TransferDetails(TransferMode.PassControl, null);
+        var right = new TransferDetails(TransferMode.PassControl, TransferTargetType.Agent, null);
 
         left.Should().Be(right);
         left.GetHashCode().Should().Be(right.GetHashCode());
@@ -105,6 +107,12 @@ public sealed class ToolCallDetailsTests
             .Should().Be("pass_control");
         new TransferDetails(TransferMode.ReturnToCaller).ModeValue
             .Should().Be("return_to_caller");
+        new TransferDetails(TransferMode.PassControl, TransferTargetType.Agent).TargetTypeValue
+            .Should().Be("agent");
+        new TransferDetails(TransferMode.PassControl, TransferTargetType.Human).TargetTypeValue
+            .Should().Be("human");
+        new TransferDetails(TransferMode.PassControl, TransferTargetType.Workflow).TargetTypeValue
+            .Should().Be("workflow");
     }
 
     [TestMethod]
@@ -121,12 +129,42 @@ public sealed class ToolCallDetailsTests
     }
 
     [TestMethod]
+    public void Equals_WithDifferentTargetType_IsFalse()
+    {
+        var left = new TransferDetails(TransferMode.PassControl, TransferTargetType.Agent);
+        var right = new TransferDetails(TransferMode.PassControl, TransferTargetType.Workflow);
+
+        left.Should().NotBe(right);
+    }
+
+    [TestMethod]
     public void TransferDetails_WithUndefinedMode_ThrowsAtConstructionTime()
     {
         Action act = () => new TransferDetails((TransferMode)999);
 
         act.Should().Throw<ArgumentOutOfRangeException>()
             .WithParameterName("mode");
+    }
+
+    [TestMethod]
+    public void TransferDetails_WithUndefinedTargetType_ThrowsAtConstructionTime()
+    {
+        Action act = () => new TransferDetails(TransferMode.PassControl, (TransferTargetType)999);
+
+        act.Should().Throw<ArgumentOutOfRangeException>()
+            .WithParameterName("targetType");
+    }
+
+    [TestMethod]
+    public void TransferDetails_WithNonAgentTargetTypeAndTargetAgentDetails_ThrowsAtConstructionTime()
+    {
+        Action act = () => new TransferDetails(
+            TransferMode.PassControl,
+            TransferTargetType.Human,
+            new AgentDetails(agentId: "agent-a"));
+
+        act.Should().Throw<ArgumentException>()
+            .WithParameterName("targetAgentDetails");
     }
 
     [TestMethod]
