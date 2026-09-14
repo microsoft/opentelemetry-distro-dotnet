@@ -310,6 +310,51 @@ public sealed class Agent365ReplayCoordinatorTests
     }
 
     [TestMethod]
+    public async Task AllBackedOffRecordsStopAtTheScanBudget()
+    {
+        const int maxRecordsPerPass = 10;
+        var scanBudget = Agent365ReplayCoordinator.CalculateDefaultScanBudget(maxRecordsPerPass);
+        var registry = new Agent365TransmissionGateRegistry(utcNow: () => _now);
+        using (var preLease = registry.Acquire("tenant-a"))
+        {
+            preLease.Gate.RecordRetryableFailure(null);
+        }
+
+        var backedOffRecords = Enumerable.Range(0, scanBudget + 1)
+            .Select(i => FakeStoredRecord.From(CreateRecord(tenantId: "tenant-a", agentId: $"agent-a-{i}")))
+            .ToArray();
+        var storage = new FakeStorage(backedOffRecords);
+        var sends = 0;
+        var coordinator = CreateCoordinator(
+            storage,
+            gates: registry,
+            maxRecordsPerPass: maxRecordsPerPass,
+            sendAsync: (_, _) =>
+            {
+                sends++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+            });
+
+        await coordinator.ReplayOnceAsync(CancellationToken.None);
+
+        sends.Should().Be(0, "every record belongs to a tenant already in backoff, so no HTTP attempt occurs");
+        backedOffRecords.Take(scanBudget).Should().OnlyContain(
+            r => r.LeaseCalls == 1 && r.ReadCalls == 1 && r.DeleteCalls == 0,
+            "the pass scans only up to the scan budget before stopping");
+        backedOffRecords.Skip(scanBudget).Should().OnlyContain(
+            r => r.LeaseCalls == 0 && r.ReadCalls == 0 && r.DeleteCalls == 0,
+            "records beyond the scan budget are left untouched for a later pass");
+        storage.PendingCount.Should().Be(1, "one backed-off record remains queued because the pass stopped at its scan budget");
+    }
+
+    [TestMethod]
+    public void DefaultScanBudgetUsesAtLeastTenTimesTheAttemptCapAndSaturatesSafely()
+    {
+        Agent365ReplayCoordinator.CalculateDefaultScanBudget(10).Should().BeGreaterOrEqualTo(100);
+        Agent365ReplayCoordinator.CalculateDefaultScanBudget(int.MaxValue).Should().Be(int.MaxValue);
+    }
+
+    [TestMethod]
     public async Task RetryableFailureBacksOffTheSharedGate()
     {
         var stored = FakeStoredRecord.From(CreateRecord());

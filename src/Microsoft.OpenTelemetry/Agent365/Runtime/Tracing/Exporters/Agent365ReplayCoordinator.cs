@@ -55,6 +55,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
     internal sealed class Agent365ReplayCoordinator : IAgent365ReplayCoordinator
     {
         internal static readonly TimeSpan DefaultReplayInterval = TimeSpan.FromMinutes(2);
+        internal const int DefaultScanBudgetMultiplier = 10;
 
         private readonly IAgent365PersistentStorage _storage;
         private readonly Agent365TransmissionGateRegistry _gates;
@@ -63,6 +64,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         private readonly TimeSpan _replayInterval;
         private readonly TimeSpan _leaseDuration;
         private readonly int _maxRecordsPerPass;
+        private readonly int _maxRecordsToScanPerPass;
         private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
         private readonly CancellationTokenSource _shutdown = new();
 
@@ -84,7 +86,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         /// <param name="replayAsync">Delegate that replays a single record and classifies the single send attempt.</param>
         /// <param name="logger">Logger for warnings (e.g. duplicate risk on delete failure).</param>
         /// <param name="replayInterval">Delay between passes. Defaults to <see cref="DefaultReplayInterval"/>.</param>
-        /// <param name="maxRecordsPerPass">Upper bound on records handled per pass. Defaults to 10.</param>
+        /// <param name="maxRecordsPerPass">
+        /// Upper bound on records handled per pass. Queue scanning is separately capped at a default
+        /// budget of 10x this value (saturated at <see cref="int.MaxValue"/>). Defaults to 10.
+        /// </param>
         /// <param name="delayAsync">
         /// Cancellation-aware delay used by the background loop. Defaults to <see cref="Task.Delay(TimeSpan, CancellationToken)"/>;
         /// injectable so the loop can be stepped deterministically in tests.
@@ -118,11 +123,28 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
             _replayInterval = replayInterval ?? DefaultReplayInterval;
             _maxRecordsPerPass = maxRecordsPerPass;
+            _maxRecordsToScanPerPass = CalculateDefaultScanBudget(maxRecordsPerPass);
 
             // A lease that covers one full cycle prevents a second worker (or the next pass) from grabbing
             // a record still being processed, while expiring in time for the next cadence to retry it.
             _leaseDuration = _replayInterval;
             _delayAsync = delayAsync ?? ((interval, token) => Task.Delay(interval, token));
+        }
+
+        /// <summary>
+        /// Calculates the default queue-scan budget for one pass, keeping the budget at least 10x the
+        /// attempt cap while saturating safely for very large caps.
+        /// </summary>
+        internal static int CalculateDefaultScanBudget(int maxRecordsPerPass)
+        {
+            if (maxRecordsPerPass < 1)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(maxRecordsPerPass), maxRecordsPerPass, "At least one record must be handled per pass.");
+            }
+
+            var budget = (long)maxRecordsPerPass * DefaultScanBudgetMultiplier;
+            return budget >= int.MaxValue ? int.MaxValue : (int)budget;
         }
 
         /// <summary>
@@ -248,22 +270,26 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         }
 
         /// <summary>
-        /// Runs a single replay pass: read, lease, and replay up to <see cref="_maxRecordsPerPass"/>
-        /// records. A record's tenant gate is looked up only after that record is leased and
+        /// Runs a single replay pass: scan up to <see cref="_maxRecordsToScanPerPass"/> records and
+        /// replay up to <see cref="_maxRecordsPerPass"/> deliverable ones. A record's tenant gate is
+        /// looked up only after that record is leased and
         /// successfully deserialized; if it is in backoff, the already-leased/read record is retained
         /// without an HTTP attempt and does <em>not</em> count against <see cref="_maxRecordsPerPass"/> —
         /// the pass keeps leasing and skipping backed-off records until it either reaches a record whose
-        /// tenant can be attempted or storage is exhausted, so a long backed-off prefix for one tenant
-        /// can never starve another tenant of its chance within the pass. Records that do get a real
-        /// attempt (including a retryable failure, which keeps scanning later records) count toward the
-        /// cap, which still bounds the number of actual replay attempts/handled records per pass. The
-        /// pass stops early only on cancellation, a failed lease, a transient storage read failure, or an
-        /// unknown replay exception/global misconfiguration.
+        /// tenant can be attempted, the separate scan budget is exhausted, or storage is exhausted, so
+        /// a long backed-off prefix for one tenant can never starve another tenant of its chance within
+        /// the default scan window while still preventing one pass from walking an arbitrarily large
+        /// queue. Records that do get a real attempt (including a retryable failure, which keeps
+        /// scanning later records) count toward the cap, which still bounds the number of actual replay
+        /// attempts/handled records per pass. The pass stops early only on cancellation, a failed lease,
+        /// the scan budget being exhausted, a transient storage read failure, or an unknown replay
+        /// exception/global misconfiguration.
         /// </summary>
         internal async Task ReplayOnceAsync(CancellationToken cancellationToken)
         {
             var attempted = 0;
-            while (attempted < _maxRecordsPerPass)
+            var scanned = 0;
+            while (attempted < _maxRecordsPerPass && scanned < _maxRecordsToScanPerPass)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -271,6 +297,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 {
                     break;
                 }
+
+                scanned++;
 
                 if (!stored!.TryLease(_leaseDuration))
                 {
