@@ -33,7 +33,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         private const string FoundryUrl403 = "https://aka.ms/foundry-grant-agent-365-permissions";
         private readonly ExportFormatter _formatter;
         private readonly ILogger<Agent365ExporterCore> _logger;
-        private readonly Agent365TransmissionGate _gate;
         private readonly Agent365TransmissionGateRegistry _gates;
         private readonly Lazy<IAgent365PersistentStorage> _storage;
         private readonly Func<DateTimeOffset> _utcNow;
@@ -72,7 +71,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             _formatter = formatter ?? throw new ArgumentNullException(nameof(formatter));
             _logger = logger ?? NullLogger<Agent365ExporterCore>.Instance;
             _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
-            _gate = gate ?? new Agent365TransmissionGate(_utcNow);
             _gates = gates
                 ?? (gate != null
                     ? new Agent365TransmissionGateRegistry(utcNow: _utcNow, gateFactory: () => gate)
@@ -94,15 +92,12 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         internal IAgent365PersistentStorage Storage => _storage.Value;
 
         /// <summary>
-        /// The shared tenant gate registry this core coordinates live-send availability through.
+        /// The shared tenant gate registry this core coordinates live-send and replay availability
+        /// through. Both the live send path and the durable replay coordinator built from this core
+        /// acquire a tenant's gate from this same registry, so a tenant's availability state is shared
+        /// across live and replay.
         /// </summary>
         internal Agent365TransmissionGateRegistry Gates => _gates;
-
-        /// <summary>
-        /// Compatibility gate retained for the replay coordinator until replay adopts the tenant gate
-        /// registry in a later task.
-        /// </summary>
-        internal Agent365TransmissionGate Gate => _gate;
 
         /// <summary>
         /// Partitions a batch of activities by tenant and agent identity.

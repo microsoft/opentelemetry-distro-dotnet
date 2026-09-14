@@ -62,7 +62,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         }
 
         /// <summary>
-        /// Creates the background replay coordinator wired to the core's shared store and replay gate and to
+        /// Creates the background replay coordinator wired to the core's shared store and tenant gate registry and to
         /// <see cref="Agent365ExporterCore.ReplayRecordAsync"/> with a cancellation-aware HTTP send.
         /// Returns <c>null</c> when the core's store is a <see cref="DisabledAgent365Storage"/> (offline
         /// storage disabled or unavailable), because there is nothing to replay.
@@ -95,7 +95,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
             return new Agent365ReplayCoordinator(
                 storage,
-                core.Gate,
+                core.Gates,
                 replayAsync: (record, ct) => core.ReplayRecordAsync(record, options, tokenResolver, sendAsync, ct),
                 logger);
         }

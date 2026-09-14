@@ -27,30 +27,37 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
     }
 
     /// <summary>
-    /// Drains durably-persisted Agent365 exports back onto the wire. On a fixed cadence it asks the
-    /// shared <see cref="Agent365TransmissionGate"/> for a permit and, when granted, reads at most a
-    /// bounded number of leased records and replays each with freshly resolved authentication:
+    /// Drains durably-persisted Agent365 exports back onto the wire. On a fixed cadence it reads at
+    /// most a bounded number of leased records and replays each with freshly resolved authentication.
+    /// A record's tenant gate is looked up in the shared <see cref="Agent365TransmissionGateRegistry"/>
+    /// only after the record has been leased and successfully deserialized (so its tenant is known) —
+    /// the same registry the live send path coordinates through, so live and replay share the exact
+    /// same gate per tenant:
     /// <list type="bullet">
     ///   <item>A delivered record is deleted. If the delete fails, a duplicate-risk warning is logged.</item>
-    ///   <item>A retryable failure retains the record, backs the gate off, and stops the pass.</item>
+    ///   <item>If the record's tenant gate is in backoff, the already-leased record is retained without an
+    ///   HTTP attempt and the pass keeps scanning later records — a different tenant still gets its
+    ///   chance to replay in the same pass.</item>
+    ///   <item>A retryable failure backs off only that tenant's gate and retains the record; the pass keeps
+    ///   scanning later records rather than stopping outright.</item>
     ///   <item>A permanent failure or an unreadable/poison blob is deleted (it can never succeed).</item>
     ///   <item>A record whose token cannot be resolved is retained for a later pass.</item>
     ///   <item>An unknown replay exception or global misconfiguration retains the current record and stops the
-    ///   pass; durable telemetry is never deleted for an unknown fault (only readable/poison and permanent
-    ///   failures delete).</item>
+    ///   whole pass; durable telemetry is never deleted for an unknown fault (only readable/poison and
+    ///   permanent failures delete).</item>
     /// </list>
     /// Exactly one background loop runs between <see cref="Start"/> and <see cref="StopAsync"/>. The class
     /// targets <c>netstandard2.0</c>, so the loop uses a cancellation-aware delay rather than
-    /// <c>PeriodicTimer</c> or <c>System.Timers.Timer</c>. The single half-open gate probe is only ever
-    /// released when this pass owns it and recorded no terminal gate outcome, so a probe is never leaked
-    /// nor double-released.
+    /// <c>PeriodicTimer</c> or <c>System.Timers.Timer</c>. Each record's owned half-open gate probe is
+    /// scoped to that one record and is only ever released when this record's processing owns it and
+    /// recorded no terminal gate outcome, so a probe is never leaked nor double-released.
     /// </summary>
     internal sealed class Agent365ReplayCoordinator : IAgent365ReplayCoordinator
     {
         internal static readonly TimeSpan DefaultReplayInterval = TimeSpan.FromMinutes(2);
 
         private readonly IAgent365PersistentStorage _storage;
-        private readonly Agent365TransmissionGate _gate;
+        private readonly Agent365TransmissionGateRegistry _gates;
         private readonly Func<Agent365DurableRecord, CancellationToken, Task<Agent365SendOutcome>> _replayAsync;
         private readonly ILogger _logger;
         private readonly TimeSpan _replayInterval;
@@ -69,7 +76,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         /// Initializes a new instance of the <see cref="Agent365ReplayCoordinator"/> class.
         /// </summary>
         /// <param name="storage">Durable store the persisted records are drained from.</param>
-        /// <param name="gate">Shared transmission gate that permits or defers each pass.</param>
+        /// <param name="gates">
+        /// Shared per-tenant transmission gate registry — the same registry the live send path uses —
+        /// consulted for a record's tenant only after that record has been leased and successfully
+        /// deserialized.
+        /// </param>
         /// <param name="replayAsync">Delegate that replays a single record and classifies the single send attempt.</param>
         /// <param name="logger">Logger for warnings (e.g. duplicate risk on delete failure).</param>
         /// <param name="replayInterval">Delay between passes. Defaults to <see cref="DefaultReplayInterval"/>.</param>
@@ -80,7 +91,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         /// </param>
         internal Agent365ReplayCoordinator(
             IAgent365PersistentStorage storage,
-            Agent365TransmissionGate gate,
+            Agent365TransmissionGateRegistry gates,
             Func<Agent365DurableRecord, CancellationToken, Task<Agent365SendOutcome>> replayAsync,
             ILogger logger,
             TimeSpan? replayInterval = null,
@@ -88,7 +99,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             Func<TimeSpan, CancellationToken, Task>? delayAsync = null)
         {
             _storage = storage ?? throw new ArgumentNullException(nameof(storage));
-            _gate = gate ?? throw new ArgumentNullException(nameof(gate));
+            _gates = gates ?? throw new ArgumentNullException(nameof(gates));
             _replayAsync = replayAsync ?? throw new ArgumentNullException(nameof(replayAsync));
             _logger = logger ?? NullLogger.Instance;
 
@@ -237,56 +248,70 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         }
 
         /// <summary>
-        /// Runs a single replay pass: acquire a gate permit, then read, lease, and replay up to
-        /// <see cref="_maxRecordsPerPass"/> records. Stops early on a retryable outcome (retaining the
-        /// current record) or cancellation.
+        /// Runs a single replay pass: read, lease, and replay up to <see cref="_maxRecordsPerPass"/>
+        /// records. A record's tenant gate is looked up only after that record is leased and
+        /// successfully deserialized; if it is in backoff, or if replaying it hits a retryable failure,
+        /// the record is retained but the pass keeps scanning later records so another tenant still gets
+        /// its chance. The pass stops early only on cancellation, a failed lease, a transient storage
+        /// read failure, or an unknown replay exception/global misconfiguration.
         /// </summary>
         internal async Task ReplayOnceAsync(CancellationToken cancellationToken)
         {
-            if (!_gate.TryAcquire(out var ownsProbe))
+            for (var processed = 0; processed < _maxRecordsPerPass; processed++)
             {
-                // Gate is in backoff: skip the network entirely this pass.
-                return;
-            }
+                cancellationToken.ThrowIfCancellationRequested();
 
-            var recordedTerminalGateOutcome = false;
-            try
-            {
-                for (var processed = 0; processed < _maxRecordsPerPass; processed++)
+                if (!_storage.TryGetNext(out var stored))
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    break;
+                }
 
-                    if (!_storage.TryGetNext(out var stored))
-                    {
-                        break;
-                    }
+                if (!stored!.TryLease(_leaseDuration))
+                {
+                    // The real FileBlobProvider is non-destructive: a failed lease leaves the same
+                    // unleased blob at the head of the queue, so the next TryGetNext re-serves it. A
+                    // "continue" here would therefore re-fetch and re-lease the identical blob up to
+                    // _maxRecordsPerPass times (a tight spin). Stop the pass instead; the next cadence
+                    // retries it once the contending lease or maintenance window clears.
+                    break;
+                }
 
-                    if (!stored!.TryLease(_leaseDuration))
-                    {
-                        // The real FileBlobProvider is non-destructive: a failed lease leaves the same
-                        // unleased blob at the head of the queue, so the next TryGetNext re-serves it. A
-                        // "continue" here would therefore re-fetch and re-lease the identical blob up to
-                        // _maxRecordsPerPass times (a tight spin). Stop the pass instead; the next cadence
-                        // retries it once the contending lease or maintenance window clears.
-                        break;
-                    }
+                var readResult = stored.Read(out var record);
+                if (readResult == Agent365StoredRecordReadResult.ReadFailure)
+                {
+                    _logger.LogWarning(
+                        "Agent365ReplayCoordinator: A durable record could not be read; retaining it and " +
+                        "stopping the pass so a transient storage failure does not delete telemetry.");
+                    return;
+                }
 
-                    var readResult = stored.Read(out var record);
-                    if (readResult == Agent365StoredRecordReadResult.ReadFailure)
-                    {
-                        _logger.LogWarning(
-                            "Agent365ReplayCoordinator: A durable record could not be read; retaining it and " +
-                            "stopping the pass so a transient storage failure does not delete telemetry.");
-                        return;
-                    }
+                if (readResult == Agent365StoredRecordReadResult.InvalidPayload)
+                {
+                    // Confirmed unsupported/corrupt payload: discard it so it cannot wedge the queue.
+                    DeleteRecord(stored, delivered: false);
+                    continue;
+                }
 
-                    if (readResult == Agent365StoredRecordReadResult.InvalidPayload)
-                    {
-                        // Confirmed unsupported/corrupt payload: discard it so it cannot wedge the queue.
-                        DeleteRecord(stored, delivered: false);
-                        continue;
-                    }
+                // The record deserialized cleanly, so its tenant is now known: look up (or create) that
+                // tenant's gate in the shared registry — the same registry the live send path uses, so a
+                // tenant backed off by a live failure is also skipped here, and vice versa.
+                using var gateLease = _gates.Acquire(record!.TenantId);
+                var gate = gateLease.Gate;
 
+                if (!gate.TryAcquire(out var ownsProbe))
+                {
+                    // This tenant's gate is in backoff: retain the already-leased/read record without
+                    // attempting HTTP, and keep scanning later records — a different tenant must still
+                    // get its chance to replay in this same pass.
+                    continue;
+                }
+
+                // ownsProbe and the terminal-outcome flag are scoped to this one record: a half-open
+                // probe claimed for this tenant must be released for THIS record's outcome, independent
+                // of any other record (including other records for the same tenant) processed this pass.
+                var recordedTerminalGateOutcome = false;
+                try
+                {
                     Agent365SendOutcome outcome;
                     try
                     {
@@ -320,16 +345,17 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                     switch (outcome.Disposition)
                     {
                         case Agent365SendDisposition.Delivered:
-                            _gate.RecordSuccess();
+                            gate.RecordSuccess();
                             recordedTerminalGateOutcome = true;
                             DeleteRecord(stored, delivered: true);
                             break;
 
                         case Agent365SendDisposition.RetryableFailure:
-                            _gate.RecordRetryableFailure(outcome.RetryAfter);
+                            gate.RecordRetryableFailure(outcome.RetryAfter);
                             recordedTerminalGateOutcome = true;
-                            // Retain the record and stop the pass; the gate is now in backoff.
-                            return;
+                            // Retain the record; this tenant's gate is now in backoff, but the pass keeps
+                            // scanning later records so another tenant still gets its chance this pass.
+                            break;
 
                         case Agent365SendDisposition.PermanentFailure:
                             // Permanent, non-retryable failure (e.g. 403): discard without signalling the
@@ -347,16 +373,16 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                             return;
                     }
                 }
-            }
-            finally
-            {
-                // Release the single half-open probe only when this pass owns it and recorded no terminal
-                // gate outcome (RecordSuccess/RecordRetryableFailure already reset the probe). This covers
-                // permanent-failure, token-unavailable, poison, unknown-fault retain-and-stop, cancellation
-                // and empty-storage exits.
-                if (ownsProbe && !recordedTerminalGateOutcome)
+                finally
                 {
-                    _gate.ReleaseProbe();
+                    // Release this record's owned half-open probe only when it recorded no terminal gate
+                    // outcome (RecordSuccess/RecordRetryableFailure already reset the probe). This covers
+                    // permanent-failure, token-unavailable, poison, unknown-fault retain-and-stop, and
+                    // cancellation exits for this record.
+                    if (ownsProbe && !recordedTerminalGateOutcome)
+                    {
+                        gate.ReleaseProbe();
+                    }
                 }
             }
         }

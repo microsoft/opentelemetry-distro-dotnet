@@ -512,6 +512,50 @@ public sealed class Agent365DurableExportTests
     }
 
     [TestMethod]
+    public async Task LiveRetryableFailureBacksOffReplayForSameTenantThroughSharedRegistry()
+    {
+        // One core, one real (non-overridden) tenant gate registry: a live 503 for tenant A must be
+        // visible to a replay coordinator built from the SAME core.Gates registry, proving live and
+        // replay coordinate through the exact same per-tenant gate rather than independent state.
+        var storage = new FakeStorage();
+        var core = CreateCore(storage: storage);
+
+        var liveResult = await ExportOneAsync(
+            core,
+            sendAsync: _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)),
+            activity: CreateActivity(tenantId: "tenant-a"));
+
+        liveResult.Should().Be(ExportResult.Success, "the retryable live failure hands the chunk to durable storage");
+        storage.Records.Should().ContainSingle();
+        storage.Records[0].TenantId.Should().Be("tenant-a");
+
+        var storedRecord = FakeStoredRecord.From(storage.Records[0]);
+        var replayStorage = new FakeStorage(storedRecord);
+        var replaySends = 0;
+        var coordinator = new Agent365ReplayCoordinator(
+            replayStorage,
+            core.Gates,
+            replayAsync: (record, ct) => core.ReplayRecordAsync(
+                record,
+                new Agent365ExporterOptions { DomainResolver = _ => "api.example.com" },
+                tokenResolver: (_, _) => Task.FromResult<string?>("replay-token"),
+                sendAsync: (_, _) =>
+                {
+                    replaySends++;
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+                },
+                ct),
+            NullLogger.Instance);
+
+        await coordinator.ReplayOnceAsync(CancellationToken.None);
+
+        replaySends.Should().Be(
+            0, "tenant A's gate is already in backoff from the live send, so replay must not attempt HTTP");
+        storedRecord.DeleteCalls.Should().Be(
+            0, "the record stays retained while the shared registry's tenant A gate is in backoff");
+    }
+
+    [TestMethod]
     public async Task PermanentFirstChunkStopsRemainingChunksForThatIdentity()
     {
         // Three same-identity chunks; the first send is a permanent 403. Later chunks for the same
