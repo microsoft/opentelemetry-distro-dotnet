@@ -645,6 +645,50 @@ public sealed class Agent365DurableExportTests
     }
 
     [TestMethod]
+    public async Task MalformedWhitespaceTenantGroupDoesNotPreventLaterValidTenantGroupFromSending()
+    {
+        // ExportBatchCoreAsync is internal and can be called directly with a caller-constructed groups
+        // list that bypasses PartitionByIdentity's own filtering. A whitespace-only tenant id reaching
+        // the gate registry's Acquire(...) would throw ArgumentException; that must be handled
+        // defensively as a per-group permanent failure rather than propagating out of the whole batch
+        // and discarding a later, valid tenant group.
+        var storage = new FakeStorage();
+        var okSends = 0;
+        var core = CreateCore(storage: storage);
+        using var malformedActivity = CreateActivity(tenantId: "  ", agentId: "agent-malformed");
+        using var okActivity = CreateActivity(tenantId: "tenant-ok", agentId: "agent-ok");
+
+        var groups = new List<(string TenantId, string AgentId, List<Activity> Activities)>
+        {
+            ("   ", "agent-malformed", new List<Activity> { malformedActivity }),
+            ("tenant-ok", "agent-ok", new List<Activity> { okActivity }),
+        };
+
+        var options = new Agent365ExporterOptions
+        {
+            DomainResolver = _ => "api.example.com",
+            TokenResolver = (_, _) => Task.FromResult<string?>("test-token"),
+        };
+
+        Func<Task<ExportResult>> act = () => core.ExportBatchCoreAsync(
+            groups: groups,
+            resource: ResourceBuilder.CreateEmpty().Build(),
+            options: options,
+            tokenResolver: (_, _) => Task.FromResult<string?>("test-token"),
+            sendAsync: _ =>
+            {
+                okSends++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+            },
+            cancellationToken: CancellationToken.None);
+
+        var result = await act.Should().NotThrowAsync();
+        result.Which.Should().Be(ExportResult.Failure, "the malformed group is a permanent failure for the batch");
+        okSends.Should().Be(1, "the later valid tenant group must still be sent");
+        storage.Records.Should().BeEmpty("neither group persists: the malformed one is rejected, the valid one is delivered");
+    }
+
+    [TestMethod]
     public async Task CancellationBetweenChunksThrowsAfterFirstChunkPersisted()
     {
         // Two same-identity chunks. The caller cancels after the first send; the per-chunk cancellation

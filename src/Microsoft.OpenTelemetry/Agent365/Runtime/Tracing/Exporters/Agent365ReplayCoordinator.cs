@@ -250,14 +250,20 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         /// <summary>
         /// Runs a single replay pass: read, lease, and replay up to <see cref="_maxRecordsPerPass"/>
         /// records. A record's tenant gate is looked up only after that record is leased and
-        /// successfully deserialized; if it is in backoff, or if replaying it hits a retryable failure,
-        /// the record is retained but the pass keeps scanning later records so another tenant still gets
-        /// its chance. The pass stops early only on cancellation, a failed lease, a transient storage
-        /// read failure, or an unknown replay exception/global misconfiguration.
+        /// successfully deserialized; if it is in backoff, the already-leased/read record is retained
+        /// without an HTTP attempt and does <em>not</em> count against <see cref="_maxRecordsPerPass"/> —
+        /// the pass keeps leasing and skipping backed-off records until it either reaches a record whose
+        /// tenant can be attempted or storage is exhausted, so a long backed-off prefix for one tenant
+        /// can never starve another tenant of its chance within the pass. Records that do get a real
+        /// attempt (including a retryable failure, which keeps scanning later records) count toward the
+        /// cap, which still bounds the number of actual replay attempts/handled records per pass. The
+        /// pass stops early only on cancellation, a failed lease, a transient storage read failure, or an
+        /// unknown replay exception/global misconfiguration.
         /// </summary>
         internal async Task ReplayOnceAsync(CancellationToken cancellationToken)
         {
-            for (var processed = 0; processed < _maxRecordsPerPass; processed++)
+            var attempted = 0;
+            while (attempted < _maxRecordsPerPass)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -270,9 +276,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 {
                     // The real FileBlobProvider is non-destructive: a failed lease leaves the same
                     // unleased blob at the head of the queue, so the next TryGetNext re-serves it. A
-                    // "continue" here would therefore re-fetch and re-lease the identical blob up to
-                    // _maxRecordsPerPass times (a tight spin). Stop the pass instead; the next cadence
-                    // retries it once the contending lease or maintenance window clears.
+                    // "continue" here would therefore re-fetch and re-lease the identical blob in a tight
+                    // spin. Stop the pass instead; the next cadence retries it once the contending lease
+                    // or maintenance window clears.
                     break;
                 }
 
@@ -287,8 +293,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
                 if (readResult == Agent365StoredRecordReadResult.InvalidPayload)
                 {
-                    // Confirmed unsupported/corrupt payload: discard it so it cannot wedge the queue.
+                    // Confirmed unsupported/corrupt payload: discard it so it cannot wedge the queue. This
+                    // is a handled record (it consumed a real decision), so it counts toward the cap.
                     DeleteRecord(stored, delivered: false);
+                    attempted++;
                     continue;
                 }
 
@@ -302,9 +310,13 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 {
                     // This tenant's gate is in backoff: retain the already-leased/read record without
                     // attempting HTTP, and keep scanning later records — a different tenant must still
-                    // get its chance to replay in this same pass.
+                    // get its chance to replay in this same pass. Deliberately does not increment
+                    // `attempted`: a backed-off record consumed no real replay attempt, so it must not
+                    // count against the per-pass cap and starve a later tenant's chance.
                     continue;
                 }
+
+                attempted++;
 
                 // ownsProbe and the terminal-outcome flag are scoped to this one record: a half-open
                 // probe claimed for this tenant must be released for THIS record's outcome, independent
@@ -377,7 +389,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 {
                     // Release this record's owned half-open probe only when it recorded no terminal gate
                     // outcome (RecordSuccess/RecordRetryableFailure already reset the probe). This covers
-                    // permanent-failure, token-unavailable, poison, unknown-fault retain-and-stop, and
+                    // permanent-failure, token-unavailable, unknown-fault retain-and-stop, and
                     // cancellation exits for this record.
                     if (ownsProbe && !recordedTerminalGateOutcome)
                     {

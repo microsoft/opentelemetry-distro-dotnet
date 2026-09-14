@@ -242,6 +242,22 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             {
                 var (tenantId, agentId, activities) = g;
 
+                // ExportBatchCoreAsync is internal and can be called directly with a caller-constructed
+                // groups list that bypasses PartitionByIdentity's own whitespace/empty filtering (e.g. a
+                // test double, or a future caller). A whitespace/null/empty tenant id reaching
+                // _gates.Acquire(tenantId) below would throw ArgumentException, which — thrown from
+                // inside this foreach — would abort the whole cross-tenant batch and discard every other,
+                // well-formed group. Treat a malformed identity as this one group's permanent failure
+                // instead: skip it (no send, no persist — there is no valid tenant to key a durable
+                // record by) and keep processing the remaining groups.
+                if (string.IsNullOrWhiteSpace(tenantId) || string.IsNullOrWhiteSpace(agentId))
+                {
+                    this._logger?.LogWarning(
+                        "Agent365ExporterCore: Malformed identity group (missing or whitespace-only tenant/agent id). Skipping export for this identity.");
+                    anyPermanentFailure = true;
+                    continue;
+                }
+
                 // Split the per-identity batch into byte-size chunks under MaxPayloadBytes.
                 // Per-span truncation already caps individual spans at 250 KB; this provides
                 // batch-level enforcement of the 1 MB server limit.
@@ -727,7 +743,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             var tenant = activity.GetAttributeOrBaggage(OpenTelemetryConstants.TenantIdKey);
             var agent = activity.GetAttributeOrBaggage(OpenTelemetryConstants.GenAiAgentIdKey) ?? activity.GetAttributeOrBaggage(OpenTelemetryConstants.AgentPlatformIdKey);
 
-            if (string.IsNullOrEmpty(tenant) || string.IsNullOrEmpty(agent))
+            // A whitespace-only tenant or agent id is not a usable identity: reject it the same as
+            // null/empty so it lines up with the gate registry's own whitespace rejection for tenant ids
+            // (Agent365TransmissionGateRegistry.Acquire) rather than silently forming a bogus group.
+            if (string.IsNullOrWhiteSpace(tenant) || string.IsNullOrWhiteSpace(agent))
                 return AddResult.MissingIdentity;
 
             var key = (tenant!, agent!);

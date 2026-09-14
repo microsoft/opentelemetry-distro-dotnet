@@ -270,6 +270,46 @@ public sealed class Agent365ReplayCoordinatorTests
     }
 
     [TestMethod]
+    public async Task BackedOffPrefixLongerThanMaxRecordsPerPassDoesNotStarveALaterTenant()
+    {
+        // A long prefix of records for a backed-off tenant must not consume the per-pass cap: each of
+        // them is only leased/read (to learn its tenant) then skipped without an HTTP attempt, so the
+        // pass must still reach and send a later, different tenant's record in the same pass even
+        // though the backed-off prefix alone is as long as (or longer than) maxRecordsPerPass.
+        const int maxRecordsPerPass = 10;
+        var registry = new Agent365TransmissionGateRegistry(utcNow: () => _now);
+        using (var preLease = registry.Acquire("tenant-a"))
+        {
+            preLease.Gate.RecordRetryableFailure(null);
+        }
+
+        var backedOffRecords = Enumerable.Range(0, maxRecordsPerPass)
+            .Select(_ => FakeStoredRecord.From(CreateRecord(tenantId: "tenant-a", agentId: "agent-a")))
+            .ToArray();
+        var tenantB = FakeStoredRecord.From(CreateRecord(tenantId: "tenant-b", agentId: "agent-b"));
+        var storage = new FakeStorage(backedOffRecords.Concat(new[] { tenantB }).ToArray());
+        var sends = 0;
+        var coordinator = CreateCoordinator(
+            storage,
+            gates: registry,
+            maxRecordsPerPass: maxRecordsPerPass,
+            sendAsync: (_, _) =>
+            {
+                sends++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+            });
+
+        await coordinator.ReplayOnceAsync(CancellationToken.None);
+
+        sends.Should().Be(1, "only tenant B's record ever gets a real HTTP attempt in this pass");
+        backedOffRecords.Should().OnlyContain(
+            r => r.LeaseCalls == 1 && r.ReadCalls == 1 && r.DeleteCalls == 0,
+            "each backed-off record is still leased/read but retained without an HTTP attempt");
+        tenantB.DeleteCalls.Should().Be(1, "tenant B is delivered and deleted in the same pass despite the long backed-off prefix");
+        storage.PendingCount.Should().Be(0, "the backed-off prefix must not consume the pass cap before tenant B is reached");
+    }
+
+    [TestMethod]
     public async Task RetryableFailureBacksOffTheSharedGate()
     {
         var stored = FakeStoredRecord.From(CreateRecord());
@@ -631,6 +671,35 @@ public sealed class Agent365ReplayCoordinatorTests
         // returned: a subsequent acquire still owns the single probe (it was not leaked).
         gate.TryAcquire(out var ownsProbe).Should().BeTrue();
         ownsProbe.Should().BeTrue("the owned probe was released, not leaked");
+    }
+
+    [TestMethod]
+    public async Task SecondSameTenantRecordReacquiresProbeReleasedByFirstNonTerminalRecord()
+    {
+        // Regression coverage: within a single pass, two same-tenant records share one half-open
+        // probe. The first record's non-terminal outcome (permanent failure) must release the probe
+        // it owned so the second, later record for the SAME tenant can immediately reacquire it and
+        // still get its own real HTTP attempt in this same pass (not silently skipped as backed off).
+        var first = FakeStoredRecord.From(CreateRecord(agentId: "agent-1"));
+        var second = FakeStoredRecord.From(CreateRecord(agentId: "agent-2"));
+        var storage = new FakeStorage(first, second);
+        var gate = ProbeGate();
+        var sends = 0;
+        var coordinator = CreateCoordinator(
+            storage,
+            gate: gate,
+            sendAsync: (_, _) =>
+            {
+                sends++;
+                return Task.FromResult(new HttpResponseMessage(
+                    sends == 1 ? HttpStatusCode.Forbidden : HttpStatusCode.OK));
+            });
+
+        await coordinator.ReplayOnceAsync(CancellationToken.None);
+
+        sends.Should().Be(2, "the second same-tenant record must reacquire the probe the first record released");
+        first.DeleteCalls.Should().Be(1, "the first record's permanent failure deletes it");
+        second.DeleteCalls.Should().Be(1, "the second record reacquires the probe and is delivered");
     }
 
     [TestMethod]
