@@ -34,6 +34,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         private readonly ExportFormatter _formatter;
         private readonly ILogger<Agent365ExporterCore> _logger;
         private readonly Agent365TransmissionGate _gate;
+        private readonly Agent365TransmissionGateRegistry _gates;
         private readonly Lazy<IAgent365PersistentStorage> _storage;
         private readonly Func<DateTimeOffset> _utcNow;
 
@@ -65,12 +66,17 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             ILogger<Agent365ExporterCore> logger,
             Func<DateTimeOffset>? utcNow,
             IAgent365PersistentStorage? storage,
-            Agent365TransmissionGate? gate)
+            Agent365TransmissionGate? gate = null,
+            Agent365TransmissionGateRegistry? gates = null)
         {
             _formatter = formatter ?? throw new ArgumentNullException(nameof(formatter));
             _logger = logger ?? NullLogger<Agent365ExporterCore>.Instance;
             _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
             _gate = gate ?? new Agent365TransmissionGate(_utcNow);
+            _gates = gates
+                ?? (gate != null
+                    ? new Agent365TransmissionGateRegistry(utcNow: _utcNow, gateFactory: () => gate)
+                    : new Agent365TransmissionGateRegistry(utcNow: _utcNow));
 
             // Resolved lazily so that a core which never persists (e.g. everything delivers on the
             // first attempt, or an injected fake is supplied) never creates the on-disk
@@ -88,8 +94,13 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         internal IAgent365PersistentStorage Storage => _storage.Value;
 
         /// <summary>
-        /// The transmission gate this core coordinates send availability through. Shared with the replay
-        /// coordinator so live sends and replay passes observe a single backoff/half-open state.
+        /// The shared tenant gate registry this core coordinates live-send availability through.
+        /// </summary>
+        internal Agent365TransmissionGateRegistry Gates => _gates;
+
+        /// <summary>
+        /// Compatibility gate retained for the replay coordinator until replay adopts the tenant gate
+        /// registry in a later task.
         /// </summary>
         internal Agent365TransmissionGate Gate => _gate;
 
@@ -340,10 +351,12 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                         json,
                         _utcNow());
 
-                    if (!_gate.TryAcquire(out var ownsProbe))
+                    using var gateLease = _gates.Acquire(tenantId);
+                    var gateForTenant = gateLease.Gate;
+                    if (!gateForTenant.TryAcquire(out var ownsProbe))
                     {
-                        // Gate is in backoff: skip the network entirely. Only log the outcome after
-                        // TryStore so the message is accurate regardless of storage type.
+                        // This tenant's gate is in backoff: skip the network entirely. Only log the
+                        // outcome after TryStore so the message is accurate regardless of storage type.
                         if (!_storage.Value.TryStore(record))
                         {
                             this._logger?.LogWarning(
@@ -379,11 +392,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                         switch (outcome.Disposition)
                         {
                             case Agent365SendDisposition.Delivered:
-                                _gate.RecordSuccess();
+                                gateForTenant.RecordSuccess();
                                 break;
 
                             case Agent365SendDisposition.RetryableFailure:
-                                _gate.RecordRetryableFailure(outcome.RetryAfter);
+                                gateForTenant.RecordRetryableFailure(outcome.RetryAfter);
                                 if (!_storage.Value.TryStore(record))
                                 {
                                     this._logger?.LogWarning(
@@ -409,7 +422,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                     finally
                     {
                         if (ownsProbe)
-                            _gate.ReleaseProbe();
+                            gateForTenant.ReleaseProbe();
                     }
 
                     if (permanentFailureForGroup)

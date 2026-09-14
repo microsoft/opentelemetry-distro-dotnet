@@ -478,6 +478,40 @@ public sealed class Agent365DurableExportTests
     }
 
     [TestMethod]
+    public async Task RetryableFailureForOneTenantDoesNotBlockAnotherTenant()
+    {
+        var storage = new FakeStorage();
+        var tenantASends = 0;
+        var tenantBSends = 0;
+
+        var result = await ExportActivitiesAsync(
+            CreateCore(storage: storage),
+            new[]
+            {
+                CreateActivity(tenantId: "tenant-a"),
+                CreateActivity(tenantId: "tenant-b"),
+            },
+            request =>
+            {
+                var uri = request.RequestUri!.ToString();
+                if (uri.Contains("tenants/tenant-a/"))
+                {
+                    tenantASends++;
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+                }
+
+                tenantBSends++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+            });
+
+        result.Should().Be(ExportResult.Success);
+        tenantASends.Should().Be(1);
+        tenantBSends.Should().Be(1);
+        storage.Records.Should().ContainSingle();
+        storage.Records[0].TenantId.Should().Be("tenant-a");
+    }
+
+    [TestMethod]
     public async Task PermanentFirstChunkStopsRemainingChunksForThatIdentity()
     {
         // Three same-identity chunks; the first send is a permanent 403. Later chunks for the same
