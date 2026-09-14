@@ -103,7 +103,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             List<string>? idleKeys = null;
             foreach (var pair in _entries)
             {
-                if (pair.Value.ActiveLeaseCount == 0
+                if (IsEvictable(pair.Value)
                     && now - pair.Value.LastAccessUtc >= _idleTimeout)
                 {
                     idleKeys ??= new List<string>();
@@ -128,7 +128,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             List<KeyValuePair<string, Entry>>? inactiveEntries = null;
             foreach (var pair in _entries)
             {
-                if (pair.Value.ActiveLeaseCount == 0)
+                if (IsEvictable(pair.Value))
                 {
                     inactiveEntries ??= new List<KeyValuePair<string, Entry>>();
                     inactiveEntries.Add(pair);
@@ -157,6 +157,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 }
             }
         }
+
+        private static bool IsEvictable(Entry entry) =>
+            entry.ActiveLeaseCount == 0 && !entry.Gate.HasPendingBackoff;
 
         internal sealed class Lease : IDisposable
         {

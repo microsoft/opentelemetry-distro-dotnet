@@ -15,8 +15,8 @@ namespace Microsoft.Agents.A365.Observability.Tests.Tracing.Exporters;
 /// <summary>
 /// Exercises the durable replay contract of <see cref="Agent365ReplayCoordinator"/> and the fresh
 /// authentication entry point <see cref="Agent365ExporterCore.ReplayRecordAsync"/>:
-/// each pass reads at most ten leased records and, only after a record is leased and successfully
-/// deserialized, consults that record's tenant's gate through the shared
+/// each pass scans a bounded number of leased records, attempts at most ten, and only after a record
+/// is leased and successfully deserialized consults that record's tenant's gate through the shared
 /// <see cref="Agent365TransmissionGateRegistry"/> — the same registry the live send path coordinates
 /// through, so a tenant backed off by a live failure is also skipped by replay and vice versa. A
 /// tenant whose gate is in backoff has its record retained without an HTTP attempt, but the pass keeps

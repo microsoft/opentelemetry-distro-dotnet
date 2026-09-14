@@ -122,6 +122,38 @@ public class Agent365TransmissionGateRegistryTests
     }
 
     [TestMethod]
+    public void IdleCleanupPreservesGateUntilRetryBackoffExpires()
+    {
+        var registry = CreateRegistry(idleTimeout: TimeSpan.FromMinutes(5));
+        var originalGate = AcquireAndRelease(registry, "tenant-a");
+        originalGate.RecordRetryableFailure(TimeSpan.FromMinutes(30));
+
+        Advance(TimeSpan.FromMinutes(6));
+        AcquireAndRelease(registry, "tenant-b");
+
+        using var reacquired = registry.Acquire("tenant-a");
+        reacquired.Gate.Should().BeSameAs(originalGate);
+        reacquired.Gate.TryAcquire(out _).Should().BeFalse(
+            "idle cleanup must not discard an outstanding retry backoff");
+    }
+
+    [TestMethod]
+    public void CapacityCleanupPreservesGateUntilRetryBackoffExpires()
+    {
+        var registry = CreateRegistry(capacity: 1, idleTimeout: TimeSpan.FromHours(1));
+        var originalGate = AcquireAndRelease(registry, "tenant-a");
+        originalGate.RecordRetryableFailure(TimeSpan.FromMinutes(30));
+
+        Advance(TimeSpan.FromMinutes(1));
+        AcquireAndRelease(registry, "tenant-b");
+
+        using var reacquired = registry.Acquire("tenant-a");
+        reacquired.Gate.Should().BeSameAs(originalGate);
+        reacquired.Gate.TryAcquire(out _).Should().BeFalse(
+            "capacity cleanup must not discard an outstanding retry backoff");
+    }
+
+    [TestMethod]
     public void RepeatedLeaseDisposalDoesNotCorruptActiveCountsOrThrow()
     {
         var registry = CreateRegistry(capacity: 1);
