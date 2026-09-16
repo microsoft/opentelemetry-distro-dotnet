@@ -71,11 +71,11 @@
     <TargetsForTfmSpecificDebugSymbolsInPackage>$(TargetsForTfmSpecificDebugSymbolsInPackage);IncludeStandaloneEtwSdkBuildOutputs</TargetsForTfmSpecificDebugSymbolsInPackage>
   </PropertyGroup>
 
-  <Target Name="IncludeStandaloneEtwSdkBuildOutputs" DependsOnTargets="ResolveReferences">
+  <Target Name="IncludeStandaloneEtwSdkBuildOutputs">
     <ItemGroup>
-      <_StandaloneEtwSdkBuildOutput Include="@(ReferenceCopyLocalPaths)"
-                                    Condition="'%(ReferenceCopyLocalPaths.ReferenceSourceTarget)' == 'ProjectReference'
-                                      and '%(ReferenceCopyLocalPaths.Filename)' == 'Microsoft.Agents.A365.Observability.Etw'" />
+      <_StandaloneEtwSdkBuildOutput Include="$(TargetDir)Microsoft.Agents.A365.Observability.Etw.dll;
+                                                $(TargetDir)Microsoft.Agents.A365.Observability.Etw.xml;
+                                                $(TargetDir)Microsoft.Agents.A365.Observability.Etw.pdb" />
       <BuildOutputInPackage Include="@(_StandaloneEtwSdkBuildOutput)"
                             Condition="'%(_StandaloneEtwSdkBuildOutput.Extension)' == '.dll'
                               or '%(_StandaloneEtwSdkBuildOutput.Extension)' == '.xml'">

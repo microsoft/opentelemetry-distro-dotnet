@@ -31,23 +31,23 @@
     <MakeDir Directories="$(PackageValidationArtifactsPath)" />
 
     <MSBuild
-      Projects="$(ContractsProjectPath)"
-      Targets="Restore;Pack"
+      Projects="$(ContractsProjectPath);$(EtwProjectPath);$(DistroProjectPath)"
+      Targets="Restore"
       BuildInParallel="false"
       RemoveProperties="TargetFramework;RuntimeIdentifier;SelfContained"
-      Properties="Configuration=$(Configuration);PackageOutputPath=$(PackageValidationArtifactsPath);Version=$(Agent365EtwSdkPackageVersion);Agent365EtwSdkPackageVersion=$(Agent365EtwSdkPackageVersion)" />
+      Properties="Configuration=$(Configuration);NoBuild=false;MicrosoftOpenTelemetryPackageVersion=$(MicrosoftOpenTelemetryPackageVersion);Agent365EtwSdkPackageVersion=$(Agent365EtwSdkPackageVersion)" />
     <MSBuild
-      Projects="$(EtwProjectPath)"
-      Targets="Restore;Pack"
+      Projects="$(ContractsProjectPath);$(EtwProjectPath);$(DistroProjectPath)"
+      Targets="Build"
       BuildInParallel="false"
       RemoveProperties="TargetFramework;RuntimeIdentifier;SelfContained"
-      Properties="Configuration=$(Configuration);PackageOutputPath=$(PackageValidationArtifactsPath);Version=$(Agent365EtwSdkPackageVersion);Agent365EtwSdkPackageVersion=$(Agent365EtwSdkPackageVersion)" />
+      Properties="Configuration=$(Configuration);NoBuild=false;MicrosoftOpenTelemetryPackageVersion=$(MicrosoftOpenTelemetryPackageVersion);Agent365EtwSdkPackageVersion=$(Agent365EtwSdkPackageVersion)" />
     <MSBuild
-      Projects="$(DistroProjectPath)"
-      Targets="Restore;Pack"
+      Projects="$(ContractsProjectPath);$(EtwProjectPath);$(DistroProjectPath)"
+      Targets="Pack"
       BuildInParallel="false"
       RemoveProperties="TargetFramework;RuntimeIdentifier;SelfContained"
-      Properties="Configuration=$(Configuration);PackageOutputPath=$(PackageValidationArtifactsPath);Version=$(MicrosoftOpenTelemetryPackageVersion);MicrosoftOpenTelemetryPackageVersion=$(MicrosoftOpenTelemetryPackageVersion);Agent365EtwSdkPackageVersion=$(Agent365EtwSdkPackageVersion)" />
+      Properties="Configuration=$(Configuration);NoBuild=true;PackageOutputPath=$(PackageValidationArtifactsPath);MicrosoftOpenTelemetryPackageVersion=$(MicrosoftOpenTelemetryPackageVersion);Agent365EtwSdkPackageVersion=$(Agent365EtwSdkPackageVersion)" />
 
     <MakeDir Directories="$(DistroPackageSourcePath);$(EtwPackageSourcePath)" />
     <Copy

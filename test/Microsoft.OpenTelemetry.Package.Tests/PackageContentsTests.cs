@@ -10,6 +10,7 @@ namespace Microsoft.OpenTelemetry.Package.Tests;
 [TestClass]
 public sealed class PackageContentsTests
 {
+    private const string EtwPackageId = "Microsoft.Agents.A365.Observability.Etw";
     private const string DistroPackageId = "Microsoft.OpenTelemetry";
     private const string ValidationVersion = "1.2.0-validation";
 
@@ -71,6 +72,41 @@ public sealed class PackageContentsTests
                 $"{expectedEntry} should be a portable PDB");
         }
 
+        archive.GetEntry($"lib/{targetFramework}/{ContractsAssemblyName}.pdb")
+            .Should().BeNull();
+    }
+
+    [DataTestMethod]
+    [DataRow("netstandard2.0")]
+    [DataRow("net8.0")]
+    public void StandaloneEtwNupkgContainsEtwButNotContracts(string targetFramework)
+    {
+        using var archive = PackageArchive.Open(EtwPackageId, ValidationVersion, "nupkg");
+        var entries = archive.Entries.Select(entry => entry.FullName);
+
+        using var scope = new AssertionScope();
+        entries.Should().Contain(
+        [
+            $"lib/{targetFramework}/{EtwPackageId}.dll",
+            $"lib/{targetFramework}/{EtwPackageId}.xml",
+        ]);
+        entries.Should().NotContain(
+        [
+            $"lib/{targetFramework}/{ContractsAssemblyName}.dll",
+            $"lib/{targetFramework}/{ContractsAssemblyName}.xml",
+        ]);
+    }
+
+    [DataTestMethod]
+    [DataRow("netstandard2.0")]
+    [DataRow("net8.0")]
+    public void StandaloneEtwSnupkgContainsEtwButNotContracts(string targetFramework)
+    {
+        using var archive = PackageArchive.Open(EtwPackageId, ValidationVersion, "snupkg");
+
+        using var scope = new AssertionScope();
+        archive.GetEntry($"lib/{targetFramework}/{EtwPackageId}.pdb")
+            .Should().NotBeNull();
         archive.GetEntry($"lib/{targetFramework}/{ContractsAssemblyName}.pdb")
             .Should().BeNull();
     }
