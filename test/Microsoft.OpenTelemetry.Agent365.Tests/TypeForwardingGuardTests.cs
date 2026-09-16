@@ -92,6 +92,9 @@ namespace Microsoft.OpenTelemetry.Agent365.Tests
         /// </summary>
         private static readonly string[] ExpectedMovedUnshippedTypes =
         {
+            "Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails",
+            "Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferMode",
+            "Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferTargetType",
             "Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallArguments",
             "Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult",
             "Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallAction",

@@ -210,6 +210,23 @@ public sealed class Agent365ExporterTests
     }
 
     [TestMethod]
+    public void PartitionByIdentity_ExcludesWhitespaceOnlyTenantOrAgentId()
+    {
+        // A whitespace-only tenant or agent id is not a real identity: it must be excluded exactly
+        // like a null/empty one, matching the registry's own whitespace rejection for tenant ids.
+        using var whitespaceTenant = CreateActivity("   ", "agent-1");
+        using var whitespaceAgent = CreateActivity("tenant-1", "   ");
+        using var valid = CreateActivity("tenant-1", "agent-1");
+
+        var batch = CreateBatch(whitespaceTenant, whitespaceAgent, valid);
+
+        var groups = _agent365ExporterCore.PartitionByIdentity(in batch);
+
+        groups.Should().HaveCount(1);
+        groups.Should().Contain(g => g.TenantId == "tenant-1" && g.AgentId == "agent-1" && g.Activities.Count == 1);
+    }
+
+    [TestMethod]
     public void PartitionByIdentity_FiltersOutNonGenAISpans()
     {
         // Arrange
@@ -1351,6 +1368,46 @@ public sealed class Agent365ExporterTests
     {
         Action act = () => _agent365ExporterCore.BuildRequestUri("http://insecure.example.com", "/observability/tenants/t1/otlp/agents/a1/traces");
         act.Should().Throw<ArgumentException>().WithParameterName("endpoint");
+    }
+
+    #endregion
+
+    #region HTTP 200 Success Logging Tests
+
+    [TestMethod]
+    public void Export_Http200_LogsStatusAndCorrelationId()
+    {
+        var handler = new TestHttpMessageHandler(_ =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.OK);
+            response.Headers.Add("x-ms-correlation-id", "success-correlation-id");
+            return response;
+        });
+        var options = new Agent365ExporterOptions
+        {
+            TokenResolver = (_, _) => Task.FromResult<string?>("test-token"),
+            UseS2SEndpoint = true,
+            DomainResolver = _ => "test.example.com",
+        };
+        var logger = new InMemoryLogger();
+        var core = new Agent365ExporterCore(
+            new ExportFormatter(NullLogger<ExportFormatter>.Instance),
+            logger);
+        var exporter = new Agent365Exporter(
+            core,
+            NullLogger<Agent365Exporter>.Instance,
+            options,
+            ResourceBuilder.CreateEmpty().AddService("test").Build(),
+            new HttpClient(handler));
+        using var activity = CreateActivity("tenant-200", "agent-200");
+        var batch = CreateBatch(activity);
+
+        var result = exporter.Export(in batch);
+
+        result.Should().Be(ExportResult.Success);
+        logger.LogMessages.Should().ContainSingle(message =>
+            message.Contains("HTTP 200")
+            && message.Contains("success-correlation-id"));
     }
 
     #endregion

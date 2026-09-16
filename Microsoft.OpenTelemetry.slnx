@@ -1,6 +1,7 @@
 <Solution>
   <Project Path="examples/Azure.Monitor.OpenTelemetry.AspNetCore.Demo/Azure.Monitor.OpenTelemetry.AspNetCore.Demo.csproj" />
   <Project Path="examples/Microsoft.OpenTelemetry.Agent365.Demo/Microsoft.OpenTelemetry.Agent365.Demo.csproj" />
+  <Project Path="examples/Microsoft.OpenTelemetry.Agent365.S2S.Demo/Microsoft.OpenTelemetry.Agent365.S2S.Demo.csproj" />
   <Project Path="examples/Microsoft.OpenTelemetry.AgentFramework.Demo/Microsoft.OpenTelemetry.AgentFramework.Demo.csproj" />
   <Project Path="test/Microsoft.Agents.A365.Observability.Contracts.Tests/Microsoft.Agents.A365.Observability.Contracts.Tests.csproj" />
   <Project Path="test/Microsoft.Agents.A365.Observability.Etw.Tests/Microsoft.Agents.A365.Observability.Etw.Tests.csproj" />
