@@ -3,11 +3,9 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
-    <!-- Defaults to the standalone SDK repo version; CI overrides it with the unique prerelease version
-         that the locally packed artifacts were produced with (-p:SmokePackageVersion=...). -->
-    <SmokePackageVersion Condition="'$(SmokePackageVersion)' == ''">$(Agent365EtwSdkPackageVersion)</SmokePackageVersion>
+    <EtwSdkSmokePackageVersion Condition="'$(EtwSdkSmokePackageVersion)' == ''">$(Agent365EtwSdkPackageVersion)</EtwSdkSmokePackageVersion>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Agents.A365.Observability.Etw" Version="[$(SmokePackageVersion)]" />
+    <PackageReference Include="Microsoft.Agents.A365.Observability.Etw" Version="[$(EtwSdkSmokePackageVersion)]" />
   </ItemGroup>
 </Project>

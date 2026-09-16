@@ -13,38 +13,46 @@ public sealed class PackageContentsTests
     private const string DistroPackageId = "Microsoft.OpenTelemetry";
     private const string ValidationVersion = "1.2.0-validation";
 
-    private static readonly string[] AssemblyNames =
+    private static readonly string[] EmbeddedAssemblyNames =
     [
         "Microsoft.OpenTelemetry",
         "Microsoft.Agents.A365.Observability.Etw",
-        "Microsoft.Agents.A365.Observability.Contracts",
     ];
+
+    private const string ContractsAssemblyName =
+        "Microsoft.Agents.A365.Observability.Contracts";
 
     [DataTestMethod]
     [DataRow("netstandard2.0")]
     [DataRow("net8.0")]
-    public void DistroNupkgContainsAllAssembliesAndXmlDocumentation(string targetFramework)
+    public void DistroNupkgEmbedsDistroAndEtwButNotContracts(string targetFramework)
     {
         using var archive = PackageArchive.Open(DistroPackageId, ValidationVersion, "nupkg");
         var entries = archive.Entries.Select(entry => entry.FullName);
-        var expectedEntries = AssemblyNames.SelectMany(assemblyName => new[]
+        var expectedEntries = EmbeddedAssemblyNames.SelectMany(assemblyName => new[]
         {
             $"lib/{targetFramework}/{assemblyName}.dll",
             $"lib/{targetFramework}/{assemblyName}.xml",
         });
 
+        using var scope = new AssertionScope();
         entries.Should().Contain(expectedEntries);
+        entries.Should().NotContain(
+        [
+            $"lib/{targetFramework}/{ContractsAssemblyName}.dll",
+            $"lib/{targetFramework}/{ContractsAssemblyName}.xml",
+        ]);
     }
 
     [DataTestMethod]
     [DataRow("netstandard2.0")]
     [DataRow("net8.0")]
-    public void DistroSnupkgContainsPortablePdbsForAllAssemblies(string targetFramework)
+    public void DistroSnupkgEmbedsDistroAndEtwButNotContracts(string targetFramework)
     {
         using var archive = PackageArchive.Open(DistroPackageId, ValidationVersion, "snupkg");
 
         using var scope = new AssertionScope();
-        foreach (var assemblyName in AssemblyNames)
+        foreach (var assemblyName in EmbeddedAssemblyNames)
         {
             var expectedEntry = $"lib/{targetFramework}/{assemblyName}.pdb";
             var entry = archive.GetEntry(expectedEntry);
@@ -62,5 +70,8 @@ public sealed class PackageContentsTests
                 "BSJB",
                 $"{expectedEntry} should be a portable PDB");
         }
+
+        archive.GetEntry($"lib/{targetFramework}/{ContractsAssemblyName}.pdb")
+            .Should().BeNull();
     }
 }

@@ -9,6 +9,8 @@
     <MicrosoftOpenTelemetryPackageVersion>1.2.0-validation</MicrosoftOpenTelemetryPackageVersion>
     <Agent365EtwSdkPackageVersion>1.2.0-validation</Agent365EtwSdkPackageVersion>
     <PackageValidationArtifactsPath>$(BaseIntermediateOutputPath)package-validation\$(Configuration)\</PackageValidationArtifactsPath>
+    <DistroPackageSourcePath>$(PackageValidationArtifactsPath)distro-source\</DistroPackageSourcePath>
+    <EtwPackageSourcePath>$(PackageValidationArtifactsPath)etw-source\</EtwPackageSourcePath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -33,19 +35,27 @@
       Targets="Restore;Pack"
       BuildInParallel="false"
       RemoveProperties="TargetFramework;RuntimeIdentifier;SelfContained"
-      Properties="Configuration=$(Configuration);PackageOutputPath=$(PackageValidationArtifactsPath);Version=$(Agent365EtwSdkPackageVersion);A365ObservabilityPackageVersion=$(Agent365EtwSdkPackageVersion);Agent365EtwSdkPackageVersion=$(Agent365EtwSdkPackageVersion)" />
+      Properties="Configuration=$(Configuration);PackageOutputPath=$(PackageValidationArtifactsPath);Version=$(Agent365EtwSdkPackageVersion);Agent365EtwSdkPackageVersion=$(Agent365EtwSdkPackageVersion)" />
     <MSBuild
       Projects="$(EtwProjectPath)"
       Targets="Restore;Pack"
       BuildInParallel="false"
       RemoveProperties="TargetFramework;RuntimeIdentifier;SelfContained"
-      Properties="Configuration=$(Configuration);PackageOutputPath=$(PackageValidationArtifactsPath);Version=$(Agent365EtwSdkPackageVersion);A365ObservabilityPackageVersion=$(Agent365EtwSdkPackageVersion);Agent365EtwSdkPackageVersion=$(Agent365EtwSdkPackageVersion)" />
+      Properties="Configuration=$(Configuration);PackageOutputPath=$(PackageValidationArtifactsPath);Version=$(Agent365EtwSdkPackageVersion);Agent365EtwSdkPackageVersion=$(Agent365EtwSdkPackageVersion)" />
     <MSBuild
       Projects="$(DistroProjectPath)"
       Targets="Restore;Pack"
       BuildInParallel="false"
       RemoveProperties="TargetFramework;RuntimeIdentifier;SelfContained"
-      Properties="Configuration=$(Configuration);PackageOutputPath=$(PackageValidationArtifactsPath);Version=$(MicrosoftOpenTelemetryPackageVersion);A365ObservabilityPackageVersion=$(MicrosoftOpenTelemetryPackageVersion);MicrosoftOpenTelemetryPackageVersion=$(MicrosoftOpenTelemetryPackageVersion)" />
+      Properties="Configuration=$(Configuration);PackageOutputPath=$(PackageValidationArtifactsPath);Version=$(MicrosoftOpenTelemetryPackageVersion);MicrosoftOpenTelemetryPackageVersion=$(MicrosoftOpenTelemetryPackageVersion);Agent365EtwSdkPackageVersion=$(Agent365EtwSdkPackageVersion)" />
+
+    <MakeDir Directories="$(DistroPackageSourcePath);$(EtwPackageSourcePath)" />
+    <Copy
+      SourceFiles="$(PackageValidationArtifactsPath)Microsoft.OpenTelemetry.$(MicrosoftOpenTelemetryPackageVersion).nupkg;$(PackageValidationArtifactsPath)Microsoft.Agents.A365.Observability.Contracts.$(Agent365EtwSdkPackageVersion).nupkg"
+      DestinationFolder="$(DistroPackageSourcePath)" />
+    <Copy
+      SourceFiles="$(PackageValidationArtifactsPath)Microsoft.Agents.A365.Observability.Etw.$(Agent365EtwSdkPackageVersion).nupkg;$(PackageValidationArtifactsPath)Microsoft.Agents.A365.Observability.Contracts.$(Agent365EtwSdkPackageVersion).nupkg"
+      DestinationFolder="$(EtwPackageSourcePath)" />
 
     <WriteLinesToFile
       File="$(OutDir)package-validation-path.txt"
