@@ -2,13 +2,14 @@
 
 A minimal non-hosted console application that routes traces, logs, and metrics from one Azure Monitor exporter to two Application Insights resources.
 
-Multi-endpoint mode requires these attributes on every telemetry item:
+Multi-endpoint mode requires these routing attributes on every telemetry item:
 
 - `microsoft.instrumentation_key`
 - `microsoft.ingestion_endpoint`
-- `microsoft.multi_endpoint_cloud_role`
 
-The sample adds them directly to activity tags, log-record attributes, and metric measurement dimensions. Telemetry missing either destination attribute is dropped in multi-endpoint mode.
+The optional `microsoft.multi_endpoint_cloud_role` attribute sets `ai.cloud.role`. If it is missing or invalid, the exporter uses `unknown_service`.
+
+The sample adds all three attributes directly to activity tags, log-record attributes, and metric measurement dimensions. Telemetry missing either required routing attribute is dropped in multi-endpoint mode.
 
 ## Run
 
