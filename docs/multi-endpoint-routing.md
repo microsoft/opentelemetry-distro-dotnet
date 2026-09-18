@@ -651,6 +651,97 @@ that target's output; do not strip them in a processor that runs before Azure Mo
 Cloud role can vary by item, but the provider resource is shared across all customers and does not
 become a separate resource per customer.
 
+## 11. Use the Azure Monitor exporter without the distro
+
+Routing is a feature of the Azure Monitor exporter, so it also works without
+`UseMicrosoftOpenTelemetry`. Register the exporter per signal with
+`AddAzureMonitorTraceExporter`, `AddAzureMonitorLogExporter`, and `AddAzureMonitorMetricExporter`, and
+keep the same `ICustomerRouting`, processors, and measurement dimensions described above.
+
+You give up what the distro adds: its instrumentation libraries, the Azure resource detectors, the
+`telemetry.distro.*` resource attributes, and Live Metrics.
+
+Four rules apply to this path:
+
+- **Add your routing processor before the exporter** on each builder. The per-signal methods add their
+  export processor where they are called, so a processor registered afterwards would run too late.
+- **Set `EnableLiveMetrics = false`.** Live Metrics is only available through
+  `UseAzureMonitorExporter`, and leaving it on makes each per-signal method log a "not supported"
+  warning.
+- **Sampling comes from the exporter options.** `AddAzureMonitorTraceExporter` applies a sampler built
+  from `SamplingRatio` and `TracesPerSecond`. Routing ignores `TracesPerSecond` exactly as it does
+  under the distro, so set it to `null` and choose a `SamplingRatio`.
+- **Do not mix the two styles.** Combining `UseAzureMonitorExporter` with the per-signal methods
+  throws.
+
+Share one options callback across the three signals:
+
+```csharp
+using Azure.Monitor.OpenTelemetry.Exporter;
+
+static void ConfigureExporter(AzureMonitorExporterOptions o)
+{
+    o.EnableLiveMetrics = false;
+    o.TracesPerSecond = null;
+    o.SamplingRatio = 1.0F;
+}
+```
+
+### Hosted: `IServiceCollection.AddOpenTelemetry`
+
+```csharp
+using OpenTelemetry;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+
+builder.Services.AddSingleton<ICustomerRouting>(new CustomerRouting(destinations));
+
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing => tracing
+        .AddSource("Contoso.Application")
+        .AddProcessor(sp => new RoutingActivityProcessor(sp.GetRequiredService<ICustomerRouting>()))
+        .AddAzureMonitorTraceExporter(ConfigureExporter))
+    .WithLogging(logging => logging
+        .AddProcessor(sp => new RoutingLogProcessor(sp.GetRequiredService<ICustomerRouting>()))
+        .AddAzureMonitorLogExporter(ConfigureExporter))
+    .WithMetrics(metrics => metrics
+        .AddMeter("Contoso.Application")
+        .AddAzureMonitorMetricExporter(ConfigureExporter));
+```
+
+### Non-hosted: `OpenTelemetrySdk.Create`
+
+Use the per-signal methods here rather than `UseAzureMonitorExporter`, which attaches its trace and
+log exporters through a hosted service that never starts without the generic host.
+
+```csharp
+using OpenTelemetry;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+
+var routing = new CustomerRouting(destinations);
+
+using var sdk = OpenTelemetrySdk.Create(otel => otel
+    .WithTracing(tracing => tracing
+        .AddSource("Contoso.Application")
+        .AddProcessor(new RoutingActivityProcessor(routing))
+        .AddAzureMonitorTraceExporter(ConfigureExporter))
+    .WithLogging(logging => logging
+        .AddProcessor(new RoutingLogProcessor(routing))
+        .AddAzureMonitorLogExporter(ConfigureExporter))
+    .WithMetrics(metrics => metrics
+        .AddMeter("Contoso.Application")
+        .AddAzureMonitorMetricExporter(ConfigureExporter)));
+
+var logger = sdk.GetLoggerFactory().CreateLogger("Contoso.Application");
+```
+
+Set the routing switch before either form runs. Everything else - the routing attributes, the
+drop-on-unresolved behaviour, storage, and the diagnostics in
+[Troubleshooting](#9-troubleshooting) - is unchanged, because it all lives in the exporter.
+
 ## Sample
 
 [Microsoft.OpenTelemetry.MultiEndpoint.Console.Demo](../examples/Microsoft.OpenTelemetry.MultiEndpoint.Console.Demo)
