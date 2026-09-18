@@ -4,8 +4,8 @@
 using System.Runtime.CompilerServices;
 
 // Microsoft.Agents.A365.Observability.Etw compiles against internal members of this assembly.
-// Contracts and ETW therefore share Agent365EtwSdkPackageVersion and must be published together.
-// Microsoft.OpenTelemetry has an independent package version and embeds both build outputs.
+// Contracts, ETW, and Microsoft.OpenTelemetry therefore share MicrosoftOpenTelemetryPackageVersion
+// and must be published together.
 [assembly: InternalsVisibleTo(
     "Microsoft.Agents.A365.Observability.Contracts.Tests, PublicKey=" + ContractsAssemblyInfo.PublicKey)]
 [assembly: InternalsVisibleTo(

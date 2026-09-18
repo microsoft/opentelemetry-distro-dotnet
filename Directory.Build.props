@@ -20,7 +20,6 @@
   <!-- Package versions -->
   <PropertyGroup>
     <MicrosoftOpenTelemetryPackageVersion>1.2.0</MicrosoftOpenTelemetryPackageVersion>
-    <Agent365EtwSdkPackageVersion>1.2.0</Agent365EtwSdkPackageVersion>
   </PropertyGroup>
 
   <!-- Source Link & deterministic builds -->
