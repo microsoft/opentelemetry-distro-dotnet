@@ -23,8 +23,9 @@ run without writing a resolver first, see [Sample](#sample).
 
 ## 1. Requirements
 
-- A `Microsoft.OpenTelemetry` release that includes multi-endpoint routing. It is **not** in
-  `Microsoft.OpenTelemetry` 1.1.0; that package predates the feature and ignores the switch.
+- **A `Microsoft.OpenTelemetry` release newer than 1.1.0.** Multi-endpoint routing is not in 1.1.0 or
+  any earlier release; those versions ignore the switch and the guidance below has no effect. The
+  [changelog](../CHANGELOG.md) lists the release that introduces it.
 - .NET 8 or later. Earlier target frameworks are not supported by the samples, which use C# 12
   primary constructors and collection expressions.
 - **Each destination must allow connection string authentication.** Routing identifies a component by
