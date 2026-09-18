@@ -12,29 +12,30 @@ Your application supplies the destination for every telemetry item:
 - **Traces and logs** - an OpenTelemetry processor attaches the destination as attributes.
 - **Metrics** - the destination is passed as dimensions when the measurement is recorded.
 
-How you identify the customer and store their connection details is application-owned. Routing does
-not require a particular cache, catalog, or context mechanism.
+Identifying the customer and storing their connection details is your application's job; routing
+prescribes no particular store, cache, or context mechanism.
 
 If your application sends all telemetry to one component, use the standard configuration in
 [Azure Monitor Getting Started](azure-monitor-getting-started.md).
 
-Read the sections in order: each code sample uses only types introduced before it, and section 5
-assembles them into a running application.
+Read the setup sections in order: each sample uses only types introduced before it. For code you can
+run without writing a resolver first, see [Sample](#sample).
 
 ## 1. Requirements
 
 - A `Microsoft.OpenTelemetry` release that includes multi-endpoint routing. It is **not** in
   `Microsoft.OpenTelemetry` 1.1.0; that package predates the feature and ignores the switch.
-- .NET 8 or later. The samples use C# 12 primary constructors and collection expressions.
-- **Each destination must allow connection string authentication.** Routing identifies a component
-  by instrumentation key, so a component with
+- .NET 8 or later. Earlier target frameworks are not supported by the samples, which use C# 12
+  primary constructors and collection expressions.
+- **Each destination must allow connection string authentication.** Routing identifies a component by
+  instrumentation key, so a component with
   [local authentication disabled](https://learn.microsoft.com/azure/azure-monitor/app/azure-ad-authentication#disable-local-authentication)
-  cannot receive routed telemetry. Microsoft Entra ID authentication is not available while routing
-  is on: configuring `AzureMonitor.Credential` throws `NotSupportedException` at startup.
+  cannot receive routed telemetry, and Microsoft Entra ID authentication is unavailable while routing
+  is on.
 - **Each destination needs an explicit ingestion endpoint.** See
   [Destinations and connection strings](#destinations-and-connection-strings).
 
-## 2. How routing works
+## 2. The routing attributes
 
 Every routed item carries these attributes:
 
@@ -47,9 +48,8 @@ Every routed item carries these attributes:
 Values must be strings. The endpoint must be an absolute `https` URI without credentials, query
 string, or fragment.
 
-**An item with missing or invalid routing attributes is dropped.** This applies whether or not a
-connection string is configured for the application itself - routed telemetry never falls back to the
-application's own component.
+**An item with missing or invalid routing attributes is dropped.** It is never sent to the
+application's own component, even when one is configured.
 
 > **Trust requirement.** Destinations must come from a server-owned store, chosen after you have
 > authenticated and authorized the customer. Routing values are validated for shape only; nothing
@@ -64,8 +64,8 @@ connection string does not always contain one: the Application Insights format a
 `EndpointSuffix` with an optional `Location`, and falls back to a default endpoint when neither is
 present. A connection string of just `InstrumentationKey=...` therefore has no endpoint to route to.
 
-Resolve and validate destinations once, where you load customer configuration - not inside a
-processor - and store the two values:
+Resolve and validate destinations where you load customer configuration, not inside a processor, and
+store the two values:
 
 ```csharp
 public sealed record RoutingDestination(
@@ -74,8 +74,8 @@ public sealed record RoutingDestination(
     string? CloudRole);
 ```
 
-When your stored configuration is a connection string, require the explicit `IngestionEndpoint`
-form, and reject anything else at load time so the failure is loud:
+If you store connection strings, require the explicit `IngestionEndpoint` form and reject other forms
+when loading configuration:
 
 ```text
 InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https://westus2-1.in.applicationinsights.azure.com/
@@ -83,8 +83,8 @@ InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https:
 
 ## 3. Provide the customer lookup
 
-Routing depends on one application-owned lookup. The examples take a function per signal, so each
-call receives the item being processed and can resolve the customer from it.
+Routing depends on one application-owned lookup, shown here as an interface with a method per signal.
+Each method receives the item being processed and resolves the customer from it.
 
 ```csharp
 using System.Diagnostics;
@@ -98,26 +98,23 @@ public interface ICustomerRouting
 }
 ```
 
-| Input | Returns | Your responsibility |
-|---|---|---|
-| An `Activity` | That activity's destination, or `null` | Identify and authorize the customer for that activity |
-| A `LogRecord` | That record's destination, or `null` | Identify and authorize the customer for that record |
-| Customer context at a measurement call | That customer's destination, or `null` | Resolve the customer before recording the measurement |
+Both methods return the destination for the item, or `null`. Metrics differ: the destination is
+resolved before the measurement is recorded, as described in
+[Record metrics with routing dimensions](#6-record-metrics-with-routing-dimensions).
 
-Three rules matter:
+Two rules:
 
 - **Never substitute another customer's destination.** Return `null` when the customer cannot be
   determined or is not authorized. Returning `null` drops the item, which is the safe outcome.
-- **Processor callbacks are synchronous and concurrent.** Do not block on remote lookups, and make
-  the lookup thread-safe. Never read a shared mutable "current customer" field.
-- **Return pre-parsed values.** Parsing a connection string on every item is wasted work.
+- **Processor callbacks are synchronous and concurrent.** Do not block on remote lookups, make the
+  lookup thread-safe, and never read a shared mutable "current customer" field.
 
 ### Carry the customer on the telemetry
 
 A processor cannot discover the customer by itself, and **a child activity does not inherit its
 parent's tags**. Stamp an opaque customer identifier on the current activity once, after
-authentication, and have the resolver walk up to find it. Do not stamp the connection string or the
-routing values themselves - only an identifier your store can resolve.
+authentication, and have the resolver walk up to find it. Stamp an identifier your store can resolve,
+never the connection string or the routing values themselves.
 
 ```csharp
 app.UseAuthentication();
@@ -174,18 +171,18 @@ for that work.
 
 ## 4. Attach the attributes in a processor
 
-A processor covers telemetry from your own code and from instrumentation you do not own - ASP.NET
-Core, HttpClient, SQL Client, Azure SDK, and the GenAI, Agent Framework, Semantic Kernel, and
-Agent365 sources the distro registers.
+One processor per signal covers telemetry from your own code and from the instrumentation libraries
+the distro enables, including the GenAI, Agent Framework, Semantic Kernel, and Agent365 sources.
 
 > **Ordering requirement.** Your routing processor must run before Azure Monitor exports the item.
 > The distro attaches its export processors to the provider after it is built, so processors
-> registered through `WithTracing` and `WithLogging` - as in section 5 - run first. A processor added
-> to an already-built `TracerProvider` or `LoggerProvider` runs too late, and for logs the batch
-> processor has already copied the attributes.
+> registered through `WithTracing` and `WithLogging` - as in
+> [Enable the switch and register the pipeline](#5-enable-the-switch-and-register-the-pipeline) - run
+> first. A processor added to an already-built `TracerProvider` or `LoggerProvider` runs too late, and
+> for logs the batch processor has already copied the attributes.
 
 Both processors own the three routing attribute names: they replace existing values and remove them
-when resolution returns nothing, so a stale or caller-supplied value cannot select a destination.
+when the resolver returns `null`, so a stale or caller-supplied value cannot select a destination.
 
 ### Traces
 
@@ -199,7 +196,6 @@ public sealed class RoutingActivityProcessor(ICustomerRouting routing) : BasePro
     {
         var destination = routing.ForActivity(activity);
 
-        // SetTag replaces the existing value for a key; a null value removes it.
         activity.SetTag("microsoft.instrumentation_key", destination?.InstrumentationKey);
         activity.SetTag("microsoft.ingestion_endpoint", destination?.IngestionEndpoint);
         activity.SetTag("microsoft.multi_endpoint_cloud_role", destination?.CloudRole);
@@ -207,8 +203,9 @@ public sealed class RoutingActivityProcessor(ICustomerRouting routing) : BasePro
 }
 ```
 
-`SetTag` clears a single entry per key. If any of your code uses `AddTag`, which permits duplicates,
-remove the routing keys before setting them.
+`SetTag` replaces the existing value for a key, and a `null` value removes it - but it clears only one
+entry per key. If any of your code uses `AddTag`, which permits duplicates, remove the routing keys
+before setting them.
 
 ### Logs
 
@@ -256,13 +253,13 @@ public sealed class RoutingLogProcessor(ICustomerRouting routing) : BaseProcesso
 
 Logging scopes are not consulted, so routing values placed only in a scope have no effect. Logs
 emitted outside a request - at startup, or from a background service serving no single customer -
-resolve to nothing and are dropped.
+resolve to `null` and are dropped.
 
-## 5. Register everything
+## 5. Enable the switch and register the pipeline
 
-Enable the switch through the executable project file. It is read once, the first time the setting is
-needed, so anything that touches the exporter earlier locks in the wrong value; the project-file form
-cannot lose that race:
+Enable routing in the executable's project file. The switch is read once, the first time it is
+needed, so code that touches the exporter before it is set locks in `false` for the process. The
+project-file form is applied before any of your code runs:
 
 ```xml
 <ItemGroup>
@@ -272,8 +269,9 @@ cannot lose that race:
 ```
 
 `AppContext.SetSwitch("Azure.Monitor.OpenTelemetry.EnableMultiEndpointRouting", true)` works too, but
-must run before any OpenTelemetry registration. If routing never activates, the
-`MultiEndpointRoutingEnabled` event in section 8 does not appear.
+must run before any OpenTelemetry registration. When routing never activates, the
+`MultiEndpointRoutingEnabled` event described in [Troubleshooting](#8-troubleshooting) does not
+appear.
 
 ```csharp
 using Microsoft.OpenTelemetry;
@@ -289,15 +287,15 @@ builder.Services.AddSingleton<ICustomerRouting>(new CustomerRouting(destinations
 builder.Services.AddOpenTelemetry()
     .UseMicrosoftOpenTelemetry(o =>
     {
-        // Required: the distro only auto-selects Azure Monitor when it finds a connection string,
-        // and a routing-only application has none. Leave o.AzureMonitor.Credential unset.
+        // A routing-only application has no connection string, so nothing auto-selects Azure Monitor.
         o.Exporters = ExportTarget.AzureMonitor;
 
-        // Routing forces these off anyway; setting them avoids collecting telemetry that is
-        // then discarded. TracesPerSecond must be null for SamplingRatio to take effect.
+        // Routing disables these anyway; turning them off avoids collecting discarded telemetry.
         o.AzureMonitor.EnableLiveMetrics = false;
         o.AzureMonitor.EnableStandardMetrics = false;
         o.AzureMonitor.EnablePerfCounters = false;
+
+        // TracesPerSecond must be null for SamplingRatio to take effect.
         o.AzureMonitor.TracesPerSecond = null;
         o.AzureMonitor.SamplingRatio = 0.1F;
     })
@@ -315,7 +313,12 @@ var app = builder.Build();
 The `AddProcessor(sp => ...)` overload resolves dependencies from the container, so your resolver can
 use any registered service. Leave `AzureMonitor.ConnectionString` unset if the application has no
 component of its own, and call `UseMicrosoftOpenTelemetry` only once per service collection - a
-second call throws.
+second call throws. For the full list of settings routing changes, see
+[What changes while routing is enabled](#what-changes-while-routing-is-enabled).
+
+Do not add Console, OTLP, or Agent365 alongside Azure Monitor without reading
+[Additional export targets](#additional-export-targets) first: routing does not govern them, and they
+receive every customer's telemetry.
 
 ## 6. Record metrics with routing dimensions
 
@@ -355,15 +358,15 @@ public static class CustomerMetrics
 ### Metrics from instrumentation libraries
 
 On .NET 8 and later, the HTTP request-duration instruments accept per-request dimensions.
-`IHttpMetricsTagsFeature` covers `http.server.request.duration`. The feature is absent when nothing
-is listening, so check for null:
+`IHttpMetricsTagsFeature` covers `http.server.request.duration`. The feature is absent when nothing is
+listening, so check for `null`:
 
 ```csharp
 using Microsoft.AspNetCore.Http.Features;
 
 app.Use(async (context, next) =>
 {
-    var destination = /* your lookup for this request */;
+    var destination = routing.ForActivity(Activity.Current!);
     var tags = context.Features.Get<IHttpMetricsTagsFeature>();
 
     if (destination is not null && tags is not null)
@@ -376,7 +379,8 @@ app.Use(async (context, next) =>
 });
 ```
 
-`HttpMetricsEnrichmentContext` covers `http.client.request.duration`, from a `DelegatingHandler`:
+`HttpMetricsEnrichmentContext` covers `http.client.request.duration`. Add the callback from a
+`DelegatingHandler` that takes `ICustomerRouting` as a constructor dependency:
 
 ```csharp
 using System.Net.Http.Metrics;
@@ -384,7 +388,7 @@ using System.Net.Http.Metrics;
 protected override Task<HttpResponseMessage> SendAsync(
     HttpRequestMessage request, CancellationToken cancellationToken)
 {
-    var destination = /* your lookup for this request */;
+    var destination = routing.ForActivity(Activity.Current!);
 
     if (destination is not null)
     {
@@ -400,43 +404,55 @@ protected override Task<HttpResponseMessage> SendAsync(
 ```
 
 These hooks cover only those two instruments. Every other instrument the distro collects - active
-request counts, connection metrics, runtime counters - carries no destination and is dropped, one
-`RoutedInstrumentDropped` event per instrument. Rather than naming them individually, drop everything
-you have not explicitly enriched:
+request counts, connection metrics, runtime counters - carries no destination and is dropped, raising
+one `RoutedInstrumentDropped` event per instrument. Rather than naming them individually, drop
+everything you have not explicitly enriched:
 
 ```csharp
 metrics.AddView(instrument =>
     RoutableInstruments.Contains(instrument.Name) ? null : MetricStreamConfiguration.Drop);
 ```
 
-Two limits worth knowing:
+### Metric views and cardinality
 
-- A view that restricts `TagKeys` must keep the routing dimensions. Views can drop dimensions but
-  cannot add them back.
-- Routing dimensions multiply cardinality by your customer count. The per-metric limit is 2000 series
-  by default; once reached, **new** attribute combinations are folded into a single overflow point
-  tagged `otel.metric.overflow=true`, which carries no destination and is dropped. One noisy customer
-  can therefore exhaust the budget and cost later customers their metrics. Size it deliberately with
-  `MetricStreamConfiguration.CardinalityLimit` - roughly customers x combinations per instrument -
-  and keep other dimensions bounded.
+A view that restricts `TagKeys` must keep the routing dimensions. Views can drop dimensions but cannot
+add them back.
+
+Routing dimensions also multiply the number of time series for each metric by your customer count.
+The default limit is 2000 series per metric. Once it is reached, **new** attribute combinations are
+folded into a single overflow point tagged `otel.metric.overflow=true`, which carries no destination
+and is dropped. Customers share this limit, so one high-cardinality customer can consume it and cost
+every other customer their new series. Size it deliberately with
+`MetricStreamConfiguration.CardinalityLimit` - roughly customers x combinations per instrument - and
+keep other dimensions bounded.
 
 ## 7. Verify isolation with two customers
 
-Isolation is the property worth testing. Use two authorized test customers with different components
-and mark **all three signals**, since a marker on an activity does not reach logs or metrics:
+Use two authorized test customers with different components, and mark **all three signals**: a marker
+on an activity does not reach logs or metrics. Keep the marker key identical everywhere, since the
+query matches on it.
 
 ```csharp
-activity?.SetTag("routing.test_marker", marker);
+// Trace
+activity?.SetTag("routing_test_marker", marker);
+
+// Log - an attribute, not a scope
 logger.LogInformation("Verification {routing_test_marker}", marker);
-CustomerMetrics.RecordRequest(destination); // add { "routing.test_marker", marker } to the TagList
+
+// Metric - a dimension alongside the routing dimensions
+tags.Add("routing_test_marker", marker);
+Requests.Add(1, tags);
 ```
+
+Use markers in verification environments only. A per-request unique value would exhaust the
+cardinality limit described above.
 
 Query each component after ingestion:
 
 ```kusto
 union withsource=Signal requests, dependencies, traces, customMetrics
 | where timestamp > ago(30m)
-| extend marker = tostring(customDimensions["routing.test_marker"])
+| extend marker = tostring(customDimensions["routing_test_marker"])
 | summarize count() by Signal, marker
 ```
 
@@ -445,12 +461,12 @@ union withsource=Signal requests, dependencies, traces, customMetrics
 | Customer A | `customer-a-test`, for all three signals | `customer-b-test` |
 | Customer B | `customer-b-test`, for all three signals | `customer-a-test` |
 
-Repeat with concurrent requests for both customers to exercise isolation under load. Then exercise
-unresolved context: confirm the processors remove existing routing attributes, that nothing falls back
-to a host connection string, and that the metric call skips recording.
-
 Counts alone do not establish isolation, and a successful export does not prove an item is queryable
-yet. Markers are for verification - avoid unbounded unique dimensions in production.
+yet.
+
+Then repeat with concurrent requests for both customers to exercise isolation under load, and
+exercise unresolved context: confirm the processors remove existing routing attributes, that nothing
+falls back to the application's own component, and that the metric call skips recording.
 
 ## 8. Troubleshooting
 
@@ -466,28 +482,28 @@ Because its name begins with `OpenTelemetry-`, OpenTelemetry self-diagnostics ca
 }
 ```
 
-For ETW tooling instead, use `dotnet-trace`
-(`dotnet tool install -g dotnet-trace`):
+For ETW tooling instead, install `dotnet-trace` with `dotnet tool install -g dotnet-trace`:
 
 ```bash
 dotnet-trace collect --process-id <PID> --providers OpenTelemetry-AzureMonitor-Exporter::Verbose
 ```
 
-| Symptom | Check | Events |
+| Symptom | Check | Diagnostic evidence |
 |---|---|---|
-| Nothing reaches Azure Monitor | `o.Exporters` set; switch applied before any OpenTelemetry registration | `MultiEndpointRoutingEnabled` (Informational) confirms routing is active |
-| Startup throws | A credential is configured | `NotSupportedException` at startup |
-| Traces missing | Resolver returned a destination for that activity; child spans can reach the customer tag; sampling | `RoutedTelemetryRejected` (Verbose) names the reason; `RoutedExportSummary` (Informational) counts routed and dropped items |
+| Nothing reaches Azure Monitor | `Exporters` set; switch applied before any OpenTelemetry registration | `MultiEndpointRoutingEnabled` (Informational) confirms routing is active |
+| Startup throws | `AzureMonitor.Credential` is set | `NotSupportedException` at startup |
+| Traces missing | Resolver returned a destination; child spans can reach the customer tag; sampling | `RoutedTelemetryRejected` (Verbose) names the reason; `RoutedExportSummary` (Informational) counts routed and dropped items |
 | Metrics missing | Dimensions supplied at measurement time; meter registered; views keep the dimensions; cardinality overflow | `RoutedMetricRejected` (Verbose), `RoutedInstrumentDropped` (Informational) |
 | Logs missing | Processor registered; attributes rather than scopes; resolver returned a destination | **Dropped log records emit no per-record event.** Compare expected counts against `RoutedGroupOutcome`, and assert on `LogRecord.Attributes` in a unit test |
-| Everything unrouted disappears | Expected with no host connection string | `RoutingWithoutConnectionString`, `DroppedUnroutedTelemetryWithoutConnectionString` (both Warning) |
+| Everything unrouted disappears | Expected when the application has no connection string | `RoutingWithoutConnectionString`, `DroppedUnroutedTelemetryWithoutConnectionString` (both Warning) |
 | Sampling behaves unexpectedly | `TracesPerSecond` is ignored under routing | `RateLimitedSamplingIgnoredForMultiEndpointRouting` (Warning) reports the ratio in use |
 | Live Metrics or standard metrics absent | Disabled automatically | `LiveMetricsDisabledForMultiEndpointRouting`, `StandardMetricsDisabledForMultiEndpointRouting` (Warning) |
 | Buffered telemetry lost | Partition cap or shared budget | `MultiEndpointPartitionCapReached`, `RoutedTelemetryEvicted`, `FailedToPersistRoutedTelemetry` |
 
 `RoutedGroupOutcome` reports item count and status per **ingestion endpoint**, not per customer, so
 customers sharing an endpoint are indistinguishable there. Use it as transport evidence, and the
-marker queries in section 7 to confirm delivery.
+marker queries in [Verify isolation with two customers](#7-verify-isolation-with-two-customers) to
+confirm delivery.
 
 ## 9. Reference
 
@@ -496,7 +512,7 @@ marker queries in section 7 to confirm delivery.
 | Setting | Default | Under routing |
 |---|---|---|
 | `AzureMonitor.Credential` | unset | **Must stay unset.** Throws `NotSupportedException` at startup |
-| `o.Exporters` | auto-detected | **Must be set explicitly** when there is no connection string |
+| `Exporters` | auto-detected | **Must be set explicitly** when there is no connection string |
 | `AzureMonitor.ConnectionString` | from environment | Optional, and never a fallback for items without a valid route |
 | `AzureMonitor.TracesPerSecond` | `5.0` | Ignored. Rate limiting is per process, so one destination would consume another's allowance |
 | `AzureMonitor.SamplingRatio` | `1.0` | Becomes the effective sampler, once `TracesPerSecond` is `null` |
@@ -508,27 +524,29 @@ Sampling also affects logs when `EnableTraceBasedLogsSampler` is on, so review t
 
 ### Buffering and offline storage
 
-Routed telemetry is buffered in up to 64 partitions keyed by **normalized ingestion endpoint**, not
-by customer, sharing a 100 MiB budget. Customers whose components share an endpoint share a
-partition, so this is not a 64-customer limit. Beyond 64 endpoints telemetry still transmits but
-without an offline fallback, and a full budget evicts the oldest stored telemetry, which may belong
-to another endpoint. Partitioning is not per-customer capacity isolation.
+Offline storage is shared, not isolated by customer. It supports up to 64 partitions, keyed by
+normalized ingestion endpoint, within a shared 100 MiB budget. Customers whose components use the
+same endpoint share a partition, so this is not a 64-customer limit.
+
+Telemetry for endpoints beyond the partition limit still transmits but has no offline fallback. When
+the shared budget is full, the oldest stored telemetry is evicted, which may belong to another
+endpoint.
 
 ### Additional export targets
 
-These routing attributes govern Azure Monitor only. Console, OTLP, and Agent365 send to their own
-configured destination, so enabling one alongside routing sends **every customer's telemetry** to
-that single destination. Apply your own filtering policy before enabling them. The attributes also
-remain on the underlying `Activity` and `LogRecord` after Azure Monitor reads them, so they may
-appear in that target's output; do not strip them in a processor that runs before Azure Monitor.
+The routing attributes govern Azure Monitor only. Console, OTLP, and Agent365 send to their own
+configured destination, so enabling one alongside routing sends **every customer's telemetry** to that
+single destination. Apply your own filtering policy before enabling them. The attributes also remain
+on the underlying `Activity` and `LogRecord` after Azure Monitor reads them, so they may appear in
+that target's output; do not strip them in a processor that runs before Azure Monitor.
 
 ### Cloud role and resources
 
-`microsoft.multi_endpoint_cloud_role` sets `ai.cloud.role` per item. The provider resource is shared
-across destinations, so it does not become a separate resource per customer.
+Cloud role can vary by item, but the provider resource is shared across all customers and does not
+become a separate resource per customer.
 
 ## Sample
 
 [Microsoft.OpenTelemetry.MultiEndpoint.Console.Demo](../examples/Microsoft.OpenTelemetry.MultiEndpoint.Console.Demo)
-routes traces, logs, and metrics to two Application Insights components. It attaches the attributes
-at the call site rather than in a processor, because it emits all of its own telemetry.
+routes traces, logs, and metrics to two Application Insights components. It attaches the attributes at
+the call site rather than in a processor, because it emits all of its own telemetry.
