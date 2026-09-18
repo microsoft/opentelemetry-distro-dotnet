@@ -11,12 +11,10 @@ public sealed class PackageDependencyTests
     private const string ContractsPackageId = "Microsoft.Agents.A365.Observability.Contracts";
     private const string DistroPackageId = "Microsoft.OpenTelemetry";
     private const string EtwPackageId = "Microsoft.Agents.A365.Observability.Etw";
-    private const string ValidationVersion = "1.2.0-validation";
-
     [TestMethod]
     public void DistroNuspecDependsOnContractsButNotEtw()
     {
-        using var archive = PackageArchive.Open(DistroPackageId, ValidationVersion, "nupkg");
+        using var archive = PackageArchive.Open(DistroPackageId, PackageValidation.Version, "nupkg");
         var dependencyIds = GetDependencyIds(archive);
 
         dependencyIds.Should().Contain(ContractsPackageId);
@@ -26,7 +24,7 @@ public sealed class PackageDependencyTests
     [TestMethod]
     public void StandaloneEtwNuspecDependsOnContracts()
     {
-        using var archive = PackageArchive.Open(EtwPackageId, ValidationVersion, "nupkg");
+        using var archive = PackageArchive.Open(EtwPackageId, PackageValidation.Version, "nupkg");
         GetDependencyIds(archive).Should().Contain(ContractsPackageId);
     }
 

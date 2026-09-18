@@ -6,7 +6,7 @@
     <IsTestProject>true</IsTestProject>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <MicrosoftOpenTelemetryPackageVersion>1.2.0-validation</MicrosoftOpenTelemetryPackageVersion>
+    <MicrosoftOpenTelemetryPackageVersion Condition="'$(MicrosoftOpenTelemetryPackageVersion)' == ''">1.2.0-validation</MicrosoftOpenTelemetryPackageVersion>
     <PackageValidationArtifactsPath>$(BaseIntermediateOutputPath)package-validation\$(Configuration)\</PackageValidationArtifactsPath>
     <DistroPackageSourcePath>$(PackageValidationArtifactsPath)distro-source\</DistroPackageSourcePath>
     <EtwPackageSourcePath>$(PackageValidationArtifactsPath)etw-source\</EtwPackageSourcePath>
@@ -59,6 +59,10 @@
     <WriteLinesToFile
       File="$(OutDir)package-validation-path.txt"
       Lines="$(PackageValidationArtifactsPath)"
+      Overwrite="true" />
+    <WriteLinesToFile
+      File="$(OutDir)package-validation-version.txt"
+      Lines="$(MicrosoftOpenTelemetryPackageVersion)"
       Overwrite="true" />
   </Target>
 </Project>

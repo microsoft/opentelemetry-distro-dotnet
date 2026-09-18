@@ -19,7 +19,7 @@
 
   <!-- Package versions -->
   <PropertyGroup>
-    <MicrosoftOpenTelemetryPackageVersion>1.2.0</MicrosoftOpenTelemetryPackageVersion>
+    <MicrosoftOpenTelemetryPackageVersion Condition="'$(MSBuildProjectName)' != 'Microsoft.OpenTelemetry.Package.Tests'">1.2.0</MicrosoftOpenTelemetryPackageVersion>
   </PropertyGroup>
 
   <!-- Source Link & deterministic builds -->

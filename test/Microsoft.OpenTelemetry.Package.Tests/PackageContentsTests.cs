@@ -12,8 +12,6 @@ public sealed class PackageContentsTests
 {
     private const string EtwPackageId = "Microsoft.Agents.A365.Observability.Etw";
     private const string DistroPackageId = "Microsoft.OpenTelemetry";
-    private const string ValidationVersion = "1.2.0-validation";
-
     private static readonly string[] EmbeddedAssemblyNames =
     [
         "Microsoft.OpenTelemetry",
@@ -28,7 +26,7 @@ public sealed class PackageContentsTests
     [DataRow("net8.0")]
     public void DistroNupkgEmbedsDistroAndEtwButNotContracts(string targetFramework)
     {
-        using var archive = PackageArchive.Open(DistroPackageId, ValidationVersion, "nupkg");
+        using var archive = PackageArchive.Open(DistroPackageId, PackageValidation.Version, "nupkg");
         var entries = archive.Entries.Select(entry => entry.FullName);
         var expectedEntries = EmbeddedAssemblyNames.SelectMany(assemblyName => new[]
         {
@@ -50,7 +48,7 @@ public sealed class PackageContentsTests
     [DataRow("net8.0")]
     public void DistroSnupkgEmbedsDistroAndEtwButNotContracts(string targetFramework)
     {
-        using var archive = PackageArchive.Open(DistroPackageId, ValidationVersion, "snupkg");
+        using var archive = PackageArchive.Open(DistroPackageId, PackageValidation.Version, "snupkg");
 
         using var scope = new AssertionScope();
         foreach (var assemblyName in EmbeddedAssemblyNames)
@@ -81,7 +79,7 @@ public sealed class PackageContentsTests
     [DataRow("net8.0")]
     public void StandaloneEtwNupkgContainsEtwButNotContracts(string targetFramework)
     {
-        using var archive = PackageArchive.Open(EtwPackageId, ValidationVersion, "nupkg");
+        using var archive = PackageArchive.Open(EtwPackageId, PackageValidation.Version, "nupkg");
         var entries = archive.Entries.Select(entry => entry.FullName);
 
         using var scope = new AssertionScope();
@@ -102,7 +100,7 @@ public sealed class PackageContentsTests
     [DataRow("net8.0")]
     public void StandaloneEtwSnupkgContainsEtwButNotContracts(string targetFramework)
     {
-        using var archive = PackageArchive.Open(EtwPackageId, ValidationVersion, "snupkg");
+        using var archive = PackageArchive.Open(EtwPackageId, PackageValidation.Version, "snupkg");
 
         using var scope = new AssertionScope();
         archive.GetEntry($"lib/{targetFramework}/{EtwPackageId}.pdb")

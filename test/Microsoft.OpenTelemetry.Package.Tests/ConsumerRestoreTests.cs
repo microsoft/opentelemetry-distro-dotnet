@@ -15,8 +15,6 @@ public sealed class ConsumerRestoreTests
     private const string DistroPackageId = "Microsoft.OpenTelemetry";
     private const string EtwPackageId = "Microsoft.Agents.A365.Observability.Etw";
     private const string NuGetOrgSource = "https://api.nuget.org/v3/index.json";
-    private const string ValidationVersion = "1.2.0-validation";
-
     [TestMethod]
     public async Task DistroConsumerRestoresContractsTransitively()
     {
@@ -27,13 +25,13 @@ public sealed class ConsumerRestoreTests
 
         GetSourcePackages(result.PackageSource).Should().BeEquivalentTo(
         [
-            $"{DistroPackageId}.{ValidationVersion}.nupkg",
-            $"{ContractsPackageId}.{ValidationVersion}.nupkg",
+            $"{DistroPackageId}.{PackageValidation.Version}.nupkg",
+            $"{ContractsPackageId}.{PackageValidation.Version}.nupkg",
         ]);
 
         var libraries = ReadPackageLibraries(result.AssetsFile);
-        GetResolvedVersion(libraries, DistroPackageId).Should().Be(ValidationVersion);
-        GetResolvedVersion(libraries, ContractsPackageId).Should().Be(ValidationVersion);
+        GetResolvedVersion(libraries, DistroPackageId).Should().Be(PackageValidation.Version);
+        GetResolvedVersion(libraries, ContractsPackageId).Should().Be(PackageValidation.Version);
         libraries.Should().NotContain(library => GetPackageId(library).Equals(EtwPackageId, StringComparison.OrdinalIgnoreCase));
 
         var outputAssemblies = GetOutputAssemblies(result.OutputDirectory);
@@ -55,13 +53,13 @@ public sealed class ConsumerRestoreTests
 
         GetSourcePackages(result.PackageSource).Should().BeEquivalentTo(
         [
-            $"{EtwPackageId}.{ValidationVersion}.nupkg",
-            $"{ContractsPackageId}.{ValidationVersion}.nupkg",
+            $"{EtwPackageId}.{PackageValidation.Version}.nupkg",
+            $"{ContractsPackageId}.{PackageValidation.Version}.nupkg",
         ]);
 
         var libraries = ReadPackageLibraries(result.AssetsFile);
-        GetResolvedVersion(libraries, EtwPackageId).Should().Be(ValidationVersion);
-        GetResolvedVersion(libraries, ContractsPackageId).Should().Be(ValidationVersion);
+        GetResolvedVersion(libraries, EtwPackageId).Should().Be(PackageValidation.Version);
+        GetResolvedVersion(libraries, ContractsPackageId).Should().Be(PackageValidation.Version);
 
         var outputAssemblies = GetOutputAssemblies(result.OutputDirectory);
         outputAssemblies.Should().Contain(
@@ -101,7 +99,7 @@ public sealed class ConsumerRestoreTests
 
         var commonProperties = new[]
         {
-            $"-p:{versionPropertyName}={ValidationVersion}",
+            $"-p:{versionPropertyName}={PackageValidation.Version}",
             $"-p:BaseIntermediateOutputPath={intermediateOutput}{Path.DirectorySeparatorChar}",
             $"-p:BaseOutputPath={outputDirectory}{Path.DirectorySeparatorChar}",
             $"-p:MSBuildProjectExtensionsPath={intermediateOutput}{Path.DirectorySeparatorChar}",
