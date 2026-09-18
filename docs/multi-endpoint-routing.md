@@ -431,8 +431,10 @@ keep other dimensions bounded.
 
 The distro enables ASP.NET Core, HttpClient, SQL Client, Azure SDK, and the GenAI and agent
 instrumentation by default. Under routing, anything your processors and measurement calls do not
-enrich is collected and then dropped, which costs work and fills the diagnostics with
-`RoutedInstrumentDropped`. Turn off what you do not need:
+enrich is collected and then dropped: wasted work, and noise in the diagnostics -
+`RoutedTelemetryRejected` per dropped span, `RoutedInstrumentDropped` per dropped instrument.
+
+Turn off what you do not need:
 
 ```csharp
 .UseMicrosoftOpenTelemetry(o =>
@@ -442,60 +444,67 @@ enrich is collected and then dropped, which costs work and fills the diagnostics
     o.Instrumentation.EnableSqlClientInstrumentation = false;
     o.Instrumentation.EnableAzureSdkInstrumentation = false;
     o.Instrumentation.EnableOpenAIInstrumentation = false;
+    o.Instrumentation.EnableSemanticKernelInstrumentation = false;
+    o.Instrumentation.EnableAgentFrameworkInstrumentation = false;
+    o.Instrumentation.EnableAgent365Instrumentation = false;
+
+    // Worth keeping: these spans reach the customer tag through Activity.Parent, and their
+    // duration instruments are the two that section 6 can enrich.
+    o.Instrumentation.EnableAspNetCoreInstrumentation = true;
+    o.Instrumentation.EnableHttpClientInstrumentation = true;
 })
 ```
 
-`EnableTracing` and `EnableLogging` switch off a whole signal, and the per-library options above
-switch off one instrumentation each. Turning a signal off means no telemetry of that kind reaches any
-exporter, routed or not.
+### What the signal switches do
 
-> **Do not switch off the metrics pipeline.** `o.Instrumentation.EnableMetrics = false` leaves the
-> application with no `MeterProvider`, and the distro attaches its Azure Monitor **trace and log**
-> exporters while the `MeterProvider` is being built. Without one, nothing is exported at all - traces
-> and logs included - and no diagnostic event reports it. To collect no metrics, keep the pipeline and
-> register no meters, or drop individual instruments with a view as shown above.
+| Option | Effect |
+|---|---|
+| `EnableTracing = false` | The distro registers no activity sources or trace instrumentation. Sources you add yourself with `AddSource` still export. |
+| `EnableMetrics = false` | The distro registers no meters. Meters you add yourself with `AddMeter` still export. |
+| `EnableLogging = false` | Suppresses every log record from reaching any OpenTelemetry exporter. Other logging providers are unaffected. |
+
+Only `EnableLogging` stops telemetry outright. Selecting `ExportTarget.AzureMonitor` turns all three
+signal pipelines on, so the providers and the Azure Monitor readers exist whatever the other two flags
+say: they control what the distro subscribes to, not whether telemetry can be exported.
+
+### What routing never reaches
+
+Live Metrics, standard metrics, performance counters, and SDK statistics each run on their own
+`MeterProvider` inside the exporter. Routing does not apply to them, the view in section 6 does not
+touch them, and they are never sent to a customer's component. Routing already disables the first
+three; see [What changes while routing is enabled](#what-changes-while-routing-is-enabled).
 
 ### How the pipeline is assembled
 
 `UseMicrosoftOpenTelemetry` registers instrumentation, resource detectors, and the Azure Monitor
-exporter against an `IOpenTelemetryBuilder`. The exporter's trace and log processors are not added
-immediately: they are attached when the `MeterProvider` is built, by which point the `TracerProvider`
-and `LoggerProvider` already exist.
+exporter. The exporter's trace and log processors are not added during that call. They are added by a
+callback that runs while the `MeterProvider` is configured, which resolves the `TracerProvider` and
+`LoggerProvider` from the container - building them then if they have not been built already - and
+appends one processor to each.
 
-Two consequences are worth knowing:
-
-- Processors you register through `WithTracing` and `WithLogging` are part of the provider build, so
-  they run before the Azure Monitor export processors. This is what makes the routing processors in
-  [Attach the attributes in a processor](#4-attach-the-attributes-in-a-processor) work.
-- A `MeterProvider` must exist, whether or not you collect metrics.
-
-### Hosted applications
-
-`IServiceCollection.AddOpenTelemetry()` returns the builder, and the host builds and disposes the
-providers for you. This is the form used throughout this guide:
-
-```csharp
-builder.Services.AddOpenTelemetry()
-    .UseMicrosoftOpenTelemetry(o => { /* ... */ })
-    .WithTracing(tracing => tracing.AddProcessor(sp => new RoutingActivityProcessor(
-        sp.GetRequiredService<ICustomerRouting>())))
-    .WithLogging(logging => logging.AddProcessor(sp => new RoutingLogProcessor(
-        sp.GetRequiredService<ICustomerRouting>())))
-    .WithMetrics(metrics => metrics.AddMeter("Contoso.Application"));
-```
+Appending to a built provider puts the export processors at the end of the chain, which is why
+processors registered through `WithTracing` and `WithLogging` run first, and why a processor you add
+to a provider you have already built yourself would run too late. This is the guarantee the routing
+processors in [Attach the attributes in a processor](#4-attach-the-attributes-in-a-processor) depend
+on.
 
 ### Non-hosted applications
 
-Console applications and background tools without the generic host use `OpenTelemetrySdk.Create`,
-which accepts the same `UseMicrosoftOpenTelemetry` call and owns the provider lifetime itself:
+Hosted applications use `IServiceCollection.AddOpenTelemetry()`, as in
+[Enable the switch and register the pipeline](#5-enable-the-switch-and-register-the-pipeline). Console
+applications and background tools without the generic host use `OpenTelemetrySdk.Create`, which takes
+the same `UseMicrosoftOpenTelemetry` call and owns the provider lifetime itself:
 
 ```csharp
 using Microsoft.OpenTelemetry;
 using OpenTelemetry;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 
 var routing = new CustomerRouting(destinations);
 
-var sdk = OpenTelemetrySdk.Create(otel => otel
+using var sdk = OpenTelemetrySdk.Create(otel => otel
     .UseMicrosoftOpenTelemetry(o =>
     {
         o.Exporters = ExportTarget.AzureMonitor;
@@ -503,6 +512,7 @@ var sdk = OpenTelemetrySdk.Create(otel => otel
         o.AzureMonitor.EnableStandardMetrics = false;
         o.AzureMonitor.EnablePerfCounters = false;
         o.AzureMonitor.TracesPerSecond = null;
+        o.AzureMonitor.SamplingRatio = 0.1F;
     })
     .WithTracing(tracing => tracing
         .AddSource("Contoso.Application")
@@ -512,16 +522,15 @@ var sdk = OpenTelemetrySdk.Create(otel => otel
     .WithMetrics(metrics => metrics
         .AddMeter("Contoso.Application")));
 
-// Application work.
+var logger = sdk.GetLoggerFactory().CreateLogger("Contoso.Application");
 
-// Dispose only at shutdown: this flushes pending telemetry and shuts down every provider.
-sdk.Dispose();
+// Application work. Disposal at the end of scope flushes and shuts down every provider.
 ```
 
-Take loggers from `sdk.GetLoggerFactory()`; records written through any other logger factory never
-reach the routing processor. Set the routing switch before `OpenTelemetrySdk.Create` runs, and do not
-dispose the SDK until the process is shutting down - disposing early stops collection and loses
-telemetry.
+Take loggers from `sdk.GetLoggerFactory()`: a logger factory you create separately is not connected to
+this pipeline, so its records never reach the routing processor. Set the routing switch before
+`OpenTelemetrySdk.Create` runs, and keep the SDK alive for the life of the process - disposing early
+stops collection and loses telemetry.
 
 ## 8. Verify isolation with two customers
 
