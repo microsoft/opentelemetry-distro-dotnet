@@ -4,7 +4,7 @@
 
 ## 1.2.0-beta.1 - 2026-09-18
 
-- Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.10.0-beta.1.
+- Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.10.0-beta.1, which makes multi-endpoint routing available: one exporter can send telemetry to several Application Insights components. It is off by default and enabled with the `Azure.Monitor.OpenTelemetry.EnableMultiEndpointRouting` switch, after which each item is sent to the component named by its `microsoft.instrumentation_key` and `microsoft.ingestion_endpoint` attributes, and an item carrying neither is dropped rather than sent to the application's own component. While routing is enabled, Live Metrics, standard metrics, and performance counters are not collected, Microsoft Entra ID authentication is unsupported, and rate-limited sampling is ignored in favour of fixed-rate `SamplingRatio`.
 - Add a console sample that routes traces, logs, and metrics to multiple Application Insights endpoints.
 - Isolate Agent365 exporter failures by tenant ([#158](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/158))
 - Support tracing A2A via execute tool span.
