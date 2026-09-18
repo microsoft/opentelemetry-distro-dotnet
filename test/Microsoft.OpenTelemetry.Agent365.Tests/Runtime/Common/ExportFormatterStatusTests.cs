@@ -19,7 +19,9 @@ public partial class ExportFormatterTests
         var formatter = CreateFormatter();
 
         // Act
+#pragma warning disable CS0618
         var json = formatter.FormatLogData(data.ToDictionary());
+#pragma warning restore CS0618
 
         // Assert
         using var doc = JsonDocument.Parse(json);
@@ -42,7 +44,9 @@ public partial class ExportFormatterTests
         var formatter = CreateFormatter();
 
         // Act
+#pragma warning disable CS0618
         var json = formatter.FormatLogData(data.ToDictionary());
+#pragma warning restore CS0618
 
         // Assert
         using var doc = JsonDocument.Parse(json);
@@ -65,7 +69,9 @@ public partial class ExportFormatterTests
         var formatter = CreateFormatter();
 
         // Act
+#pragma warning disable CS0618
         var json = formatter.FormatLogData(bareData);
+#pragma warning restore CS0618
 
         // Assert
         using var doc = JsonDocument.Parse(json);

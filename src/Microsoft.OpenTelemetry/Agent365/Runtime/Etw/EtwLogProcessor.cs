@@ -1,3 +1,4 @@
+#pragma warning disable RS0026 // Multiple overloads with optional parameters — compatibility overload retained by design
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 using Microsoft.Agents.A365.Observability.Runtime.Common;
@@ -13,7 +14,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
     /// </summary>
     public class EtwLogProcessor : BaseProcessor<LogRecord>
     {
-        private readonly ExportFormatter _formatter;
+        private readonly EtwExportFormatter _formatter;
         private readonly ILogger<EtwLogProcessor>? _logger;
 
         /// <summary>
@@ -21,11 +22,26 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
         /// </summary>
         /// <param name="formatter">The formatter used to format log data.</param>
         /// <param name="logger">The logger used to log messages.</param>
-        public EtwLogProcessor(ExportFormatter formatter, ILogger<EtwLogProcessor>? logger = null)
+        /// <param name="compatibilityFormatter">The legacy formatter registration used to disambiguate dependency injection activation.</param>
+        public EtwLogProcessor(EtwExportFormatter formatter, ILogger<EtwLogProcessor>? logger = null, ExportFormatter? compatibilityFormatter = null)
         {
             _formatter = formatter;
             _logger = logger;
+            _ = compatibilityFormatter;
         }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EtwLogProcessor"/> class.
+        /// </summary>
+        /// <param name="formatter">The compatibility formatter retained for source compatibility.</param>
+        /// <param name="logger">The logger used to log messages.</param>
+        [Obsolete("Use the EtwLogProcessor overload that accepts EtwExportFormatter instead.")]
+        public EtwLogProcessor(ExportFormatter formatter, ILogger<EtwLogProcessor>? logger = null)
+            : this(new EtwExportFormatter(), logger, compatibilityFormatter: formatter)
+        {
+            _ = formatter;
+        }
+
         /// <summary>
         /// Emits an ETW event with log details.
         /// </summary>
@@ -47,3 +63,4 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
         }
     }
 }
+#pragma warning restore RS0026
