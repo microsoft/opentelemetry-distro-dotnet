@@ -271,7 +271,7 @@ project-file form is applied before any of your code runs:
 
 `AppContext.SetSwitch("Azure.Monitor.OpenTelemetry.EnableMultiEndpointRouting", true)` works too, but
 must run before any OpenTelemetry registration. When routing never activates, the
-`MultiEndpointRoutingEnabled` event described in [Troubleshooting](#8-troubleshooting) does not
+`MultiEndpointRoutingEnabled` event described in [Troubleshooting](#9-troubleshooting) does not
 appear.
 
 ```csharp
@@ -427,7 +427,103 @@ every other customer their new series. Size it deliberately with
 `MetricStreamConfiguration.CardinalityLimit` - roughly customers x combinations per instrument - and
 keep other dimensions bounded.
 
-## 7. Verify isolation with two customers
+## 7. Collect only what you route
+
+The distro enables ASP.NET Core, HttpClient, SQL Client, Azure SDK, and the GenAI and agent
+instrumentation by default. Under routing, anything your processors and measurement calls do not
+enrich is collected and then dropped, which costs work and fills the diagnostics with
+`RoutedInstrumentDropped`. Turn off what you do not need:
+
+```csharp
+.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.AzureMonitor;
+
+    o.Instrumentation.EnableSqlClientInstrumentation = false;
+    o.Instrumentation.EnableAzureSdkInstrumentation = false;
+    o.Instrumentation.EnableOpenAIInstrumentation = false;
+})
+```
+
+`EnableTracing` and `EnableLogging` switch off a whole signal, and the per-library options above
+switch off one instrumentation each. Turning a signal off means no telemetry of that kind reaches any
+exporter, routed or not.
+
+> **Do not switch off the metrics pipeline.** `o.Instrumentation.EnableMetrics = false` leaves the
+> application with no `MeterProvider`, and the distro attaches its Azure Monitor **trace and log**
+> exporters while the `MeterProvider` is being built. Without one, nothing is exported at all - traces
+> and logs included - and no diagnostic event reports it. To collect no metrics, keep the pipeline and
+> register no meters, or drop individual instruments with a view as shown above.
+
+### How the pipeline is assembled
+
+`UseMicrosoftOpenTelemetry` registers instrumentation, resource detectors, and the Azure Monitor
+exporter against an `IOpenTelemetryBuilder`. The exporter's trace and log processors are not added
+immediately: they are attached when the `MeterProvider` is built, by which point the `TracerProvider`
+and `LoggerProvider` already exist.
+
+Two consequences are worth knowing:
+
+- Processors you register through `WithTracing` and `WithLogging` are part of the provider build, so
+  they run before the Azure Monitor export processors. This is what makes the routing processors in
+  [Attach the attributes in a processor](#4-attach-the-attributes-in-a-processor) work.
+- A `MeterProvider` must exist, whether or not you collect metrics.
+
+### Hosted applications
+
+`IServiceCollection.AddOpenTelemetry()` returns the builder, and the host builds and disposes the
+providers for you. This is the form used throughout this guide:
+
+```csharp
+builder.Services.AddOpenTelemetry()
+    .UseMicrosoftOpenTelemetry(o => { /* ... */ })
+    .WithTracing(tracing => tracing.AddProcessor(sp => new RoutingActivityProcessor(
+        sp.GetRequiredService<ICustomerRouting>())))
+    .WithLogging(logging => logging.AddProcessor(sp => new RoutingLogProcessor(
+        sp.GetRequiredService<ICustomerRouting>())))
+    .WithMetrics(metrics => metrics.AddMeter("Contoso.Application"));
+```
+
+### Non-hosted applications
+
+Console applications and background tools without the generic host use `OpenTelemetrySdk.Create`,
+which accepts the same `UseMicrosoftOpenTelemetry` call and owns the provider lifetime itself:
+
+```csharp
+using Microsoft.OpenTelemetry;
+using OpenTelemetry;
+
+var routing = new CustomerRouting(destinations);
+
+var sdk = OpenTelemetrySdk.Create(otel => otel
+    .UseMicrosoftOpenTelemetry(o =>
+    {
+        o.Exporters = ExportTarget.AzureMonitor;
+        o.AzureMonitor.EnableLiveMetrics = false;
+        o.AzureMonitor.EnableStandardMetrics = false;
+        o.AzureMonitor.EnablePerfCounters = false;
+        o.AzureMonitor.TracesPerSecond = null;
+    })
+    .WithTracing(tracing => tracing
+        .AddSource("Contoso.Application")
+        .AddProcessor(new RoutingActivityProcessor(routing)))
+    .WithLogging(logging => logging
+        .AddProcessor(new RoutingLogProcessor(routing)))
+    .WithMetrics(metrics => metrics
+        .AddMeter("Contoso.Application")));
+
+// Application work.
+
+// Dispose only at shutdown: this flushes pending telemetry and shuts down every provider.
+sdk.Dispose();
+```
+
+Take loggers from `sdk.GetLoggerFactory()`; records written through any other logger factory never
+reach the routing processor. Set the routing switch before `OpenTelemetrySdk.Create` runs, and do not
+dispose the SDK until the process is shutting down - disposing early stops collection and loses
+telemetry.
+
+## 8. Verify isolation with two customers
 
 Use two authorized test customers with different components, and mark **all three signals**: a marker
 on an activity does not reach logs or metrics. Keep the marker key identical everywhere, since the
@@ -469,7 +565,7 @@ Then repeat with concurrent requests for both customers to exercise isolation un
 exercise unresolved context: confirm the processors remove existing routing attributes, that nothing
 falls back to the application's own component, and that the metric call skips recording.
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 Routing decisions are reported through the Azure Monitor event source, not through application logs.
 Because its name begins with `OpenTelemetry-`, OpenTelemetry self-diagnostics captures it: place an
@@ -503,10 +599,10 @@ dotnet-trace collect --process-id <PID> --providers OpenTelemetry-AzureMonitor-E
 
 `RoutedGroupOutcome` reports item count and status per **ingestion endpoint**, not per customer, so
 customers sharing an endpoint are indistinguishable there. Use it as transport evidence, and the
-marker queries in [Verify isolation with two customers](#7-verify-isolation-with-two-customers) to
+marker queries in [Verify isolation with two customers](#8-verify-isolation-with-two-customers) to
 confirm delivery.
 
-## 9. Reference
+## 10. Reference
 
 ### What changes while routing is enabled
 
