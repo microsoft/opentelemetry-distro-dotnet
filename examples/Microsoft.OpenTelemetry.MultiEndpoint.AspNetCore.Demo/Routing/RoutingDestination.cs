@@ -36,8 +36,22 @@ public sealed record RoutingDestination(
         var key = values["InstrumentationKey"].FirstOrDefault();
         var endpoint = values["IngestionEndpoint"].FirstOrDefault();
 
-        return string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(endpoint)
-            ? null
-            : new RoutingDestination(key, endpoint, cloudRole);
+        if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(endpoint))
+        {
+            return null;
+        }
+
+        // Validate here so a bad endpoint fails at startup. The exporter applies the same rules at
+        // export time, where the only symptom would be telemetry quietly going nowhere.
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri)
+            || uri.Scheme != Uri.UriSchemeHttps
+            || uri.UserInfo.Length != 0
+            || uri.Query.Length != 0
+            || uri.Fragment.Length != 0)
+        {
+            return null;
+        }
+
+        return new RoutingDestination(key.Trim(), endpoint, cloudRole);
     }
 }

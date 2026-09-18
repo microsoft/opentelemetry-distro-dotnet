@@ -31,7 +31,8 @@ public sealed class CustomerCatalog
             {
                 // Loud at startup beats telemetry vanishing at runtime.
                 throw new InvalidOperationException(
-                    $"Customer '{customer.Id}' has no connection string with an explicit IngestionEndpoint.");
+                    $"Customer '{customer.Id}' needs a connection string with an InstrumentationKey and an " +
+                    "explicit https IngestionEndpoint carrying no credentials, query string, or fragment.");
             }
 
             // A duplicate would quietly send one customer's telemetry to another's component.

@@ -1,6 +1,8 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.OpenTelemetry;
 using MultiEndpointDemo;
 using MultiEndpointDemo.Routing;
@@ -64,6 +66,7 @@ app.MapGet("/orders", async (
     HttpContext context,
     OrderMetrics metrics,
     IHttpClientFactory clientFactory,
+    IServer server,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
 {
@@ -81,9 +84,19 @@ app.MapGet("/orders", async (
 
     // A child activity that never sees the customer identifier itself: the routing processor finds
     // it by walking up to the request activity.
+    //
+    // The address comes from the server, not from context.Request.Host: the Host header is supplied
+    // by the caller, so building an outbound URI from it would let a request point this call at any
+    // host it liked.
+    var baseAddress = server.Features.Get<IServerAddressesFeature>()?.Addresses.FirstOrDefault();
+
+    if (baseAddress is null)
+    {
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+
     var client = clientFactory.CreateClient("downstream");
-    var downstream = $"{context.Request.Scheme}://{context.Request.Host}/health";
-    using var response = await client.GetAsync(downstream, cancellationToken);
+    using var response = await client.GetAsync(new Uri(new Uri(baseAddress), "/health"), cancellationToken);
 
     // An ordinary ILogger call: the log processor attaches the destination.
     logger.LogInformation("Order {OrderId} accepted for {CustomerId}.", orderId, customerId);
