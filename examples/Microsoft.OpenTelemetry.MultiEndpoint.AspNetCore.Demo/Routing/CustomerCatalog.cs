@@ -12,7 +12,7 @@ namespace MultiEndpointDemo.Routing;
 public sealed class CustomerCatalog
 {
     private readonly Dictionary<string, string> _customerIdByApiKey = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, RoutingDestination> _destinationByCustomerId = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, RoutingDestination> _destinationByCustomerId = new(StringComparer.Ordinal);
 
     public CustomerCatalog(IOptions<DemoOptions> options, ILogger<CustomerCatalog> logger)
     {
@@ -20,7 +20,7 @@ public sealed class CustomerCatalog
         {
             if (string.IsNullOrWhiteSpace(customer.Id) || string.IsNullOrWhiteSpace(customer.ApiKey))
             {
-                continue;
+                throw new InvalidOperationException("Every configured customer needs an Id and an ApiKey.");
             }
 
             var destination = RoutingDestination.FromConnectionString(
@@ -34,16 +34,22 @@ public sealed class CustomerCatalog
                     $"Customer '{customer.Id}' has no connection string with an explicit IngestionEndpoint.");
             }
 
-            _customerIdByApiKey[customer.ApiKey] = customer.Id;
-            _destinationByCustomerId[customer.Id] = destination;
+            // A duplicate would quietly send one customer's telemetry to another's component.
+            if (!_destinationByCustomerId.TryAdd(customer.Id, destination))
+            {
+                throw new InvalidOperationException($"Customer '{customer.Id}' is configured more than once.");
+            }
+
+            if (!_customerIdByApiKey.TryAdd(customer.ApiKey, customer.Id))
+            {
+                throw new InvalidOperationException($"Customer '{customer.Id}' reuses another customer's ApiKey.");
+            }
         }
 
         logger.LogInformation("Loaded {CustomerCount} routed customers.", _destinationByCustomerId.Count);
     }
 
     public int Count => _destinationByCustomerId.Count;
-
-    public IEnumerable<string> CustomerIds => _destinationByCustomerId.Keys;
 
     /// <summary>
     /// Stands in for authentication. A real service would authenticate the caller and map the

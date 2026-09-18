@@ -7,11 +7,6 @@ using MultiEndpointDemo.Routing;
 
 namespace MultiEndpointDemo;
 
-public static class DemoTelemetry
-{
-    public static readonly ActivitySource Source = new(TelemetryNames.ActivitySource);
-}
-
 /// <summary>
 /// The application's own instruments. Routing dimensions are supplied at the measurement call,
 /// because a metric's dimensions are part of its aggregation key and cannot be added later.

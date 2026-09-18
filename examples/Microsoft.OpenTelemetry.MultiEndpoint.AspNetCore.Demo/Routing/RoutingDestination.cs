@@ -9,7 +9,7 @@ namespace MultiEndpointDemo.Routing;
 public sealed record RoutingDestination(
     string InstrumentationKey,
     string IngestionEndpoint,
-    string? CloudRole)
+    string CloudRole)
 {
     /// <summary>
     /// Reads the two routing values out of a connection string.
@@ -20,7 +20,7 @@ public sealed record RoutingDestination(
     /// endpoint when neither is present; those forms are rejected here so a misconfigured customer
     /// fails at startup instead of having every telemetry item silently dropped.
     /// </remarks>
-    public static RoutingDestination? FromConnectionString(string? connectionString, string? cloudRole)
+    public static RoutingDestination? FromConnectionString(string? connectionString, string cloudRole)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
         {

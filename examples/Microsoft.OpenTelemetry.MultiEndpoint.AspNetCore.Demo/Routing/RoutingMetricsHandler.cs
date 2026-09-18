@@ -26,11 +26,7 @@ public sealed class RoutingMetricsHandler(ICustomerRouting routing) : Delegating
             {
                 context.AddCustomTag(TelemetryNames.InstrumentationKey, destination.InstrumentationKey);
                 context.AddCustomTag(TelemetryNames.IngestionEndpoint, destination.IngestionEndpoint);
-
-                if (destination.CloudRole is not null)
-                {
-                    context.AddCustomTag(TelemetryNames.CloudRole, destination.CloudRole);
-                }
+                context.AddCustomTag(TelemetryNames.CloudRole, destination.CloudRole);
             });
         }
 

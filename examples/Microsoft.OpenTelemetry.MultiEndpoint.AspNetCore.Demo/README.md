@@ -13,7 +13,27 @@ Traces, logs, and metrics all carry the destination:
 | `http.server.request.duration` | `CustomerContextMiddleware` uses `IHttpMetricsTagsFeature` |
 | `http.client.request.duration` | `RoutingMetricsHandler` uses `HttpMetricsEnrichmentContext` |
 
-For the full feature guide, see [Multi-Endpoint Routing](../../docs/multi-endpoint-routing.md).
+## Prerequisite: enable the routing switch
+
+Multi-endpoint routing is off by default. This sample turns it on in its project file, which applies
+the setting before any application code runs:
+
+```xml
+<ItemGroup>
+  <RuntimeHostConfigurationOption Include="Azure.Monitor.OpenTelemetry.EnableMultiEndpointRouting"
+                                  Value="true" />
+</ItemGroup>
+```
+
+The switch is read once, the first time it is needed, so it has to be set before the exporter is
+constructed. `AppContext.SetSwitch` works too, but only if it runs before OpenTelemetry is
+registered.
+
+**Do not copy the routing classes without the switch.** With routing off, the exporter does not
+consume the routing attributes: every customer's telemetry goes to whatever single connection string
+the process has - `APPLICATIONINSIGHTS_CONNECTION_STRING` is often already set on a development
+machine or in App Service - and arrives there carrying the other customers' instrumentation keys and
+endpoints as custom dimensions.
 
 ## How a request is routed
 
@@ -41,8 +61,9 @@ $env:MultiEndpointDemo__Customers__1__ConnectionString = "<fabrikam connection s
 Add more customers by adding entries to the `MultiEndpointDemo:Customers` array in
 `appsettings.json` and supplying the matching connection strings.
 
-A customer whose connection string is missing or has no explicit `IngestionEndpoint` fails at
-startup, rather than having every telemetry item silently dropped at runtime.
+Misconfiguration fails at startup rather than silently dropping telemetry at runtime: a missing
+`Id` or `ApiKey`, a duplicate of either, or a connection string without an explicit
+`IngestionEndpoint` all throw.
 
 ## Run
 
@@ -53,14 +74,19 @@ dotnet run --project .\examples\Microsoft.OpenTelemetry.MultiEndpoint.AspNetCore
 Send a request as each customer:
 
 ```powershell
-curl -H "X-Api-Key: contoso-key"  http://localhost:5000/orders
-curl -H "X-Api-Key: fabrikam-key" http://localhost:5000/orders
-curl http://localhost:5000/health
+Invoke-RestMethod http://localhost:5000/orders -Headers @{ 'X-Api-Key' = 'contoso-key' }
+Invoke-RestMethod http://localhost:5000/orders -Headers @{ 'X-Api-Key' = 'fabrikam-key' }
+Invoke-RestMethod http://localhost:5000/health
 ```
 
 `/orders` produces a request span, a nested client span, a log, and two application metrics, all
-routed to the caller's component. `/health` has no caller, so its telemetry is dropped - that is the
-expected result, not a failure.
+routed to the caller's component.
+
+`/health` has no API key of its own, so nothing routes it. Note that `/orders` calls `/health` over
+HTTP: the outgoing client span belongs to the caller and is routed, but the incoming `/health`
+request starts a new activity whose parent is remote, so `Activity.Parent` is null and it resolves
+to no customer. That is the boundary of this technique - **each service must resolve the destination
+itself**; the routing context does not survive an HTTP hop.
 
 ## Verify isolation
 
@@ -72,8 +98,8 @@ union withsource=Signal requests, dependencies, traces, customMetrics
 | summarize count() by Signal, cloud_RoleName
 ```
 
-`cloud_RoleName` comes from the optional `microsoft.multi_endpoint_cloud_role` attribute, so each
-component shows the role configured for that customer and no other.
+`cloud_RoleName` comes from the `microsoft.multi_endpoint_cloud_role` attribute, so each component
+shows the role configured for that customer and no other.
 
 ## Before copying this pattern
 
@@ -86,9 +112,23 @@ authorized. Never take an instrumentation key or ingestion endpoint from a reque
 propagated baggage, or a request body. Those values are validated for shape but not for ownership,
 so a caller-supplied endpoint would receive your telemetry.
 
+Traces and logs have a safety net - the processors overwrite whatever routing attributes an item
+arrives with. **Metrics do not.** Whatever the measurement call passes is final, and the exporter
+takes the first occurrence of each dimension, so never let request data reach an instrument's tags.
+
+## Metric cardinality
+
+Routing dimensions multiply a metric's time series by the number of customers. Past OpenTelemetry's
+default limit of 2000 series per instrument, further attribute combinations collapse into a single
+overflow point tagged `otel.metric.overflow=true`, which carries no routing dimensions and is
+therefore dropped.
+
+`http.server.request.duration` is the most exposed, since it is already multiplied by route and
+status code. Keep business dimensions bounded, and raise
+`MetricStreamConfiguration.CardinalityLimit` deliberately for the instruments that need it.
+
 ## What routing changes
 
 Live Metrics, standard metrics, and performance counters are unavailable while routing is enabled,
 and Microsoft Entra ID authentication cannot be used. Rate-limited sampling is ignored in favour of
 fixed-rate `SamplingRatio`, because a per-process rate limit would be shared across every customer.
-See the [feature guide](../../docs/multi-endpoint-routing.md) for the full list.

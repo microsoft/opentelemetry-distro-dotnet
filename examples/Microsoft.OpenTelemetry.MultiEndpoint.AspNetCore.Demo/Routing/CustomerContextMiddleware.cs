@@ -25,23 +25,21 @@ public sealed class CustomerContextMiddleware(RequestDelegate next, CustomerCata
 
         if (customerId is not null)
         {
+            var destination = catalog.Resolve(customerId);
+
             context.Items[TelemetryNames.CustomerIdTag] = customerId;
+            context.Items[TelemetryNames.DestinationItem] = destination;
             Activity.Current?.SetTag(TelemetryNames.CustomerIdTag, customerId);
 
             // Metric dimensions must be supplied while the measurement is being recorded, so they
             // cannot come from the processors above. The feature is absent when nothing is listening.
-            var destination = catalog.Resolve(customerId);
             var tags = context.Features.Get<IHttpMetricsTagsFeature>();
 
             if (destination is not null && tags is not null)
             {
                 tags.Tags.Add(new(TelemetryNames.InstrumentationKey, destination.InstrumentationKey));
                 tags.Tags.Add(new(TelemetryNames.IngestionEndpoint, destination.IngestionEndpoint));
-
-                if (destination.CloudRole is not null)
-                {
-                    tags.Tags.Add(new(TelemetryNames.CloudRole, destination.CloudRole));
-                }
+                tags.Tags.Add(new(TelemetryNames.CloudRole, destination.CloudRole));
             }
         }
 

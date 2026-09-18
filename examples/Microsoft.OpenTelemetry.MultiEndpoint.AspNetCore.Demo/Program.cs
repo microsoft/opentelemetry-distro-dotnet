@@ -18,7 +18,11 @@ builder.Services.AddSingleton<CustomerCatalog>();
 builder.Services.AddSingleton<ICustomerRouting, CustomerRouting>();
 builder.Services.AddSingleton<OrderMetrics>();
 builder.Services.AddTransient<RoutingMetricsHandler>();
-builder.Services.AddHttpClient("downstream").AddHttpMessageHandler<RoutingMetricsHandler>();
+
+// Applies to every client the factory creates. A client built with `new HttpClient()` bypasses the
+// factory, so its metrics carry no destination and are dropped.
+builder.Services.ConfigureHttpClientDefaults(http => http.AddHttpMessageHandler<RoutingMetricsHandler>());
+builder.Services.AddHttpClient("downstream");
 
 builder.Services.AddOpenTelemetry()
     .UseMicrosoftOpenTelemetry(o =>
@@ -58,18 +62,18 @@ app.UseMiddleware<CustomerContextMiddleware>();
 // Routed: everything this endpoint produces carries the caller's destination.
 app.MapGet("/orders", async (
     HttpContext context,
-    CustomerCatalog catalog,
     OrderMetrics metrics,
     IHttpClientFactory clientFactory,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
 {
-    if (context.Items[TelemetryNames.CustomerIdTag] is not string customerId)
+    // Resolved once by the middleware, after the caller was authorized.
+    if (context.Items[TelemetryNames.DestinationItem] is not RoutingDestination destination
+        || context.Items[TelemetryNames.CustomerIdTag] is not string customerId)
     {
         return Results.Unauthorized();
     }
 
-    var destination = catalog.Resolve(customerId)!;
     var orderId = Guid.NewGuid().ToString("N")[..8];
 
     using var activity = DemoTelemetry.Source.StartActivity("place.order");
@@ -91,8 +95,5 @@ app.MapGet("/orders", async (
 
 // Not routed: no caller, so no destination. Its telemetry is dropped rather than sent anywhere.
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
-
-// Shows which customers the catalogue loaded, without revealing any connection string.
-app.MapGet("/customers", (CustomerCatalog catalog) => Results.Ok(catalog.CustomerIds));
 
 app.Run();

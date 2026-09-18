@@ -29,25 +29,37 @@ public sealed class RoutingActivityProcessor(ICustomerRouting routing) : BasePro
 /// </summary>
 public sealed class RoutingLogProcessor(ICustomerRouting routing) : BaseProcessor<LogRecord>
 {
+    private static readonly string[] RoutingKeys =
+    [
+        TelemetryNames.InstrumentationKey,
+        TelemetryNames.IngestionEndpoint,
+        TelemetryNames.CloudRole,
+    ];
+
     public override void OnEnd(LogRecord record)
     {
+        var destination = routing.ForLogRecord(record);
+        var existing = record.Attributes ?? [];
+        var carriesRoutingKey = existing.Any(attribute => RoutingKeys.Contains(attribute.Key));
+
+        if (destination is null && !carriesRoutingKey)
+        {
+            // Nothing to add and nothing stale to strip: leave the record untouched. It has no
+            // destination, so it is dropped.
+            return;
+        }
+
         // Routing reads the first occurrence of each key, so appending would lose to a pre-existing
         // value. Rebuild the list without the routing keys, then add the trusted ones.
-        var attributes = (record.Attributes ?? [])
-            .Where(attribute => !TelemetryNames.RoutingKeys.Contains(attribute.Key))
+        var attributes = existing
+            .Where(attribute => !RoutingKeys.Contains(attribute.Key))
             .ToList();
-
-        var destination = routing.ForLogRecord(record);
 
         if (destination is not null)
         {
             attributes.Add(new(TelemetryNames.InstrumentationKey, destination.InstrumentationKey));
             attributes.Add(new(TelemetryNames.IngestionEndpoint, destination.IngestionEndpoint));
-
-            if (destination.CloudRole is not null)
-            {
-                attributes.Add(new(TelemetryNames.CloudRole, destination.CloudRole));
-            }
+            attributes.Add(new(TelemetryNames.CloudRole, destination.CloudRole));
         }
 
         record.Attributes = attributes;
