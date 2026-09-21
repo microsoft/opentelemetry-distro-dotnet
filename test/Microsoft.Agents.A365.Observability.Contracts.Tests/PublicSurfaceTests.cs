@@ -3,10 +3,12 @@
 
 using System.Reflection;
 using FluentAssertions;
+using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.A365.Observability.Runtime.DTOs;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 
 namespace Microsoft.Agents.A365.Observability.Contracts.Tests;
@@ -45,6 +47,22 @@ public class PublicSurfaceTests
         ];
 
         members.Should().OnlyContain(member => IsPublic(member));
+    }
+
+    [TestMethod]
+    public void SharedRuntimeTypes_AreOwnedByContractsAssembly()
+    {
+        const string contractsAssemblyName = "Microsoft.Agents.A365.Observability.Contracts";
+        Type[] types =
+        [
+            typeof(ActivityExtensions),
+            typeof(ActivityProcessor),
+            typeof(EnvironmentUtils),
+            typeof(ExportFormatter),
+        ];
+
+        types.Should().OnlyContain(
+            type => type.Assembly.GetName().Name == contractsAssemblyName);
     }
 
     private static bool IsPublic(MemberInfo member) => member switch

@@ -1,6 +1,5 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Extensions.Logging;
 using global::OpenTelemetry;
 using global::OpenTelemetry.Logs;
@@ -21,22 +20,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
         /// </summary>
         /// <param name="formatter">The formatter used to format log data.</param>
         /// <param name="logger">The logger used to log messages.</param>
-        internal EtwLogProcessor(EtwExportFormatter formatter, ILogger<EtwLogProcessor>? logger = null)
+        public EtwLogProcessor(EtwExportFormatter formatter, ILogger<EtwLogProcessor>? logger = null)
         {
             _formatter = formatter;
             _logger = logger;
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="EtwLogProcessor"/> class.
-        /// </summary>
-        /// <param name="formatter">The compatibility formatter retained for source compatibility.</param>
-        /// <param name="logger">The logger used to log messages.</param>
-        [Obsolete("Use AddLoggingWithEtw to register the ETW logging pipeline instead.")]
-        public EtwLogProcessor(ExportFormatter formatter, ILogger<EtwLogProcessor>? logger = null)
-            : this(new EtwExportFormatter(), logger)
-        {
-            _ = formatter;
         }
 
         /// <summary>

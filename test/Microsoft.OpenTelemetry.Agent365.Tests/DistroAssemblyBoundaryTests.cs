@@ -4,6 +4,7 @@
 using System.Reflection;
 using FluentAssertions;
 using Microsoft.Agents.A365.Observability.Runtime.Etw;
+using Microsoft.OpenTelemetry;
 
 namespace Microsoft.OpenTelemetry.Agent365.Tests
 {
@@ -14,12 +15,14 @@ namespace Microsoft.OpenTelemetry.Agent365.Tests
     [TestClass]
     public class DistroAssemblyBoundaryTests
     {
-        private static Assembly DistroAssembly => typeof(EtwLoggingBuilder).Assembly;
+        private static Assembly DistroAssembly => typeof(Agent365Options).Assembly;
 
         [TestMethod]
         public void DistroAssembly_DoesNotForwardMovedAgent365Types()
         {
             DistroAssembly.GetName().Name.Should().Be("Microsoft.OpenTelemetry");
+            typeof(EtwLoggingBuilder).Assembly.GetName().Name
+                .Should().Be("Microsoft.Agents.A365.Observability.Etw");
             DistroAssembly.GetForwardedTypes()
                 .Where(type => type.Namespace?.StartsWith(
                     "Microsoft.Agents.A365.Observability",

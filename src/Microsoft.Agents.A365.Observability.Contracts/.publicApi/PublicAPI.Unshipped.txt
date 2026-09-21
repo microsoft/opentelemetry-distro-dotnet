@@ -114,6 +114,14 @@ const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryCo
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.UserEmailKey = "user.email" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.UserIdKey = "user.id" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.UserNameKey = "user.name" -> string!
+Microsoft.Agents.A365.Observability.Runtime.Common.ActivityExtensions
+Microsoft.Agents.A365.Observability.Runtime.Common.EnvironmentUtils
+Microsoft.Agents.A365.Observability.Runtime.Common.EnvironmentUtils.EnvironmentUtils() -> void
+Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter
+Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter.ExportFormatter(Microsoft.Extensions.Logging.ILogger<Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter!>! logger) -> void
+Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter.FormatLogData(System.Collections.Generic.IDictionary<string!, object?>! data) -> string!
+Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter.FormatMany(System.Collections.Generic.IEnumerable<System.Diagnostics.Activity!>! activities, OpenTelemetry.Resources.Resource! resource) -> string!
+Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter.FormatSingle(System.Diagnostics.Activity! activity, OpenTelemetry.Resources.Resource! resource) -> string!
 Microsoft.Agents.A365.Observability.Runtime.DTOs.SpanKindConstants
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.InputMessagesConverter
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.InputMessagesConverter.InputMessagesConverter() -> void
@@ -138,6 +146,8 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails.Tr
 Microsoft.Agents.A365.Observability.Runtime.Tracing.MessageUtils
 Microsoft.Agents.A365.Observability.Runtime.Tracing.MessageUtils.SnakeCaseJsonStringEnumConverter
 Microsoft.Agents.A365.Observability.Runtime.Tracing.MessageUtils.SnakeCaseJsonStringEnumConverter.SnakeCaseJsonStringEnumConverter() -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.ActivityProcessor
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.ActivityProcessor.ActivityProcessor() -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.AutoInstrumentationConstants
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.OperationNames
@@ -306,6 +316,14 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolCallResu
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolPolicyDecision
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolPolicyDecision.Allow = 0 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolPolicyDecision
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolPolicyDecision.Deny = 1 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ToolPolicyDecision
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.ActivityProcessor.OnStart(System.Diagnostics.Activity! activity) -> void
+static Microsoft.Agents.A365.Observability.Runtime.Common.ActivityExtensions.CoalesceTag(this System.Diagnostics.Activity! activity, string! key, params string?[]! values) -> void
+static Microsoft.Agents.A365.Observability.Runtime.Common.ActivityExtensions.GetAttributeOrBaggage(this System.Diagnostics.Activity! activity, string! key) -> string?
+static Microsoft.Agents.A365.Observability.Runtime.Common.EnvironmentUtils.GetObservabilityAuthenticationScope() -> string![]!
+static Microsoft.Agents.A365.Observability.Runtime.Common.EnvironmentUtils.GetObservabilityAuthenticationScope(string! clusterCategory = "prod") -> string![]!
+static Microsoft.Agents.A365.Observability.Runtime.Common.EnvironmentUtils.GetObservabilityClusterCategory() -> string!
+static Microsoft.Agents.A365.Observability.Runtime.Common.EnvironmentUtils.GetObservabilityClusterCategory(string! clusterCategory = "prod") -> string!
+static Microsoft.Agents.A365.Observability.Runtime.Common.EnvironmentUtils.IsDevelopmentEnvironment() -> bool
 static Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.ExecuteToolDataBuilder.Build(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails! toolCallDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult? result, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, string! conversationId, System.DateTimeOffset? startTime = null, System.DateTimeOffset? endTime = null, string? spanId = null, string? parentSpanId = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Channel? channel = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.CallerDetails? callerDetails = null, System.Collections.Generic.IDictionary<string!, object?>? extraAttributes = null, string? spanKind = null, string? traceId = null, System.Exception? error = null) -> Microsoft.Agents.A365.Observability.Runtime.DTOs.ExecuteToolData!
 static Microsoft.Agents.A365.Observability.Runtime.Tracing.MessageUtils.IsJson(string? value) -> bool
 static Microsoft.Agents.A365.Observability.Runtime.Tracing.MessageUtils.NormalizeInputMessages(string! content) -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.InputMessages!

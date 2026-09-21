@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 using Microsoft.Agents.A365.Observability.Runtime.DTOs;
-using Microsoft.Agents.A365.Observability.Runtime.Etw;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -135,14 +134,34 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Common
         }
 
         /// <summary>
-        /// Formats the log data for the OTLP payload.
+        /// Formats operation data into the ETW JSON payload shape.
         /// </summary>
-        /// <param name="data">The operation data containing the log information.</param>
-        /// <returns>A JSON string representing the OTLP payload for the log data.</returns>
-        [Obsolete("Use Microsoft.Agents.A365.Observability.Runtime.Etw.EtwExportFormatter.FormatLogData instead.")]
+        /// <param name="data">The operation data to serialize.</param>
+        /// <returns>The serialized ETW JSON payload.</returns>
         public string FormatLogData(IDictionary<string, object?> data)
         {
-            return new EtwExportFormatter().FormatLogData(data);
+            var payload = new
+            {
+                Name = data["Name"],
+                Attributes = data["Attributes"],
+                StartTimeUnixNano = data.TryGetValue("StartTime", out var startTimeObj) && startTimeObj != null
+                    ? ToUnixNanos(((DateTimeOffset)startTimeObj).UtcDateTime)
+                    : 0,
+                EndTimeUnixNano = data.TryGetValue("EndTime", out var endTimeObj) && endTimeObj != null
+                    ? ToUnixNanos(((DateTimeOffset)endTimeObj).UtcDateTime)
+                    : 0,
+                SpanId = data["SpanId"],
+                ParentSpanId = data["ParentSpanId"],
+                TraceId = data.TryGetValue("TraceId", out var traceIdObj) ? traceIdObj : null,
+                Kind = data.TryGetValue("SpanKind", out var spanKindObj) && spanKindObj != null
+                    ? spanKindObj
+                    : SpanKindConstants.Client,
+                Status = data.TryGetValue("Status", out var statusObj) && statusObj != null
+                    ? statusObj
+                    : new Dictionary<string, object> { ["code"] = 0, ["message"] = string.Empty },
+            };
+
+            return SerializePayload(payload);
         }
 
         private static Dictionary<string, object?> GetResourceAttributes(Resource resource)

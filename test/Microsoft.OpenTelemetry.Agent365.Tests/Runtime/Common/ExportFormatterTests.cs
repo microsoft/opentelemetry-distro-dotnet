@@ -514,32 +514,28 @@ public partial class ExportFormatterTests : ActivityTest
     }
 
     [TestMethod]
-    public void FormatLogData_ForwardsToEtwFormatter()
+    public void EtwFormatter_UsesSharedFormatLogDataImplementation()
     {
         var data = new InvokeAgentData(
             new Dictionary<string, object?> { ["key"] = "value" },
             spanId: "span");
 
-#pragma warning disable CS0618
-        var compatibilityJson = CreateFormatter().FormatLogData(data.ToDictionary());
-#pragma warning restore CS0618
+        var sharedJson = CreateFormatter().FormatLogData(data.ToDictionary());
         var etwJson = new EtwExportFormatter().FormatLogData(data.ToDictionary());
 
-        compatibilityJson.Should().Be(etwJson);
+        sharedJson.Should().Be(etwJson);
     }
 
     [TestMethod]
-    public void FormatLogData_IsObsoleteAndPointsToEtwFormatter()
+    public void FormatLogData_IsOwnedByContractsAssembly()
     {
         var method = typeof(ExportFormatter).GetMethod(nameof(ExportFormatter.FormatLogData));
 
         method.Should().NotBeNull();
-        var obsoleteAttribute = method!.GetCustomAttributes(typeof(ObsoleteAttribute), inherit: false)
-            .Cast<ObsoleteAttribute>()
-            .Single();
-
-        obsoleteAttribute.Message.Should().Be(
-            "Use Microsoft.Agents.A365.Observability.Runtime.Etw.EtwExportFormatter.FormatLogData instead.");
+        method!.DeclaringType!.Assembly.GetName().Name
+            .Should().Be("Microsoft.Agents.A365.Observability.Contracts");
+        method.GetCustomAttributes(typeof(ObsoleteAttribute), inherit: false)
+            .Should().BeEmpty();
     }
 
 #region ExportFormatter FormatMany Truncation Tests

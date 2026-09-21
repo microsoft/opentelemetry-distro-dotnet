@@ -2,14 +2,12 @@
 // Licensed under the MIT License.
 
 using FluentAssertions;
-using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.A365.Observability.Runtime.Etw;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using global::OpenTelemetry.Logs;
 using System.Diagnostics;
 using System.Diagnostics.Tracing;
@@ -33,39 +31,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
 
         private ServiceProvider BuildProvider() => new ServiceCollection().AddLoggingWithEtw().BuildServiceProvider();
 
-        private static ServiceProvider BuildProviderWithCompatibilityConstructor()
-        {
-            var services = new ServiceCollection();
-
-            services
-                .AddSingleton(typeof(IA365EtwLogger<>), typeof(A365EtwLogger<>))
-                .AddSingleton<ExportFormatter>(sp =>
-                {
-                    var logger = sp.GetService<ILogger<ExportFormatter>>() ?? NullLoggerFactory.Instance.CreateLogger<ExportFormatter>();
-                    return new ExportFormatter(logger);
-                })
-                .AddLogging(logging =>
-                {
-                    logging.AddOpenTelemetry(otelLogging =>
-                    {
-                        otelLogging.ParseStateValues = true;
-#pragma warning disable CS0618
-                        otelLogging.AddProcessor(sp =>
-                            new EtwLogProcessor(
-                                sp.GetRequiredService<ExportFormatter>(),
-                                sp.GetService<ILogger<EtwLogProcessor>>() ?? NullLoggerFactory.Instance.CreateLogger<EtwLogProcessor>()));
-#pragma warning restore CS0618
-                    });
-                })
-                .Configure<LoggerFilterOptions>(options =>
-                {
-                    options.AddFilter<OpenTelemetryLoggerProvider>(
-                        (category, level) => category != null && category.StartsWith(Constants.EtwCategoryPrefix, StringComparison.Ordinal));
-                });
-
-            return services.BuildServiceProvider();
-        }
-
         [TestMethod]
         public void Build_RegistersEtwExportFormatterAsSingleton()
         {
@@ -78,34 +43,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
         }
 
         [TestMethod]
-        public void Build_StillRegistersExportFormatterAsSingleton_ForCompatibility()
+        public void EtwLogProcessor_Constructor_ConsumesEtwExportFormatter()
         {
-            using var provider = BuildProvider();
-
-            var first = provider.GetRequiredService<ExportFormatter>();
-            var second = provider.GetRequiredService<ExportFormatter>();
-
-            first.Should().NotBeNull();
-            first.Should().BeSameAs(second);
-        }
-
-        [TestMethod]
-        public void Build_RegistersBothFormatters_AsDistinctServices()
-        {
-            using var provider = BuildProvider();
-
-            var exportFormatter = provider.GetRequiredService<ExportFormatter>();
-            var etwExportFormatter = provider.GetRequiredService<EtwExportFormatter>();
-
-            exportFormatter.Should().BeOfType<ExportFormatter>();
-            etwExportFormatter.Should().BeOfType<EtwExportFormatter>();
-        }
-
-        [TestMethod]
-        public void EtwLogProcessor_InternalConstructor_ConsumesEtwExportFormatter()
-        {
-            var constructor = typeof(EtwLogProcessor)
-                .GetConstructors(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            var constructor = typeof(EtwLogProcessor).GetConstructors()
                 .Single(candidate => candidate.GetParameters()[0].ParameterType == typeof(EtwExportFormatter));
 
             constructor.Should().NotBeNull();
@@ -119,28 +59,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
             var formatterConstructors = typeof(EtwLogProcessor).GetConstructors()
                 .Where(constructor =>
                     constructor.GetParameters().Length > 0 &&
-                    (constructor.GetParameters()[0].ParameterType == typeof(ExportFormatter) ||
-                     constructor.GetParameters()[0].ParameterType == typeof(EtwExportFormatter)));
+                    constructor.GetParameters()[0].ParameterType == typeof(EtwExportFormatter));
 
             formatterConstructors.Should().ContainSingle()
-                .Which.GetParameters()[0].ParameterType.Should().Be(typeof(ExportFormatter));
-        }
-
-        [TestMethod]
-        public void EtwLogProcessor_CompatibilityConstructor_IsObsolete()
-        {
-            var constructor = typeof(EtwLogProcessor).GetConstructor(new[]
-            {
-                typeof(ExportFormatter),
-                typeof(ILogger<EtwLogProcessor>),
-            });
-
-            constructor.Should().NotBeNull();
-            constructor!
-                .GetCustomAttributes(typeof(ObsoleteAttribute), inherit: false)
-                .Cast<ObsoleteAttribute>()
-                .Should()
-                .ContainSingle();
+                .Which.GetParameters()[0].ParameterType.Should().Be(typeof(EtwExportFormatter));
         }
 
         [TestMethod]
@@ -153,32 +75,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
             using var provider = services.BuildServiceProvider();
 
             provider.GetRequiredService<EtwLogProcessor>().Should().NotBeNull();
-        }
-
-        [TestMethod]
-        public void EtwLogProcessor_CompatibilityConstructor_EmitsValidEtwJson()
-        {
-            using var listener = new TestEventListener();
-            listener.EnableEvents(EtwEventSource.Log, EventLevel.Informational);
-            using var provider = BuildProviderWithCompatibilityConstructor();
-            var logger = provider.GetRequiredService<IA365EtwLogger<EtwLoggingBuilderTests>>();
-            var agentDetails = new AgentDetails("agent-id", agentName: "agent-name");
-            var scopeDetails = new InvokeAgentScopeDetails(endpoint: new Uri("https://example.com/agent"));
-
-            logger.LogInvokeAgent(scopeDetails, agentDetails, "conv-compat");
-
-            var evt = listener.Events.Find(e => e.EventId == 2000);
-            evt.Should().NotBeNull();
-            evt!.Payload.Should().NotBeNull();
-            var payload = evt.Payload![0] as string;
-            payload.Should().NotBeNullOrWhiteSpace();
-
-            using var doc = JsonDocument.Parse(payload!);
-            var root = doc.RootElement;
-            root.GetProperty("Name").GetString().Should().Be(OpenTelemetryConstants.OperationNames.InvokeAgent.ToString());
-            root.GetProperty("Kind").GetString().Should().Be(ActivityKind.Internal.ToString());
-            root.GetProperty("SpanId").GetString().Should().NotBeNullOrWhiteSpace();
-            root.GetProperty("Attributes").GetProperty(OpenTelemetryConstants.GenAiAgentIdKey).GetString().Should().Be("agent-id");
         }
 
         [TestMethod]
