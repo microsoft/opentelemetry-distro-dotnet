@@ -51,7 +51,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages
     /// <summary>
     /// Serializes <see cref="InputMessages"/> as a plain JSON array of ChatMessage objects.
     /// </summary>
-    internal sealed class InputMessagesConverter : JsonConverter<InputMessages>
+    public sealed class InputMessagesConverter : JsonConverter<InputMessages>
     {
         /// <inheritdoc/>
         public override InputMessages Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -69,7 +69,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages
     /// <summary>
     /// Serializes <see cref="OutputMessages"/> as a plain JSON array of OutputMessage objects.
     /// </summary>
-    internal sealed class OutputMessagesConverter : JsonConverter<OutputMessages>
+    public sealed class OutputMessagesConverter : JsonConverter<OutputMessages>
     {
         /// <inheritdoc/>
         public override OutputMessages Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

@@ -14,17 +14,26 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing
     /// Provides normalization from plain <c>string[]</c> (backward compat) to the
     /// structured array format, and non-throwing Serialize methods.
     /// </summary>
-    internal static class MessageUtils
+    public static class MessageUtils
     {
-        internal sealed class SnakeCaseJsonStringEnumConverter : JsonStringEnumConverter
+        /// <summary>
+        /// Converts enum values to and from lower snake_case JSON strings.
+        /// </summary>
+        public sealed class SnakeCaseJsonStringEnumConverter : JsonStringEnumConverter
         {
+            /// <summary>
+            /// Initializes a new instance of the <see cref="SnakeCaseJsonStringEnumConverter"/> class.
+            /// </summary>
             public SnakeCaseJsonStringEnumConverter()
                 : base(JsonNamingPolicy.SnakeCaseLower, allowIntegerValues: false)
             {
             }
         }
 
-        internal static readonly JsonSerializerOptions SerializerOptions = CreateSerializerOptions();
+        /// <summary>
+        /// Gets the shared JSON serializer options used for Agent365 contract payloads.
+        /// </summary>
+        public static readonly JsonSerializerOptions SerializerOptions = CreateSerializerOptions();
 
         private static readonly string DiagnosticFallback =
             "[{\"role\":\"system\",\"parts\":[{\"type\":\"text\",\"content\":\"[serialization failed]\"}],\"finish_reason\":\"error\"}]";

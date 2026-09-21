@@ -61,7 +61,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// Serializes this instance to a JSON string.
         /// </summary>
         /// <returns>A JSON string representation of this instance.</returns>
-        internal string ToJson()
+        public string ToJson()
         {
             return JsonSerializer.Serialize(this, JsonOptions);
         }

@@ -71,14 +71,20 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// </summary>
         public AgentDetails? TargetAgentDetails { get; }
 
-        internal string ModeValue => Mode switch
+        /// <summary>
+        /// Gets the wire-format value for <see cref="Mode"/>.
+        /// </summary>
+        public string ModeValue => Mode switch
         {
             TransferMode.ReturnToCaller => "return_to_caller",
             TransferMode.PassControl => "pass_control",
             _ => throw new ArgumentOutOfRangeException(nameof(Mode)),
         };
 
-        internal string TargetTypeValue => TargetType switch
+        /// <summary>
+        /// Gets the wire-format value for <see cref="TargetType"/>.
+        /// </summary>
+        public string TargetTypeValue => TargetType switch
         {
             TransferTargetType.Agent => "agent",
             TransferTargetType.Human => "human",

@@ -9,7 +9,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
     /// <summary>
     /// OpenTelemetry constant keys and values used across the Microsoft Agent 365 SDK.
     /// </summary>
-    internal static class OpenTelemetryConstants
+    public static class OpenTelemetryConstants
     {
         public const string EnableOpenTelemetrySwitch = "Azure.Experimental.EnableActivitySource";
         public const string SourceName = "Agent365Sdk";
@@ -159,7 +159,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// The set of recognized genAI operation names used to identify A365-exportable spans.
         /// Comparison is case-insensitive.
         /// </summary>
-        internal static readonly HashSet<string> GenAiOperationNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        public static readonly HashSet<string> GenAiOperationNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             InvokeAgentOperationName,
             ExecuteToolOperationName,

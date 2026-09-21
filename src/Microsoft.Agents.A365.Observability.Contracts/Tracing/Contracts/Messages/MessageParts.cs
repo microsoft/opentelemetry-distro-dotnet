@@ -295,7 +295,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages
     /// Custom JSON converter that serializes <see cref="IMessagePart"/> using the runtime concrete type,
     /// ensuring all properties of derived types (TextPart, ToolCallRequestPart, etc.) are included.
     /// </summary>
-    internal sealed class MessagePartConverter : JsonConverter<IMessagePart>
+    public sealed class MessagePartConverter : JsonConverter<IMessagePart>
     {
         /// <inheritdoc/>
         public override IMessagePart Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

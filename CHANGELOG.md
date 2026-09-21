@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Added standalone Agent365 Contracts and ETW packages while preserving compatibility through `Microsoft.OpenTelemetry`.
+- Added standalone Agent365 Contracts and ETW packages. The Contracts implementation surface is public, and applications must rebuild when upgrading because moved Agent365 types are no longer forwarded from `Microsoft.OpenTelemetry`.
 
 ## 1.2.0-beta.1 - 2026-09-18
 - Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.10.0-beta.1, which makes multi-endpoint routing available: one exporter can send telemetry to several Application Insights components. It is off by default and enabled with the `Azure.Monitor.OpenTelemetry.EnableMultiEndpointRouting` switch, after which each item is sent to the component named by its `microsoft.instrumentation_key` and `microsoft.ingestion_endpoint` attributes, and an item carrying neither is dropped rather than sent to the application's own component.
