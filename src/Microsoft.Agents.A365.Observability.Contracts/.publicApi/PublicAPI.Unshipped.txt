@@ -119,7 +119,6 @@ Microsoft.Agents.A365.Observability.Runtime.Common.EnvironmentUtils
 Microsoft.Agents.A365.Observability.Runtime.Common.EnvironmentUtils.EnvironmentUtils() -> void
 Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter
 Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter.ExportFormatter(Microsoft.Extensions.Logging.ILogger<Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter!>! logger) -> void
-Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter.FormatLogData(System.Collections.Generic.IDictionary<string!, object?>! data) -> string!
 Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter.FormatMany(System.Collections.Generic.IEnumerable<System.Diagnostics.Activity!>! activities, OpenTelemetry.Resources.Resource! resource) -> string!
 Microsoft.Agents.A365.Observability.Runtime.Common.ExportFormatter.FormatSingle(System.Diagnostics.Activity! activity, OpenTelemetry.Resources.Resource! resource) -> string!
 Microsoft.Agents.A365.Observability.Runtime.DTOs.SpanKindConstants

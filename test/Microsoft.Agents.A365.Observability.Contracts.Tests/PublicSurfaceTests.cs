@@ -65,6 +65,13 @@ public class PublicSurfaceTests
             type => type.Assembly.GetName().Name == contractsAssemblyName);
     }
 
+    [TestMethod]
+    public void ExportFormatter_DoesNotExposeEtwLogFormatting()
+    {
+        typeof(ExportFormatter).GetMethod("FormatLogData")
+            .Should().BeNull("ETW-specific log formatting belongs to the ETW package");
+    }
+
     private static bool IsPublic(MemberInfo member) => member switch
     {
         FieldInfo field => field.IsPublic,
