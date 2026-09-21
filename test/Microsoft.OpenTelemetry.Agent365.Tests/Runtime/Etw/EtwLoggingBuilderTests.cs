@@ -102,14 +102,28 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
         }
 
         [TestMethod]
-        public void EtwLogProcessor_Constructor_ConsumesEtwExportFormatter()
+        public void EtwLogProcessor_InternalConstructor_ConsumesEtwExportFormatter()
         {
-            var constructor = typeof(EtwLogProcessor).GetConstructors()
+            var constructor = typeof(EtwLogProcessor)
+                .GetConstructors(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
                 .Single(candidate => candidate.GetParameters()[0].ParameterType == typeof(EtwExportFormatter));
 
             constructor.Should().NotBeNull();
             constructor!.GetParameters().Select(parameter => parameter.ParameterType)
                 .Should().Contain(typeof(EtwExportFormatter));
+        }
+
+        [TestMethod]
+        public void EtwLogProcessor_HasSinglePublicFormatterConstructor()
+        {
+            var formatterConstructors = typeof(EtwLogProcessor).GetConstructors()
+                .Where(constructor =>
+                    constructor.GetParameters().Length > 0 &&
+                    (constructor.GetParameters()[0].ParameterType == typeof(ExportFormatter) ||
+                     constructor.GetParameters()[0].ParameterType == typeof(EtwExportFormatter)));
+
+            formatterConstructors.Should().ContainSingle()
+                .Which.GetParameters()[0].ParameterType.Should().Be(typeof(ExportFormatter));
         }
 
         [TestMethod]

@@ -1,4 +1,3 @@
-#pragma warning disable RS0026 // Multiple overloads with optional parameters — compatibility overload retained by design
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 using Microsoft.Agents.A365.Observability.Runtime.Common;
@@ -22,12 +21,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
         /// </summary>
         /// <param name="formatter">The formatter used to format log data.</param>
         /// <param name="logger">The logger used to log messages.</param>
-        /// <param name="compatibilityFormatter">The legacy formatter registration used to disambiguate dependency injection activation.</param>
-        public EtwLogProcessor(EtwExportFormatter formatter, ILogger<EtwLogProcessor>? logger = null, ExportFormatter? compatibilityFormatter = null)
+        internal EtwLogProcessor(EtwExportFormatter formatter, ILogger<EtwLogProcessor>? logger = null)
         {
             _formatter = formatter;
             _logger = logger;
-            _ = compatibilityFormatter;
         }
 
         /// <summary>
@@ -35,9 +32,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
         /// </summary>
         /// <param name="formatter">The compatibility formatter retained for source compatibility.</param>
         /// <param name="logger">The logger used to log messages.</param>
-        [Obsolete("Use the EtwLogProcessor overload that accepts EtwExportFormatter instead.")]
+        [Obsolete("Use AddLoggingWithEtw to register the ETW logging pipeline instead.")]
         public EtwLogProcessor(ExportFormatter formatter, ILogger<EtwLogProcessor>? logger = null)
-            : this(new EtwExportFormatter(), logger, compatibilityFormatter: formatter)
+            : this(new EtwExportFormatter(), logger)
         {
             _ = formatter;
         }
@@ -63,4 +60,3 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
         }
     }
 }
-#pragma warning restore RS0026
