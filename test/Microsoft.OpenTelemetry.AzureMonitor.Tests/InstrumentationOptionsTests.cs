@@ -9,6 +9,8 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -534,6 +536,8 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
             dnsMeter.CreateHistogram<double>("dns.lookup.duration").Record(0.1);
 
             meterProvider.ForceFlush();
+
+            // Meter version isolates this test's synthetic instruments from any real System.Net.Http meter in the process.
             var httpMetrics = exportedMetrics.Where(metric => metric.MeterName == meter.Name && metric.MeterVersion == meter.Version).ToList();
             Assert.Equal(configuration == "all" ? 6 : configuration == "one" ? 2 : configuration == "drop" ? 0 : 1, httpMetrics.Count);
             if (configuration != "drop")
@@ -585,6 +589,54 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
             meter.CreateUpDownCounter<long>("http.client.open_connections").Add(1);
             meterProvider.ForceFlush();
             Assert.Contains(exportedMetrics, metric => metric.MeterName == meter.Name && metric.Name == "http.client.open_connections");
+        }
+
+        [Fact]
+        public async Task HttpClientMetrics_CollectOnlyRequestDurationFromRealRequests()
+        {
+            var probe = new TcpListener(IPAddress.Loopback, 0);
+            probe.Start();
+            var port = ((IPEndPoint)probe.LocalEndpoint).Port;
+            probe.Stop();
+
+            using var httpListener = new HttpListener();
+            httpListener.Prefixes.Add($"http://localhost:{port}/");
+            httpListener.Start();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var ctx = await httpListener.GetContextAsync();
+                    ctx.Response.StatusCode = 200;
+                    ctx.Response.Close();
+                }
+                catch
+                {
+                    // The listener is stopped at the end of the test.
+                }
+            });
+
+            var exportedMetrics = new List<Metric>();
+            var services = new ServiceCollection();
+            services.AddOpenTelemetry()
+                .UseMicrosoftOpenTelemetry(options => options.Exporters = ExportTarget.Console)
+                .WithMetrics(metrics => metrics.AddInMemoryExporter(exportedMetrics));
+
+            using var serviceProvider = services.BuildServiceProvider();
+            var meterProvider = serviceProvider.GetRequiredService<MeterProvider>();
+
+            using (var httpClient = new HttpClient())
+            {
+                using var response = await httpClient.GetAsync($"http://localhost:{port}/probe");
+            }
+
+            meterProvider.ForceFlush();
+            httpListener.Stop();
+
+            // Catches the distro's instrument name drifting from the name the runtime actually emits.
+            Assert.Equal(
+                new[] { "http.client.request.duration" },
+                exportedMetrics.Where(metric => metric.MeterName == "System.Net.Http").Select(metric => metric.Name).Distinct().ToArray());
         }
 
         [Fact]
