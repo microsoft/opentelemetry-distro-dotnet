@@ -58,6 +58,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             SetTagMaybe(GenAiResponseFinishReasonsKey, details.FinishReasons);
             SetTagMaybe(GenAiConversationIdKey, request?.ConversationId);
             SetTagMaybe(SessionIdKey, request?.SessionId);
+            SetTagMaybe(ServiceNameKey, request?.OperationSource);
 
             if (request?.InputContent != null)
             {

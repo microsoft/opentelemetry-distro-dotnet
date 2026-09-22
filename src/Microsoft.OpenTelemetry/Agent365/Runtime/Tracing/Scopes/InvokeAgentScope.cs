@@ -73,6 +73,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         {
             SetTagMaybe(OpenTelemetryConstants.SessionIdKey, request?.SessionId);
             SetTagMaybe(OpenTelemetryConstants.GenAiConversationIdKey, request?.ConversationId);
+            SetTagMaybe(OpenTelemetryConstants.ServiceNameKey, request?.OperationSource);
             SetTagMaybe(OpenTelemetryConstants.ThreatDiagnosticsSummaryKey, threatDiagnosticsSummary?.ToJson());
 
             var endpoint = scopeDetails?.Endpoint;

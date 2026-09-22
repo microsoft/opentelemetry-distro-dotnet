@@ -21,8 +21,7 @@ public sealed class InferenceScopeTest : ActivityTest
             "openai",
             123,
             456,
-            new[] { "stop", "length" },
-            "response-123");
+            new[] { "stop", "length" });
 
         var activity = ListenForActivity(() =>
         {
@@ -188,6 +187,26 @@ public sealed class InferenceScopeTest : ActivityTest
         });
 
         activity.ShouldHaveTag(OpenTelemetryConstants.SessionIdKey, sessionId);
+    }
+
+    [TestMethod]
+    public void Start_SetsOperationSource_WhenProvidedOnRequest()
+    {
+        var operationSource = OperationSource.SDK.ToString();
+        var details = new InferenceCallDetails(
+            InferenceOperationType.Chat,
+            "gpt-4o",
+            "openai");
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = InferenceScope.Start(
+                new Request(operationSource: operationSource),
+                details,
+                Util.GetAgentDetails());
+        });
+
+        activity.ShouldHaveTag(OpenTelemetryConstants.ServiceNameKey, operationSource);
     }
 
     [TestMethod]

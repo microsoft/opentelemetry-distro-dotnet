@@ -56,8 +56,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
                 agenticUserId: "auid",
                 agenticUserEmail: "upn@example.com",
                 agentBlueprintId: "bp-1",
-                agentPlatformId: "platform-1",
-                agentType: AgentType.MicrosoftCopilot);
+                agentPlatformId: "platform-1");
             var response = new Response(new[] { "Test" });
 
             var data = OutputDataBuilder.Build(agent, response);

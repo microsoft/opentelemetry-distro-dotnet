@@ -38,7 +38,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
             listener.EnableEvents(EtwEventSource.Log, EventLevel.Informational);
             using var provider = BuildProvider();
             var logger = provider.GetRequiredService<IA365EtwLogger<EtwLoggingBuilderTests>>();
-            var agentDetails = new AgentDetails("agent-id", agentName: "agent-name", agentType: AgentType.MicrosoftCopilot, tenantId: Guid.NewGuid().ToString());
+            var agentDetails = new AgentDetails("agent-id", agentName: "agent-name", tenantId: Guid.NewGuid().ToString());
             var invokeAgentScopeDetails = new InvokeAgentScopeDetails(endpoint: new Uri("https://example.com/agent"));
             var callerDetails = new CallerDetails(userDetails: new UserDetails(userId: "caller-id-1", userName: "Caller Name", userEmail: "caller@example.com", userClientIP: IPAddress.Parse("192.168.1.100")));
             string conversationId = "conv-123";
@@ -292,7 +292,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
             listener.EnableEvents(EtwEventSource.Log, EventLevel.Informational);
             using var provider = BuildProvider();
             var logger = provider.GetRequiredService<IA365EtwLogger<EtwLoggingBuilderTests>>();
-            var agentDetails = new AgentDetails("agent-id", agentName: "agent-name", agentType: AgentType.MicrosoftCopilot, tenantId: Guid.NewGuid().ToString());
+            var agentDetails = new AgentDetails("agent-id", agentName: "agent-name", tenantId: Guid.NewGuid().ToString());
             var response = new Response(new[] { "Hello", "World" });
 
             // Act

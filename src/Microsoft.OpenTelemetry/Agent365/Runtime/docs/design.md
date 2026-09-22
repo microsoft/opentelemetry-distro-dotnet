@@ -130,8 +130,7 @@ using var scope = InferenceScope.Start(
         ProviderName = "Azure OpenAI",
         InputTokens = 150,
         OutputTokens = 200,
-        FinishReasons = new[] { "stop" },
-        ResponseId = "chatcmpl-123"
+        FinishReasons = new[] { "stop" }
     },
     agentDetails: new AgentDetails { AgentName = "MyAgent" },
     tenantDetails: new TenantDetails { TenantId = "tenant-789" }

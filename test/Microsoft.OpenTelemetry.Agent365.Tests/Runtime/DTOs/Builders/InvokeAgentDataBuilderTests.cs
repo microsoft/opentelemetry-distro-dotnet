@@ -22,7 +22,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
             var request = new Request(
                 "test content",
                 sessionId: "session-456",
-                channel: new Channel(name: "source-name", link: "source-description"));
+                channel: new Channel(name: "source-name", link: "source-description"),
+                operationSource: OperationSource.SDK.ToString());
             var conversationId = "conv-123";
 
             // Act
@@ -37,6 +38,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
             telemetry.Attributes[OpenTelemetryConstants.ChannelNameKey].Should().Be("source-name");
             telemetry.Attributes.Should().ContainKey(OpenTelemetryConstants.ChannelLinkKey);
             telemetry.Attributes[OpenTelemetryConstants.ChannelLinkKey].Should().Be("source-description");
+            telemetry.Attributes[OpenTelemetryConstants.SessionIdKey].Should().Be("session-456");
+            telemetry.Attributes[OpenTelemetryConstants.ServiceNameKey].Should().Be(OperationSource.SDK.ToString());
         }
 
         [TestMethod]

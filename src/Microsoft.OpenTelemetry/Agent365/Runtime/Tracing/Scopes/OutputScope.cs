@@ -42,6 +42,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
                 userDetails: userDetails)
         {
             SetTagMaybe(OpenTelemetryConstants.GenAiConversationIdKey, request?.ConversationId);
+            SetTagMaybe(OpenTelemetryConstants.SessionIdKey, request?.SessionId);
+            SetTagMaybe(OpenTelemetryConstants.ServiceNameKey, request?.OperationSource);
 
             if (request?.Channel != null)
             {

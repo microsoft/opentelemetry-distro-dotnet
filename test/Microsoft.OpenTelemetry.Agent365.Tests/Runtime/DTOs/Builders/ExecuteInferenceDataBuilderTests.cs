@@ -50,7 +50,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
         public void Build_WithTokensAndFinishReasons_IncludesUsageAndReasons()
         {
             // Arrange
-            var details = new InferenceCallDetails(InferenceOperationType.Chat, "gpt-4o", "openai", 10, 20, new[]{"stop"}, "resp-1");
+            var details = new InferenceCallDetails(InferenceOperationType.Chat, "gpt-4o", "openai", 10, 20, new[]{"stop"});
             var agent = new AgentDetails("agent-2");
             var conversationId = "conv-tokens";
 
@@ -160,7 +160,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
         public void Build_WithAllParameters_SetsAllExpectedAttributes()
         {
             // Arrange
-            var details = new InferenceCallDetails(InferenceOperationType.Chat, "gpt-4o", "openai", 33, 44, new[]{"length","stop"}, "resp-all");
+            var details = new InferenceCallDetails(InferenceOperationType.Chat, "gpt-4o", "openai", 33, 44, new[]{"length","stop"});
             var agent = new AgentDetails("agent-8", "AgentEight", "Desc", agenticUserId: "auid8", agenticUserEmail: "upn8@example.com", agentBlueprintId: "bp-8");
             var conversationId = "conv-all";
             var input = new[]{"Hello"};

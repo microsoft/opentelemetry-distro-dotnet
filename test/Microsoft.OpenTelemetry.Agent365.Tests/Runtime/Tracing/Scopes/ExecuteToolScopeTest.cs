@@ -116,6 +116,21 @@ public sealed class ExecuteToolScopeTest : ActivityTest
     }
 
     [TestMethod]
+    public void Start_SetsOperationSource_WhenProvidedOnRequest()
+    {
+        var operationSource = OperationSource.SDK.ToString();
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                new Request(operationSource: operationSource),
+                new ToolCallDetails("TestTool", "args"),
+                Util.GetAgentDetails());
+        });
+
+        activity.ShouldHaveTag(OpenTelemetryConstants.ServiceNameKey, operationSource);
+    }
+
+    [TestMethod]
     public void Start_SetsChannel_Tags()
     {
         var metadata = new Channel(name: "ChannelY", link: "https://channel/link/y");

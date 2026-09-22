@@ -21,15 +21,13 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// <param name="inputTokens">Optional count of tokens provided as input.</param>
         /// <param name="outputTokens">Optional count of tokens produced by the model.</param>
         /// <param name="finishReasons">Optional set of finish reasons supplied by the model.</param>
-        /// <param name="responseId">Optional identifier for the model response.</param>
         public InferenceCallDetails(
             InferenceOperationType operationName,
             string model,
             string providerName,
             int? inputTokens = null,
             int? outputTokens = null,
-            string[]? finishReasons = null,
-            string? responseId = null)
+            string[]? finishReasons = null)
         {
             OperationName = operationName;
             Model = model;
@@ -37,7 +35,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
             InputTokens = inputTokens;
             OutputTokens = outputTokens;
             FinishReasons = finishReasons;
-            ResponseId = responseId;
         }
 
         /// <summary>
@@ -71,11 +68,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         public string[]? FinishReasons { get; }
 
         /// <summary>
-        /// Gets the identifier associated with the model's response payload.
-        /// </summary>
-        public string? ResponseId { get; }
-
-        /// <summary>
         /// Deconstructs this instance into individual components.
         /// </summary>
         /// <param name="operationName">Receives the operation name.</param>
@@ -84,15 +76,13 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// <param name="inputTokens">Receives the input token count.</param>
         /// <param name="outputTokens">Receives the output token count.</param>
         /// <param name="finishReasons">Receives the finish reasons.</param>
-        /// <param name="responseId">Receives the response identifier.</param>
         public void Deconstruct(
             out InferenceOperationType operationName,
             out string model,
             out string providerName,
             out int? inputTokens,
             out int? outputTokens,
-            out string[]? finishReasons,
-            out string? responseId)
+            out string[]? finishReasons)
         {
             operationName = OperationName;
             model = Model;
@@ -100,7 +90,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
             inputTokens = InputTokens;
             outputTokens = OutputTokens;
             finishReasons = FinishReasons;
-            responseId = ResponseId;
         }
 
         /// <inheritdoc/>
@@ -116,8 +105,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
                    string.Equals(ProviderName, other.ProviderName, StringComparison.Ordinal) &&
                    InputTokens == other.InputTokens &&
                    OutputTokens == other.OutputTokens &&
-                   Equals(FinishReasons, other.FinishReasons) &&
-                   string.Equals(ResponseId, other.ResponseId, StringComparison.Ordinal);
+                   Equals(FinishReasons, other.FinishReasons);
         }
 
         /// <inheritdoc/>
@@ -138,7 +126,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
                 hash = (hash * 31) + (InputTokens?.GetHashCode() ?? 0);
                 hash = (hash * 31) + (OutputTokens?.GetHashCode() ?? 0);
                 hash = (hash * 31) + EqualityComparer<string[]?>.Default.GetHashCode(FinishReasons);
-                hash = (hash * 31) + (ResponseId != null ? StringComparer.Ordinal.GetHashCode(ResponseId) : 0);
                 return hash;
             }
         }
