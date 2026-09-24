@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Report Live Metrics usage in Feature SDK Stats from the first outgoing active-collection request, without polling or adding network requests. Skip tracking when Live Metrics is disabled and stop inspecting requests after first use. Correlate the Agent Framework feature with instrumentation detected by the existing bounded activity processor.
 - **Breaking change:** Reduce default HTTP client metric volume while retaining request latency, count, and failure dimensions through `http.client.request.duration`. Other `System.Net.Http` metrics are now opt-in through OpenTelemetry `AddView`; dashboards and alerts using them must [explicitly enable collection](docs/customization.md#http-client-metrics). HTTP dependency tracing and server metrics are unchanged. No new public API is introduced.
 - Added standalone Agent365 Contracts and ETW packages. ETW-specific APIs and processors are owned by `Microsoft.Agents.A365.Observability.Etw`, while runtime code shared with `Microsoft.OpenTelemetry` is owned by Contracts. The Contracts implementation surface is public, and applications must rebuild when upgrading because moved Agent365 types are no longer forwarded from `Microsoft.OpenTelemetry`.
 

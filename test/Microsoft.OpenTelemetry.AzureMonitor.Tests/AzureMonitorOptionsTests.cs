@@ -2,6 +2,8 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Reflection;
+using Azure.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Azure.Monitor.OpenTelemetry.Exporter;
@@ -12,6 +14,51 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
     public class AzureMonitorOptionsTests
     {
         private const string TestConnectionString = "InstrumentationKey=00000000-0000-0000-0000-000000000000";
+
+        [Fact]
+        public void AzureMonitorOptions_PublicTransportRemainsInherited()
+        {
+            var transport = typeof(AzureMonitorOptions).GetProperty(
+                nameof(ClientOptions.Transport), BindingFlags.Instance | BindingFlags.Public);
+
+            Assert.NotNull(transport);
+            Assert.Equal(typeof(ClientOptions), transport.DeclaringType);
+            Assert.True(transport.GetMethod!.IsPublic);
+            Assert.True(transport.SetMethod!.IsPublic);
+        }
+
+        [Fact]
+        public void AzureMonitorOptions_ReadingTransport_DoesNotMarkItExplicit()
+        {
+            var options = new AzureMonitorOptions();
+
+            Assert.NotNull(options.Transport);
+            Assert.Null(options.ExplicitTransport);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void AzureMonitorOptions_InvalidTransportAssignment_DoesNotMarkItExplicit(bool useInternalSetter)
+        {
+            var options = new AzureMonitorOptions();
+            var inheritedTransport = options.Transport;
+
+            Assert.Throws<ArgumentNullException>(() =>
+            {
+                if (useInternalSetter)
+                {
+                    options.SetTransport(null!);
+                }
+                else
+                {
+                    options.Transport = null!;
+                }
+            });
+
+            Assert.Same(inheritedTransport, options.Transport);
+            Assert.Null(options.ExplicitTransport);
+        }
 
         [Fact]
         public void AzureMonitorOptions_EnableTraceBasedLogsSampler_DefaultValue_IsTrue()
