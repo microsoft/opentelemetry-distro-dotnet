@@ -38,19 +38,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
                 operationName: OpenTelemetryConstants.OutputMessagesOperationName,
                 activityName: $"{OpenTelemetryConstants.OutputMessagesOperationName} {agentDetails.AgentId}",
                 agentDetails: agentDetails,
+                request: request,
                 spanDetails: spanDetails ?? new SpanDetails(ActivityKind.Client),
                 userDetails: userDetails)
         {
-            SetTagMaybe(OpenTelemetryConstants.GenAiConversationIdKey, request?.ConversationId);
-            SetTagMaybe(OpenTelemetryConstants.SessionIdKey, request?.SessionId);
-            SetTagMaybe(OpenTelemetryConstants.ServiceNameKey, request?.OperationSource);
-
-            if (request?.Channel != null)
-            {
-                SetTagMaybe(OpenTelemetryConstants.ChannelNameKey, request.Channel.Name);
-                SetTagMaybe(OpenTelemetryConstants.ChannelLinkKey, request.Channel.Link);
-            }
-
             if (response?.ToolResultObject != null)
             {
                 SetTagMaybe(OpenTelemetryConstants.GenAiOutputMessagesKey, MessageUtils.Serialize(response.ToolResultObject));

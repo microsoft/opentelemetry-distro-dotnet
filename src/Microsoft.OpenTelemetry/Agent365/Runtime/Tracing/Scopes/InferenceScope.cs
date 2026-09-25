@@ -47,6 +47,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
                 operationName: details.OperationName.ToString(),
                 activityName: $"{details.OperationName} {details.Model}",
                 agentDetails: agentDetails,
+                request: request,
                 spanDetails: spanDetails ?? new SpanDetails(ActivityKind.Client),
                 userDetails: userDetails)
         {
@@ -56,9 +57,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             SetTagMaybe(GenAiUsageInputTokensKey, details.InputTokens);
             SetTagMaybe(GenAiUsageOutputTokensKey, details.OutputTokens);
             SetTagMaybe(GenAiResponseFinishReasonsKey, details.FinishReasons);
-            SetTagMaybe(GenAiConversationIdKey, request?.ConversationId);
-            SetTagMaybe(SessionIdKey, request?.SessionId);
-            SetTagMaybe(ServiceNameKey, request?.OperationSource);
 
             if (request?.InputContent != null)
             {
@@ -69,11 +67,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
                 RecordInputMessages(new[] { request.Content });
             }
 
-            if (request?.Channel != null)
-            {
-                SetTagMaybe(ChannelNameKey, request.Channel.Name);
-                SetTagMaybe(ChannelLinkKey, request.Channel.Link);
-            }
         }
 
         /// <summary>
