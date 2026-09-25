@@ -28,8 +28,11 @@ protected OpenTelemetryScope(
     UserDetails? userDetails = null)
 ```
 
-Update the unshipped public API baseline to replace the old constructor
-signature with this signature.
+The existing constructor is recorded in `PublicAPI.Shipped.txt`. This design
+intentionally removes that shipped signature without a compatibility overload.
+Record the old signature as removed and add the replacement signature in
+`PublicAPI.Unshipped.txt`. This is an explicitly approved source and binary
+breaking change for external `OpenTelemetryScope` subclasses.
 
 ## Centralized request attributes
 
@@ -79,6 +82,7 @@ Tests must verify:
   `BaggageBuilder`.
 - Baggage values still populate attributes when the request omits them.
 - Scope-specific request behavior remains unchanged.
-- The public API baseline contains only the new constructor signature.
+- The public API baseline records the shipped constructor removal and the new
+  constructor signature.
 
 Run the focused scope and processor tests, then build the affected projects.
