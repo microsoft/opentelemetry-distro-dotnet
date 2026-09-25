@@ -184,6 +184,21 @@ public sealed class MessageUtilsToolPayloadTests
     }
 
     [TestMethod]
+    public void SerializeToolPayload_WhenExtensionDataCollidesWithDeclaredProperty_ReplacesEntirePayload()
+    {
+        var payload = new ExecuteToolCallArguments
+        {
+            Action = null,
+            AdditionalProperties =
+            {
+                ["action"] = "write",
+            },
+        };
+
+        MessageUtils.SerializeToolPayload(payload).Should().Be(ExpectedSerializationError);
+    }
+
+    [TestMethod]
     public void SerializeToolPayload_WhenPayloadIsNull_ReturnsNull()
     {
         MessageUtils.SerializeToolPayload(null).Should().BeNull();
