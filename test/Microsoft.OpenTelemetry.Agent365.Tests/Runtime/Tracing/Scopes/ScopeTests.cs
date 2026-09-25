@@ -5,6 +5,7 @@ namespace Microsoft.Agents.A365.Observability.Tests.Tracing.Scopes;
 
 using System.Diagnostics;
 using FluentAssertions;
+using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
 using static Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants;
@@ -14,8 +15,15 @@ public sealed class ScopeTests : ActivityTest
 {
     private class TestScope : OpenTelemetryScope
     {
-        public TestScope(string operationName, string activityName, AgentDetails agentDetails, SpanDetails? spanDetails = null)
-            : base(operationName, activityName, agentDetails, spanDetails) { }
+        public TestScope(
+            string operationName,
+            string activityName,
+            AgentDetails agentDetails,
+            Request? request = null,
+            SpanDetails? spanDetails = null)
+            : base(operationName, activityName, agentDetails, request, spanDetails)
+        {
+        }
     }
 
     [TestMethod]
@@ -54,13 +62,90 @@ public sealed class ScopeTests : ActivityTest
         };
         ActivitySource.AddActivityListener(listener);
         
-        using var scope = new TestScope("TestOperation", "TestActivity", Util.GetAgentDetails(), new SpanDetails(ActivityKind.Internal));
+        using var scope = new TestScope(
+            "TestOperation",
+            "TestActivity",
+            Util.GetAgentDetails(),
+            spanDetails: new SpanDetails(ActivityKind.Internal));
         
         // Act
         var expectedId = scope.Id;
 
         // Assert
         expectedId.Should().NotBeNullOrEmpty();
+    }
+
+    [TestMethod]
+    public void Constructor_SetsSharedRequestTags()
+    {
+        var request = new Request(
+            sessionId: "session-123",
+            channel: new Channel("service", "https://example.invalid/channel"),
+            conversationId: "conversation-123",
+            operationSource: "request-source");
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = new TestScope(
+                InvokeAgentOperationName,
+                "test activity",
+                Util.GetAgentDetails(),
+                request);
+        });
+
+        activity.ShouldHaveTag(SessionIdKey, "session-123");
+        activity.ShouldHaveTag(GenAiConversationIdKey, "conversation-123");
+        activity.ShouldHaveTag(ServiceNameKey, "request-source");
+        activity.ShouldHaveTag(ChannelNameKey, "service");
+        activity.ShouldHaveTag(ChannelLinkKey, "https://example.invalid/channel");
+    }
+
+    [TestMethod]
+    public void Constructor_RequestValuesTakePrecedenceOverBaggage()
+    {
+        using var tracerProvider = ConstructTracerProvider();
+        using (new BaggageBuilder()
+            .OperationSource("baggage-source")
+            .SessionId("baggage-session")
+            .Build())
+        {
+            var activity = ListenForActivity(() =>
+            {
+                using var scope = new TestScope(
+                    InvokeAgentOperationName,
+                    "test activity",
+                    Util.GetAgentDetails(),
+                    new Request(
+                        sessionId: "request-session",
+                        operationSource: "request-source"));
+            });
+
+            activity.ShouldHaveTag(SessionIdKey, "request-session");
+            activity.ShouldHaveTag(ServiceNameKey, "request-source");
+        }
+    }
+
+    [TestMethod]
+    public void Constructor_BaggageFillsRequestValuesThatAreMissing()
+    {
+        using var tracerProvider = ConstructTracerProvider();
+        using (new BaggageBuilder()
+            .OperationSource("baggage-source")
+            .SessionId("baggage-session")
+            .Build())
+        {
+            var activity = ListenForActivity(() =>
+            {
+                using var scope = new TestScope(
+                    InvokeAgentOperationName,
+                    "test activity",
+                    Util.GetAgentDetails(),
+                    new Request());
+            });
+
+            activity.ShouldHaveTag(SessionIdKey, "baggage-session");
+            activity.ShouldHaveTag(ServiceNameKey, "baggage-source");
+        }
     }
 
     [TestMethod]

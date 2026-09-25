@@ -230,8 +230,10 @@ public sealed class ApplyGuardrailScopeTest : ActivityTest
 
         var request = new Request(
             content: "test input",
+            sessionId: "session-123",
             conversationId: "conv-123",
-            channel: new Channel(name: "msteams", link: "https://test.link"));
+            channel: new Channel(name: "msteams", link: "https://test.link"),
+            operationSource: "guardrail-source");
 
         var activity = ListenForActivity(() =>
         {
@@ -239,7 +241,9 @@ public sealed class ApplyGuardrailScopeTest : ActivityTest
         });
 
         activity.ShouldHaveTag(OpenTelemetryConstants.GenAiSecurityContentInputValueKey, "test input");
+        activity.ShouldHaveTag(OpenTelemetryConstants.SessionIdKey, "session-123");
         activity.ShouldHaveTag(OpenTelemetryConstants.GenAiConversationIdKey, "conv-123");
+        activity.ShouldHaveTag(OpenTelemetryConstants.ServiceNameKey, "guardrail-source");
         activity.ShouldHaveTag(OpenTelemetryConstants.ChannelNameKey, "msteams");
         activity.ShouldHaveTag(OpenTelemetryConstants.ChannelLinkKey, "https://test.link");
     }
