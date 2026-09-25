@@ -1,4 +1,6 @@
 #nullable enable
+*REMOVED*Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryScope.OpenTelemetryScope(string! operationName, string! activityName, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SpanDetails? spanDetails = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.UserDetails? userDetails = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryScope.OpenTelemetryScope(string! operationName, string! activityName, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails! agentDetails, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Request? request, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SpanDetails? spanDetails = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.UserDetails? userDetails = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.DisableOfflineStorage.get -> bool
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.DisableOfflineStorage.set -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365ExporterOptions.StorageDirectory.get -> string?

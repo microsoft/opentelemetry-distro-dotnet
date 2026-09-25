@@ -17,8 +17,15 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Common;
 
 public sealed class TestScope : OpenTelemetryScope
 {
-    public TestScope(string operationName, string activityName, AgentDetails agentDetails, SpanDetails? spanDetails = null)
-        : base(operationName, activityName, agentDetails, spanDetails) { }
+    public TestScope(
+        string operationName,
+        string activityName,
+        AgentDetails agentDetails,
+        Request? request = null,
+        SpanDetails? spanDetails = null)
+        : base(operationName, activityName, agentDetails, request, spanDetails)
+    {
+    }
 }
 
 [TestClass]

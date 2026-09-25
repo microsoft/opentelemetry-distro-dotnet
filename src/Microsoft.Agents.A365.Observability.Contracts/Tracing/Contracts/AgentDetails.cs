@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 using System;
-using System.Net;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
 {
@@ -21,8 +20,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// <param name="agenticUserEmail">Optional email address for the agentic user.</param>
         /// <param name="agentBlueprintId">Optional Blueprint/Application ID for the agent.</param>
         /// <param name="tenantId">Optional Tenant ID for the agent.</param>
-        /// <param name="agentType">Optional agent type.</param>
-        /// <param name="agentClientIP">Optional client IP address of the agent.</param>
         /// <param name="agentPlatformId">Optional platform ID for the agent.</param>
         /// <param name="providerName">Optional provider name (e.g., openai, anthropic).</param>
         /// <param name="agentVersion">Optional version of the agent (e.g., "1.0.0", "2025-05-01").</param>
@@ -53,8 +50,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
             string? agenticUserEmail = null,
             string? agentBlueprintId = null,
             string? tenantId = null,
-            AgentType? agentType = null,
-            IPAddress? agentClientIP = null,
             string? agentPlatformId = null,
             string? providerName = null,
             string? agentVersion = null)
@@ -66,8 +61,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
             AgenticUserEmail = agenticUserEmail;
             AgentBlueprintId = agentBlueprintId;
             TenantId = tenantId;
-            AgentType = agentType;
-            AgentClientIP = agentClientIP;
             AgentPlatformId = agentPlatformId;
             ProviderName = providerName;
             AgentVersion = agentVersion;
@@ -104,16 +97,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         public string? AgentDescription { get; }
 
         /// <summary>
-        /// The agent type. 
-        /// </summary>
-        public AgentType? AgentType { get; }
-
-        /// <summary>
-        /// Gets the client IP address of the agent.
-        /// </summary>
-        public IPAddress? AgentClientIP { get; }
-
-        /// <summary>
         /// The optional platform ID for the agent.
         /// </summary>
         public string? AgentPlatformId { get; }
@@ -142,9 +125,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// <param name="agenticUserId">Receives the agentic user ID.</param>
         /// <param name="agenticUserEmail">Receives the agentic user email.</param>
         /// <param name="agentBlueprintId">Receives the agent Blueprint/Application ID.</param>
-        /// <param name="agentType">Receives the agent type.</param>
         /// <param name="tenantId">Receives the tenant identifier.</param>
-        /// <param name="agentClientIP">Receives the client IP address.</param>
         /// <param name="agentPlatformId">Receives the platform ID.</param>
         /// <param name="agentVersion">Receives the agent version.</param>
         public void Deconstruct(
@@ -154,9 +135,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
             out string? agenticUserId,
             out string? agenticUserEmail,
             out string? agentBlueprintId,
-            out AgentType? agentType,
             out string? tenantId,
-            out IPAddress? agentClientIP,
             out string? agentPlatformId,
             out string? agentVersion)
         {
@@ -166,9 +145,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
             agenticUserId = AgenticUserId;
             agenticUserEmail = AgenticUserEmail;
             agentBlueprintId = AgentBlueprintId;
-            agentType = AgentType;
             tenantId = TenantId;
-            agentClientIP = AgentClientIP;
             agentPlatformId = AgentPlatformId;
             agentVersion = AgentVersion;
         }
@@ -187,9 +164,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
                    string.Equals(AgenticUserId, other.AgenticUserId, StringComparison.Ordinal) &&
                    string.Equals(AgenticUserEmail, other.AgenticUserEmail, StringComparison.Ordinal) &&
                    string.Equals(AgentBlueprintId, other.AgentBlueprintId, StringComparison.Ordinal) &&
-                   AgentType == other.AgentType &&
                    string.Equals(TenantId, other.TenantId, StringComparison.Ordinal) &&
-                   Equals(AgentClientIP, other.AgentClientIP) &&
                    string.Equals(AgentPlatformId, other.AgentPlatformId, StringComparison.Ordinal) &&
                    string.Equals(AgentVersion, other.AgentVersion, StringComparison.Ordinal);
         }
@@ -212,9 +187,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
                 hash = (hash * 31) + (AgenticUserId != null ? StringComparer.Ordinal.GetHashCode(AgenticUserId) : 0);
                 hash = (hash * 31) + (AgenticUserEmail != null ? StringComparer.Ordinal.GetHashCode(AgenticUserEmail) : 0);
                 hash = (hash * 31) + (AgentBlueprintId != null ? StringComparer.Ordinal.GetHashCode(AgentBlueprintId) : 0);
-                hash = (hash * 31) + (AgentType?.GetHashCode() ?? 0);
                 hash = (hash * 31) + (TenantId != null ? StringComparer.Ordinal.GetHashCode(TenantId) : 0);
-                hash = (hash * 31) + (AgentClientIP?.GetHashCode() ?? 0);
                 hash = (hash * 31) + (AgentPlatformId != null ? StringComparer.Ordinal.GetHashCode(AgentPlatformId) : 0);
                 hash = (hash * 31) + (AgentVersion != null ? StringComparer.Ordinal.GetHashCode(AgentVersion) : 0);
                 return hash;

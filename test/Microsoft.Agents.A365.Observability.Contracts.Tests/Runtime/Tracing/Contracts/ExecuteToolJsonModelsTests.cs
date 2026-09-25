@@ -133,6 +133,80 @@ public sealed class ExecuteToolJsonModelsTests
     }
 
     [TestMethod]
+    public void DefaultJsonSerializer_RejectsExtensionActionWhenDeclaredPropertyIsNull()
+    {
+        var arguments = new ExecuteToolCallArguments
+        {
+            Action = null,
+            AdditionalProperties =
+            {
+                ["action"] = "write",
+            },
+        };
+
+        var act = () => JsonSerializer.Serialize(arguments);
+
+        act.Should().Throw<JsonException>();
+    }
+
+    [TestMethod]
+    public void DefaultJsonSerializer_RejectsExtensionOutcomeStatusWhenDeclaredPropertyIsNull()
+    {
+        var outcome = new ToolCallResultOutcome
+        {
+            Status = null,
+            AdditionalProperties =
+            {
+                ["status"] = "unknown",
+            },
+        };
+
+        var act = () => JsonSerializer.Serialize(outcome);
+
+        act.Should().Throw<JsonException>();
+    }
+
+    [TestMethod]
+    public void DefaultJsonSerializer_RejectsExtensionPolicyDecisionWhenDeclaredPropertyIsNull()
+    {
+        var policy = new ToolCallResultPolicy
+        {
+            Decision = null,
+            AdditionalProperties =
+            {
+                ["decision"] = "audit",
+            },
+        };
+
+        var act = () => JsonSerializer.Serialize(policy);
+
+        act.Should().Throw<JsonException>();
+    }
+
+    [TestMethod]
+    public void DefaultJsonSerializer_RejectsDeclaredFieldNamesFromEveryExtensionDataModel()
+    {
+        var models = new object[]
+        {
+            new ExecuteToolCallResult { AdditionalProperties = { ["outcome"] = "invalid" } },
+            new ToolCallResource { AdditionalProperties = { ["provider"] = "invalid" } },
+            new ToolCallIdentifier { AdditionalProperties = { ["value"] = "invalid" } },
+            new ToolCallContainer { AdditionalProperties = { ["uri"] = "invalid" } },
+            new ToolCallResultResource { AdditionalProperties = { ["sensitivity"] = "invalid" } },
+            new ToolCallResultSensitivity { AdditionalProperties = { ["label_id"] = "invalid" } },
+            new ToolCallResultSecurity { AdditionalProperties = { ["xpia_detected"] = "invalid" } },
+            new ToolCallResultPagination { AdditionalProperties = { ["next_cursor"] = "invalid" } },
+        };
+
+        foreach (var model in models)
+        {
+            var act = () => JsonSerializer.Serialize(model, model.GetType());
+
+            act.Should().Throw<JsonException>();
+        }
+    }
+
+    [TestMethod]
     public void DefaultJsonSerializer_RejectsNumericAction()
     {
         var act = () => JsonSerializer.Deserialize<ExecuteToolCallArguments>(

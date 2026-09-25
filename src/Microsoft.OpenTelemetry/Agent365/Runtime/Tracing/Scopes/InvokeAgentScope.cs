@@ -68,11 +68,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
                     ? OpenTelemetryConstants.InvokeAgentOperationName
                     : $"invoke_agent {agentDetails!.AgentName}",
                 agentDetails: agentDetails!,
+                request: request,
                 spanDetails: new SpanDetails(spanDetails?.SpanKind ?? ActivityKind.Internal, spanDetails?.ParentContext, spanDetails?.StartTime, spanDetails?.EndTime, spanDetails?.SpanLinks),
                 userDetails: callerDetails?.UserDetails)
         {
-            SetTagMaybe(OpenTelemetryConstants.SessionIdKey, request?.SessionId);
-            SetTagMaybe(OpenTelemetryConstants.GenAiConversationIdKey, request?.ConversationId);
             SetTagMaybe(OpenTelemetryConstants.ThreatDiagnosticsSummaryKey, threatDiagnosticsSummary?.ToJson());
 
             var endpoint = scopeDetails?.Endpoint;
@@ -87,13 +86,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
 
             SetRequestParameters(scopeDetails?.RequestParameters);
             SetResponseParameters(scopeDetails?.ResponseParameters);
-
-            // Set request metadata
-            if (request?.Channel != null)
-            {
-                SetTagMaybe(OpenTelemetryConstants.ChannelNameKey, request.Channel.Name);
-                SetTagMaybe(OpenTelemetryConstants.ChannelLinkKey, request.Channel.Link);
-            }
 
             if (request?.InputContent != null)
             {

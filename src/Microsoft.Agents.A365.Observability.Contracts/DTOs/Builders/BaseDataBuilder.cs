@@ -135,6 +135,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
         {
             if (request == null) return;
 
+            AddIfNotNull(attributes, OpenTelemetryConstants.SessionIdKey, request.SessionId);
+            AddIfNotNull(attributes, OpenTelemetryConstants.ServiceNameKey, request.OperationSource);
             AddChannelAttributes(attributes, request.Channel);
         }
 

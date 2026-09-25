@@ -397,6 +397,42 @@ public sealed class InvokeAgentScopeTest : ActivityTest
     }
 
     [TestMethod]
+    public void OperationSource_IsSetOnInvokeAgentSpan_WhenProvidedOnRequest()
+    {
+        var operationSource = OperationSource.SDK.ToString();
+        var request = new Request(operationSource: operationSource);
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = InvokeAgentScope.Start(request, ScopeDetails, TestAgentDetails);
+        });
+
+        activity.ShouldHaveTag(ServiceNameKey, operationSource);
+    }
+
+    [TestMethod]
+    public void OperationSource_OnRequestOverridesBaggage()
+    {
+        const string baggageOperationSource = "baggage-source";
+        const string requestOperationSource = "request-source";
+
+        using (new Runtime.Common.BaggageBuilder()
+            .OperationSource(baggageOperationSource)
+            .Build())
+        {
+            var activity = ListenForActivity(() =>
+            {
+                using var scope = InvokeAgentScope.Start(
+                    new Request(operationSource: requestOperationSource),
+                    ScopeDetails,
+                    TestAgentDetails);
+            });
+
+            activity.ShouldHaveTag(ServiceNameKey, requestOperationSource);
+        }
+    }
+
+    [TestMethod]
     public void RequestParameters_AreSetOnSpan_WhenProvided()
     {
         // Arrange
