@@ -184,18 +184,22 @@ public sealed class MessageUtilsToolPayloadTests
     }
 
     [TestMethod]
-    public void SerializeToolPayload_WhenExtensionDataCollidesWithDeclaredProperty_ReplacesEntirePayload()
+    public void SerializeToolPayload_WhenMetadataKeyMatchesDeclaredProperty_KeepsBothValues()
     {
         var payload = new ExecuteToolCallArguments
         {
-            Action = null,
+            Action = ToolCallAction.Read,
             AdditionalProperties =
             {
-                ["action"] = "write",
+                ["action"] = "provider-specific-action",
             },
         };
 
-        MessageUtils.SerializeToolPayload(payload).Should().Be(ExpectedSerializationError);
+        using var document = JsonDocument.Parse(MessageUtils.SerializeToolPayload(payload)!);
+
+        document.RootElement.GetProperty("action").GetString().Should().Be("read");
+        document.RootElement.GetProperty("metadata").GetProperty("action").GetString()
+            .Should().Be("provider-specific-action");
     }
 
     [TestMethod]

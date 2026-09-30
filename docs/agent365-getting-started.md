@@ -632,6 +632,37 @@ using var scope = ExecuteToolScope.Start(
 scope.RecordResponse("{\"status\": \"returned_to_caller\", \"target\": \"weather-agent\"}");
 ```
 
+Typed execute-tool arguments and results support provider-specific metadata
+through `AdditionalProperties`. The SDK serializes those entries under a nested
+`metadata` object and omits `metadata` when the dictionary is empty:
+
+```csharp
+var arguments = new ExecuteToolCallArguments
+{
+    Action = ToolCallAction.Read,
+    AdditionalProperties =
+    {
+        ["provider_option"] = true,
+        ["action"] = "provider-specific-action",
+    },
+};
+```
+
+```json
+{
+  "schema_version": "1.0",
+  "action": "read",
+  "metadata": {
+    "provider_option": true,
+    "action": "provider-specific-action"
+  }
+}
+```
+
+Metadata keys remain isolated from declared schema fields, including on nested
+resources, identifiers, containers, outcomes, sensitivity, policy, security,
+and pagination models.
+
 `agentDetails` identifies the source agent executing the tool. `TransferDetails`
 describes the explicit transfer exposed by this tool call. The ergonomic
 constructor (`new TransferDetails(mode, targetAgentDetails)`) defaults

@@ -326,7 +326,9 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
                 attributes.GetProperty(OpenTelemetryConstants.GenAiToolCallResultKey).GetString()!);
 
             resultJson.RootElement.GetProperty("schema_version").GetString().Should().Be("1.0");
-            resultJson.RootElement.GetProperty("provider_summary").GetString().Should().Be("ok");
+            resultJson.RootElement.GetProperty("metadata")
+                .GetProperty("provider_summary").GetString().Should().Be("ok");
+            resultJson.RootElement.TryGetProperty("provider_summary", out _).Should().BeFalse();
             resultJson.RootElement.GetProperty("outcome")
                 .GetProperty("status").GetString().Should().Be("success");
         }

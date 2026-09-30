@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing;
@@ -29,10 +30,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools
     /// <summary>
     /// Represents the structured arguments for an execute tool call.
     /// </summary>
+    [JsonConverter(typeof(ExecuteToolJsonConverterFactory))]
     public sealed class ExecuteToolCallArguments
     {
         private IDictionary<string, object?> additionalProperties =
-            ToolCallExtensionDataDictionary<ExecuteToolCallArguments>.Create();
+            new Dictionary<string, object?>();
 
         /// <summary>Gets or sets the schema version.</summary>
         [JsonPropertyName("schema_version")]
@@ -50,23 +52,23 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools
         [JsonPropertyName("parameters")]
         public IDictionary<string, object?>? Parameters { get; set; }
 
-        /// <summary>Gets or sets provider-specific properties not defined by the schema.</summary>
-        [JsonExtensionData]
+        /// <summary>Gets or sets provider-specific metadata not defined by the schema.</summary>
+        [JsonIgnore]
         public IDictionary<string, object?> AdditionalProperties
         {
             get => this.additionalProperties;
-            set => this.additionalProperties =
-                ToolCallExtensionDataDictionary<ExecuteToolCallArguments>.Wrap(value);
+            set => this.additionalProperties = value ?? throw new ArgumentNullException(nameof(value));
         }
     }
 
     /// <summary>
     /// Represents a resource referenced by an execute tool call.
     /// </summary>
+    [JsonConverter(typeof(ExecuteToolJsonConverterFactory))]
     public sealed class ToolCallResource
     {
         private IDictionary<string, object?> additionalProperties =
-            ToolCallExtensionDataDictionary<ToolCallResource>.Create();
+            new Dictionary<string, object?>();
 
         /// <summary>Gets or sets the resource identifier.</summary>
         [JsonPropertyName("id")]
@@ -96,23 +98,23 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools
         [JsonPropertyName("container")]
         public ToolCallContainer? Container { get; set; }
 
-        /// <summary>Gets or sets provider-specific properties not defined by the schema.</summary>
-        [JsonExtensionData]
+        /// <summary>Gets or sets provider-specific metadata not defined by the schema.</summary>
+        [JsonIgnore]
         public IDictionary<string, object?> AdditionalProperties
         {
             get => this.additionalProperties;
-            set => this.additionalProperties =
-                ToolCallExtensionDataDictionary<ToolCallResource>.Wrap(value);
+            set => this.additionalProperties = value ?? throw new ArgumentNullException(nameof(value));
         }
     }
 
     /// <summary>
     /// Represents a resource identifier.
     /// </summary>
+    [JsonConverter(typeof(ExecuteToolJsonConverterFactory))]
     public sealed class ToolCallIdentifier
     {
         private IDictionary<string, object?> additionalProperties =
-            ToolCallExtensionDataDictionary<ToolCallIdentifier>.Create();
+            new Dictionary<string, object?>();
 
         /// <summary>Gets or sets the identifier type.</summary>
         [JsonPropertyName("type")]
@@ -122,23 +124,23 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools
         [JsonPropertyName("value")]
         public string? Value { get; set; }
 
-        /// <summary>Gets or sets provider-specific properties not defined by the schema.</summary>
-        [JsonExtensionData]
+        /// <summary>Gets or sets provider-specific metadata not defined by the schema.</summary>
+        [JsonIgnore]
         public IDictionary<string, object?> AdditionalProperties
         {
             get => this.additionalProperties;
-            set => this.additionalProperties =
-                ToolCallExtensionDataDictionary<ToolCallIdentifier>.Wrap(value);
+            set => this.additionalProperties = value ?? throw new ArgumentNullException(nameof(value));
         }
     }
 
     /// <summary>
     /// Represents the resource container for a tool call.
     /// </summary>
+    [JsonConverter(typeof(ExecuteToolJsonConverterFactory))]
     public sealed class ToolCallContainer
     {
         private IDictionary<string, object?> additionalProperties =
-            ToolCallExtensionDataDictionary<ToolCallContainer>.Create();
+            new Dictionary<string, object?>();
 
         /// <summary>Gets or sets the container identifier.</summary>
         [JsonPropertyName("id")]
@@ -152,13 +154,12 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools
         [JsonPropertyName("type")]
         public string? Type { get; set; }
 
-        /// <summary>Gets or sets provider-specific properties not defined by the schema.</summary>
-        [JsonExtensionData]
+        /// <summary>Gets or sets provider-specific metadata not defined by the schema.</summary>
+        [JsonIgnore]
         public IDictionary<string, object?> AdditionalProperties
         {
             get => this.additionalProperties;
-            set => this.additionalProperties =
-                ToolCallExtensionDataDictionary<ToolCallContainer>.Wrap(value);
+            set => this.additionalProperties = value ?? throw new ArgumentNullException(nameof(value));
         }
     }
 }
