@@ -633,8 +633,8 @@ scope.RecordResponse("{\"status\": \"returned_to_caller\", \"target\": \"weather
 ```
 
 Typed execute-tool arguments and results support provider-specific metadata
-through `AdditionalProperties`. The SDK serializes those entries under a nested
-`metadata` object and omits `metadata` when the dictionary is empty:
+through `AdditionalProperties`. The SDK serializes the dictionary under a nested
+`metadata` object:
 
 ```csharp
 var arguments = new ExecuteToolCallArguments

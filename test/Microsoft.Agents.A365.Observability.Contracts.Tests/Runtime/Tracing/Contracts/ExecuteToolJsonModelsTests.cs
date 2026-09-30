@@ -214,13 +214,13 @@ public sealed class ExecuteToolJsonModelsTests
     }
 
     [TestMethod]
-    public void EmptyAdditionalPropertiesOmitMetadata()
+    public void EmptyAdditionalPropertiesEmitEmptyMetadata()
     {
         using var argumentsDocument = JsonDocument.Parse(JsonSerializer.Serialize(new ExecuteToolCallArguments()));
         using var resultDocument = JsonDocument.Parse(JsonSerializer.Serialize(new ExecuteToolCallResult()));
 
-        argumentsDocument.RootElement.TryGetProperty("metadata", out _).Should().BeFalse();
-        resultDocument.RootElement.TryGetProperty("metadata", out _).Should().BeFalse();
+        argumentsDocument.RootElement.GetProperty("metadata").GetRawText().Should().Be("{}");
+        resultDocument.RootElement.GetProperty("metadata").GetRawText().Should().Be("{}");
     }
 
     [TestMethod]
@@ -235,7 +235,8 @@ public sealed class ExecuteToolJsonModelsTests
         using var directDocument = JsonDocument.Parse(JsonSerializer.Serialize(arguments));
         using var sdkDocument = JsonDocument.Parse(MessageUtils.SerializeToolPayload(arguments)!);
 
-        JsonElement.DeepEquals(directDocument.RootElement, sdkDocument.RootElement).Should().BeTrue();
+        JsonElement.DeepEquals(directDocument.RootElement, sdkDocument.RootElement).Should().BeTrue(
+            $"direct JSON was {directDocument.RootElement} and SDK JSON was {sdkDocument.RootElement}");
     }
 
     [TestMethod]
