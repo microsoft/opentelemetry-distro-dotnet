@@ -4,7 +4,13 @@
 # ─── Default (repo-level) ──────────────────────────────────────────────
 *                                                    @harsimar @rajkumar-rangaraj @xiang17 @rads-1996
 
+# ─── Repository configuration and skills ──────────────────────────────
+.github/                                             @harsimar @rajkumar-rangaraj @xiang17 @rads-1996 @alexlu4250
+skills/                                              @harsimar @rajkumar-rangaraj @xiang17 @rads-1996 @alexlu4250
+
 # ─── Agent365 (src only) ───────────────────────────────────────────────
+src/Microsoft.Agents.A365.Observability.Contracts/   @harsimar @rajkumar-rangaraj @xiang17 @rads-1996 @alexlu4250
+src/Microsoft.Agents.A365.Observability.Etw/         @harsimar @rajkumar-rangaraj @xiang17 @rads-1996 @alexlu4250
 src/Microsoft.OpenTelemetry/Agent365/                @harsimar @rajkumar-rangaraj @xiang17 @rads-1996 @nikhilNava @juliomenendez @alexlu4250
 
 # ─── Agent Framework (src only) ────────────────────────────────────────
