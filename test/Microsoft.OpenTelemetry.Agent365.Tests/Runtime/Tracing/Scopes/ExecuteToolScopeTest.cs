@@ -455,6 +455,7 @@ public sealed class ExecuteToolScopeTest : ActivityTest
             Action = ToolCallAction.Read,
             Parameters = new Dictionary<string, object?> { ["location"] = "Seattle" },
             Resources = new List<ToolCallResource>(),
+            AdditionalProperties = { ["provider_option"] = true },
         };
 
         var activity = ListenForActivity(() =>
@@ -470,6 +471,8 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         using var document = JsonDocument.Parse(json!);
         document.RootElement.GetProperty("action").GetString().Should().Be("read");
         document.RootElement.GetProperty("schema_version").GetString().Should().Be("1.0");
+        document.RootElement.GetProperty("metadata")
+            .GetProperty("provider_option").GetBoolean().Should().BeTrue();
     }
 
     [TestMethod]
@@ -526,6 +529,7 @@ public sealed class ExecuteToolScopeTest : ActivityTest
                 HasMore = false,
                 TotalCount = 0,
             },
+            AdditionalProperties = { ["provider_summary"] = "ok" },
         };
 
         var activity = ListenForActivity(() =>
@@ -543,6 +547,8 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         document.RootElement.GetProperty("schema_version").GetString().Should().Be("1.0");
         document.RootElement.GetProperty("outcome")
             .GetProperty("status").GetString().Should().Be("success");
+        document.RootElement.GetProperty("metadata")
+            .GetProperty("provider_summary").GetString().Should().Be("ok");
     }
 
     [TestMethod]
