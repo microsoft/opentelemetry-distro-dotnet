@@ -42,7 +42,7 @@ public sealed class ExecuteToolScopeTest : ActivityTest
     [TestMethod]
     public void Start_WithEndpoint_SetsFullUrlAndServerAttributes()
     {
-        var endpoint = new Uri("https://example.com:7071/tools/search?mode=fast");
+        var endpoint = new Uri("https://user:password@example.com:7071/tools/search?mode=fast&sig=secret&access_token=token");
 
         var activity = ListenForActivity(() =>
         {
@@ -54,7 +54,9 @@ public sealed class ExecuteToolScopeTest : ActivityTest
 
         activity.ShouldHaveTag(OpenTelemetryConstants.ServerAddressKey, "example.com");
         activity.ShouldHaveTag(OpenTelemetryConstants.ServerPortKey, "7071");
-        activity.ShouldHaveTag(OpenTelemetryConstants.UrlFullKey, endpoint.AbsoluteUri);
+        activity.ShouldHaveTag(
+            OpenTelemetryConstants.UrlFullKey,
+            "https://example.com:7071/tools/search?mode=fast&sig=REDACTED&access_token=REDACTED");
     }
 
     [TestMethod]
@@ -650,7 +652,10 @@ public sealed class ExecuteToolScopeTest : ActivityTest
                 TotalCount = 1,
             },
         };
-        var details = new ToolCallDetails("sharepoint_get_document", arguments);
+        var details = new ToolCallDetails(
+            "sharepoint_get_document",
+            arguments,
+            endpoint: new Uri("https://user:password@example.com/tools?sig=secret"));
 
         var activity = ListenForActivity(() =>
         {
@@ -679,6 +684,10 @@ public sealed class ExecuteToolScopeTest : ActivityTest
             JsonNode.Parse(scopeResultJson!),
             JsonNode.Parse(etwAttributes.GetProperty(OpenTelemetryConstants.GenAiToolCallResultKey).GetString()!))
             .Should().BeTrue();
+        activity.Tags.Single(pair => pair.Key == OpenTelemetryConstants.UrlFullKey).Value
+            .Should().Be("https://example.com/tools?sig=REDACTED");
+        etwAttributes.GetProperty(OpenTelemetryConstants.UrlFullKey).GetString()
+            .Should().Be("https://example.com/tools?sig=REDACTED");
     }
 
     [TestMethod]

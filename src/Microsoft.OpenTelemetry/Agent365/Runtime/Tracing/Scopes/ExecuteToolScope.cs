@@ -108,7 +108,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             if (endpoint != null)
             {
                 SetTagMaybe(OpenTelemetryConstants.ServerAddressKey, endpoint.Host);
-                SetTagMaybe(OpenTelemetryConstants.UrlFullKey, endpoint.AbsoluteUri);
+                SetTagMaybe(OpenTelemetryConstants.UrlFullKey, UrlSanitizer.Sanitize(endpoint));
                 if (endpoint.Port != 443)
                 {
                     SetTagMaybe(OpenTelemetryConstants.ServerPortKey, endpoint.Port.ToString());

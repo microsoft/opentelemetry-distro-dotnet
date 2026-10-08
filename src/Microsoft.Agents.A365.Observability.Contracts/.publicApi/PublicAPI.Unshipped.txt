@@ -164,6 +164,7 @@ Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.TransferDetails.Tr
 Microsoft.Agents.A365.Observability.Runtime.Tracing.MessageUtils
 Microsoft.Agents.A365.Observability.Runtime.Tracing.MessageUtils.SnakeCaseJsonStringEnumConverter
 Microsoft.Agents.A365.Observability.Runtime.Tracing.MessageUtils.SnakeCaseJsonStringEnumConverter.SnakeCaseJsonStringEnumConverter() -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.UrlSanitizer
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.ActivityProcessor
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.ActivityProcessor.ActivityProcessor() -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.AutoInstrumentationConstants
@@ -350,6 +351,7 @@ static Microsoft.Agents.A365.Observability.Runtime.Tracing.MessageUtils.Normaliz
 static Microsoft.Agents.A365.Observability.Runtime.Tracing.MessageUtils.NormalizeOutputMessages(System.Collections.Generic.IEnumerable<string!>! messages) -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Messages.OutputMessages!
 static Microsoft.Agents.A365.Observability.Runtime.Tracing.MessageUtils.Serialize(object! value) -> string!
 static Microsoft.Agents.A365.Observability.Runtime.Tracing.MessageUtils.SerializeToolPayload(object? value) -> string?
+static Microsoft.Agents.A365.Observability.Runtime.Tracing.UrlSanitizer.Sanitize(System.Uri! url) -> string!
 static Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.TelemetrySdkVersionValue.get -> string!
 static readonly Microsoft.Agents.A365.Observability.Runtime.Tracing.MessageUtils.SerializerOptions -> System.Text.Json.JsonSerializerOptions!
 static readonly Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiOperationNames -> System.Collections.Generic.HashSet<string!>!
