@@ -40,6 +40,24 @@ public sealed class ExecuteToolScopeTest : ActivityTest
     }
 
     [TestMethod]
+    public void Start_WithEndpoint_SetsFullUrlAndServerAttributes()
+    {
+        var endpoint = new Uri("https://example.com:7071/tools/search?mode=fast");
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails("TestTool", "args", endpoint: endpoint),
+                Util.GetAgentDetails());
+        });
+
+        activity.ShouldHaveTag(OpenTelemetryConstants.ServerAddressKey, "example.com");
+        activity.ShouldHaveTag(OpenTelemetryConstants.ServerPortKey, "7071");
+        activity.ShouldHaveTag(OpenTelemetryConstants.UrlFullKey, endpoint.AbsoluteUri);
+    }
+
+    [TestMethod]
     public void RecordResponse_Response_Set()
     {
         const string expected = "Output: 42";
