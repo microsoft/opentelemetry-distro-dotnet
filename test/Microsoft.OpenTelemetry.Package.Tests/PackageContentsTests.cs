@@ -10,12 +10,13 @@ namespace Microsoft.OpenTelemetry.Package.Tests;
 [TestClass]
 public sealed class PackageContentsTests
 {
-    private const string EtwPackageId = "Microsoft.Agents.A365.Observability.Etw";
+    private const string EtwAssemblyName = "Microsoft.Agents.A365.Observability.Etw";
+    private const string EtwPackageId = "Microsoft.OpenTelemetry.A365.Etw";
     private const string DistroPackageId = "Microsoft.OpenTelemetry";
     private static readonly string[] EmbeddedAssemblyNames =
     [
         "Microsoft.OpenTelemetry",
-        "Microsoft.Agents.A365.Observability.Etw",
+        EtwAssemblyName,
     ];
 
     private const string ContractsAssemblyName =
@@ -85,8 +86,8 @@ public sealed class PackageContentsTests
         using var scope = new AssertionScope();
         entries.Should().Contain(
         [
-            $"lib/{targetFramework}/{EtwPackageId}.dll",
-            $"lib/{targetFramework}/{EtwPackageId}.xml",
+            $"lib/{targetFramework}/{EtwAssemblyName}.dll",
+            $"lib/{targetFramework}/{EtwAssemblyName}.xml",
         ]);
         entries.Should().NotContain(
         [
@@ -103,7 +104,7 @@ public sealed class PackageContentsTests
         using var archive = PackageArchive.Open(EtwPackageId, PackageValidation.Version, "snupkg");
 
         using var scope = new AssertionScope();
-        archive.GetEntry($"lib/{targetFramework}/{EtwPackageId}.pdb")
+        archive.GetEntry($"lib/{targetFramework}/{EtwAssemblyName}.pdb")
             .Should().NotBeNull();
         archive.GetEntry($"lib/{targetFramework}/{ContractsAssemblyName}.pdb")
             .Should().BeNull();
