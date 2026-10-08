@@ -208,7 +208,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             if (endpoint != null)
             {
                 AddIfNotNull(attributes, OpenTelemetryConstants.ServerAddressKey, endpoint.Host);
-                AddIfNotNull(attributes, OpenTelemetryConstants.UrlFullKey, UrlSanitizer.Sanitize(endpoint));
+                AddIfNotNull(attributes, OpenTelemetryConstants.UrlFullKey, endpoint.AbsoluteUri);
                 if (endpoint.Port != 443)
                 {
                     AddIfNotNull(attributes, OpenTelemetryConstants.ServerPortKey, endpoint.Port.ToString());

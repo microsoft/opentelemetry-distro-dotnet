@@ -54,9 +54,7 @@ public sealed class ExecuteToolScopeTest : ActivityTest
 
         activity.ShouldHaveTag(OpenTelemetryConstants.ServerAddressKey, "example.com");
         activity.ShouldHaveTag(OpenTelemetryConstants.ServerPortKey, "7071");
-        activity.ShouldHaveTag(
-            OpenTelemetryConstants.UrlFullKey,
-            "https://example.com:7071/tools/search?mode=fast&sig=REDACTED&access_token=REDACTED");
+        activity.ShouldHaveTag(OpenTelemetryConstants.UrlFullKey, endpoint.AbsoluteUri);
     }
 
     [TestMethod]
@@ -685,9 +683,9 @@ public sealed class ExecuteToolScopeTest : ActivityTest
             JsonNode.Parse(etwAttributes.GetProperty(OpenTelemetryConstants.GenAiToolCallResultKey).GetString()!))
             .Should().BeTrue();
         activity.Tags.Single(pair => pair.Key == OpenTelemetryConstants.UrlFullKey).Value
-            .Should().Be("https://example.com/tools?sig=REDACTED");
+            .Should().Be(details.Endpoint!.AbsoluteUri);
         etwAttributes.GetProperty(OpenTelemetryConstants.UrlFullKey).GetString()
-            .Should().Be("https://example.com/tools?sig=REDACTED");
+            .Should().Be(details.Endpoint.AbsoluteUri);
     }
 
     [TestMethod]
