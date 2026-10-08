@@ -11,7 +11,8 @@ namespace Microsoft.OpenTelemetry.Package.Tests;
 [TestClass]
 public sealed class ConsumerRestoreTests
 {
-    private const string ContractsPackageId = "Microsoft.Agents.A365.Observability.Contracts";
+    private const string ContractsAssemblyName = "Microsoft.Agents.A365.Observability.Contracts";
+    private const string ContractsPackageId = "Microsoft.OpenTelemetry.A365.Contracts";
     private const string DistroPackageId = "Microsoft.OpenTelemetry";
     private const string EtwPackageId = "Microsoft.Agents.A365.Observability.Etw";
     private const string NuGetOrgSource = "https://api.nuget.org/v3/index.json";
@@ -39,7 +40,7 @@ public sealed class ConsumerRestoreTests
         [
             $"{DistroPackageId}.dll",
             $"{EtwPackageId}.dll",
-            $"{ContractsPackageId}.dll",
+            $"{ContractsAssemblyName}.dll",
         ]);
     }
 
@@ -65,7 +66,7 @@ public sealed class ConsumerRestoreTests
         outputAssemblies.Should().Contain(
         [
             $"{EtwPackageId}.dll",
-            $"{ContractsPackageId}.dll",
+            $"{ContractsAssemblyName}.dll",
         ]);
         outputAssemblies.Should().NotContain($"{DistroPackageId}.dll");
     }
