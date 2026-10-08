@@ -14,7 +14,8 @@ public sealed class ConsumerRestoreTests
     private const string ContractsAssemblyName = "Microsoft.Agents.A365.Observability.Contracts";
     private const string ContractsPackageId = "Microsoft.OpenTelemetry.A365.Contracts";
     private const string DistroPackageId = "Microsoft.OpenTelemetry";
-    private const string EtwPackageId = "Microsoft.Agents.A365.Observability.Etw";
+    private const string EtwAssemblyName = "Microsoft.Agents.A365.Observability.Etw";
+    private const string EtwPackageId = "Microsoft.OpenTelemetry.A365.Etw";
     private const string NuGetOrgSource = "https://api.nuget.org/v3/index.json";
     [TestMethod]
     public async Task DistroConsumerRestoresContractsTransitively()
@@ -39,7 +40,7 @@ public sealed class ConsumerRestoreTests
         outputAssemblies.Should().Contain(
         [
             $"{DistroPackageId}.dll",
-            $"{EtwPackageId}.dll",
+            $"{EtwAssemblyName}.dll",
             $"{ContractsAssemblyName}.dll",
         ]);
     }
@@ -65,7 +66,7 @@ public sealed class ConsumerRestoreTests
         var outputAssemblies = GetOutputAssemblies(result.OutputDirectory);
         outputAssemblies.Should().Contain(
         [
-            $"{EtwPackageId}.dll",
+            $"{EtwAssemblyName}.dll",
             $"{ContractsAssemblyName}.dll",
         ]);
         outputAssemblies.Should().NotContain($"{DistroPackageId}.dll");
