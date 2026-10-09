@@ -40,6 +40,24 @@ public sealed class ExecuteToolScopeTest : ActivityTest
     }
 
     [TestMethod]
+    public void Start_WithEndpoint_SetsFullUrlAndServerAttributes()
+    {
+        var endpoint = new Uri("https://user:password@example.com:7071/tools/search?mode=fast&sig=secret&access_token=token");
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails("TestTool", "args", endpoint: endpoint),
+                Util.GetAgentDetails());
+        });
+
+        activity.ShouldHaveTag(OpenTelemetryConstants.ServerAddressKey, "example.com");
+        activity.ShouldHaveTag(OpenTelemetryConstants.ServerPortKey, "7071");
+        activity.ShouldHaveTag(OpenTelemetryConstants.UrlFullKey, endpoint.AbsoluteUri);
+    }
+
+    [TestMethod]
     public void RecordResponse_Response_Set()
     {
         const string expected = "Output: 42";
@@ -632,7 +650,10 @@ public sealed class ExecuteToolScopeTest : ActivityTest
                 TotalCount = 1,
             },
         };
-        var details = new ToolCallDetails("sharepoint_get_document", arguments);
+        var details = new ToolCallDetails(
+            "sharepoint_get_document",
+            arguments,
+            endpoint: new Uri("https://user:password@example.com/tools?sig=secret"));
 
         var activity = ListenForActivity(() =>
         {
@@ -661,6 +682,10 @@ public sealed class ExecuteToolScopeTest : ActivityTest
             JsonNode.Parse(scopeResultJson!),
             JsonNode.Parse(etwAttributes.GetProperty(OpenTelemetryConstants.GenAiToolCallResultKey).GetString()!))
             .Should().BeTrue();
+        activity.Tags.Single(pair => pair.Key == OpenTelemetryConstants.UrlFullKey).Value
+            .Should().Be(details.Endpoint!.AbsoluteUri);
+        etwAttributes.GetProperty(OpenTelemetryConstants.UrlFullKey).GetString()
+            .Should().Be(details.Endpoint.AbsoluteUri);
     }
 
     [TestMethod]

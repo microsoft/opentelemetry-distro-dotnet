@@ -129,6 +129,7 @@ const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryCo
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.TransferTargetAgentPlatformIdKey = "microsoft.a365.transfer.target.agent.platform.id" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.TransferTargetAgentVersionKey = "microsoft.a365.transfer.target.agent.version" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.TransferTargetTypeKey = "microsoft.a365.transfer.target.type" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.UrlFullKey = "url.full" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.UserEmailKey = "user.email" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.UserIdKey = "user.id" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.UserNameKey = "user.name" -> string!

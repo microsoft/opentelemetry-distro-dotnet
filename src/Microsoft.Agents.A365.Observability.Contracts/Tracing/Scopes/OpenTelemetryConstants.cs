@@ -16,6 +16,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
 
         public const string ServerAddressKey = "server.address";
         public const string ServerPortKey = "server.port";
+        public const string UrlFullKey = "url.full";
         public const string SessionIdKey = "microsoft.session.id";
         public const string SessionDescriptionKey = "microsoft.session.description";
         public const string TenantIdKey = "microsoft.tenant.id";

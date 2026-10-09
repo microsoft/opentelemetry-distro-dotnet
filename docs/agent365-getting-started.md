@@ -913,6 +913,7 @@ Received HTTP response headers after *ms - 200
     "microsoft.a365.transfer.target.agent.version": "Optional",
     "server.address": "Optional",
     "server.port": "Optional",
+    "url.full": "Optional",
     "microsoft.session.id": "Optional",
     "microsoft.session.description": "Optional",
     "microsoft.tenant.id": "Required"
