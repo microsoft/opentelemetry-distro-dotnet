@@ -5,7 +5,7 @@
     <RootNamespace>Microsoft.Agents.A365.Observability</RootNamespace>
     <AssemblyName>Microsoft.Agents.A365.Observability.Etw</AssemblyName>
     <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
-    <PackageId>Microsoft.Agents.A365.Observability.Etw</PackageId>
+    <PackageId>Microsoft.OpenTelemetry.A365.Etw</PackageId>
     <Version>$(MicrosoftOpenTelemetryPackageVersion)</Version>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>

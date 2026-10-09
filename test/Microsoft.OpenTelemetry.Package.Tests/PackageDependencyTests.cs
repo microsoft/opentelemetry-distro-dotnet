@@ -8,9 +8,9 @@ namespace Microsoft.OpenTelemetry.Package.Tests;
 [TestClass]
 public sealed class PackageDependencyTests
 {
-    private const string ContractsPackageId = "Microsoft.Agents.A365.Observability.Contracts";
+    private const string ContractsPackageId = "Microsoft.OpenTelemetry.A365.Contracts";
     private const string DistroPackageId = "Microsoft.OpenTelemetry";
-    private const string EtwPackageId = "Microsoft.Agents.A365.Observability.Etw";
+    private const string EtwPackageId = "Microsoft.OpenTelemetry.A365.Etw";
     [TestMethod]
     public void DistroNuspecDependsOnContractsButNotEtw()
     {
