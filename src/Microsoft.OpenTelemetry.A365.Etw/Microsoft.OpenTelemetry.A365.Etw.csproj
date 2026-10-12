@@ -1,11 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Description>Agent365 observability shared contracts, DTOs, builders, and runtime helpers.</Description>
-    <AssemblyTitle>Microsoft Agent365 Observability Contracts</AssemblyTitle>
+    <Description>Agent365 observability ETW event emission and payload formatting.</Description>
+    <AssemblyTitle>Microsoft Agent365 Observability ETW</AssemblyTitle>
     <RootNamespace>Microsoft.Agents.A365.Observability</RootNamespace>
-    <AssemblyName>Microsoft.Agents.A365.Observability.Contracts</AssemblyName>
+    <AssemblyName>Microsoft.OpenTelemetry.A365.Etw</AssemblyName>
     <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
-    <PackageId>Microsoft.OpenTelemetry.A365.Contracts</PackageId>
+    <PackageId>Microsoft.OpenTelemetry.A365.Etw</PackageId>
     <Version>$(MicrosoftOpenTelemetryPackageVersion)</Version>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -23,10 +23,17 @@
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Extensions.Logging" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all" />
-    <PackageReference Include="OpenTelemetry" />
+    <PackageReference Include="OpenTelemetry.Exporter.Console" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="System.Diagnostics.DiagnosticSource" />
     <PackageReference Include="System.Text.Json" />
     <AdditionalFiles Include=".publicApi\PublicAPI.Shipped.txt" />
     <AdditionalFiles Include=".publicApi\PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseA365ContractsPackageReference)' != 'true'">
+    <ProjectReference Include="..\Microsoft.OpenTelemetry.A365.Contracts\Microsoft.OpenTelemetry.A365.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseA365ContractsPackageReference)' == 'true'">
+    <PackageReference Include="Microsoft.OpenTelemetry.A365.Contracts" />
   </ItemGroup>
 </Project>

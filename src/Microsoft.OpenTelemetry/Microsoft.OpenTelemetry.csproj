@@ -61,9 +61,15 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(UseA365ContractsPackageReference)' != 'true'">
+    <ProjectReference Include="..\Microsoft.OpenTelemetry.A365.Contracts\Microsoft.OpenTelemetry.A365.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseA365ContractsPackageReference)' == 'true'">
+    <PackageReference Include="Microsoft.OpenTelemetry.A365.Contracts" />
+  </ItemGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\Microsoft.Agents.A365.Observability.Contracts\Microsoft.Agents.A365.Observability.Contracts.csproj" />
-    <ProjectReference Include="..\Microsoft.Agents.A365.Observability.Etw\Microsoft.Agents.A365.Observability.Etw.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\Microsoft.OpenTelemetry.A365.Etw\Microsoft.OpenTelemetry.A365.Etw.csproj" PrivateAssets="all" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -73,9 +79,9 @@
 
   <Target Name="IncludeStandaloneEtwSdkBuildOutputs">
     <ItemGroup>
-      <_StandaloneEtwSdkBuildOutput Include="$(TargetDir)Microsoft.Agents.A365.Observability.Etw.dll;
-                                                $(TargetDir)Microsoft.Agents.A365.Observability.Etw.xml;
-                                                $(TargetDir)Microsoft.Agents.A365.Observability.Etw.pdb" />
+      <_StandaloneEtwSdkBuildOutput Include="$(TargetDir)Microsoft.OpenTelemetry.A365.Etw.dll;
+                                                $(TargetDir)Microsoft.OpenTelemetry.A365.Etw.xml;
+                                                $(TargetDir)Microsoft.OpenTelemetry.A365.Etw.pdb" />
       <BuildOutputInPackage Include="@(_StandaloneEtwSdkBuildOutput)"
                             Condition="'%(_StandaloneEtwSdkBuildOutput.Extension)' == '.dll'
                               or '%(_StandaloneEtwSdkBuildOutput.Extension)' == '.xml'">

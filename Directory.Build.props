@@ -22,6 +22,14 @@
     <MicrosoftOpenTelemetryPackageVersion Condition="'$(MSBuildProjectName)' != 'Microsoft.OpenTelemetry.Package.Tests'">1.2.0</MicrosoftOpenTelemetryPackageVersion>
   </PropertyGroup>
 
+  <!-- Agent365 Contracts reference mode. Set UseA365ContractsPackageReference=true to consume
+       Microsoft.OpenTelemetry.A365.Contracts from NuGet (version A365ContractsPackageVersion)
+       instead of the in-repo project. -->
+  <PropertyGroup>
+    <UseA365ContractsPackageReference Condition="'$(UseA365ContractsPackageReference)' == ''">false</UseA365ContractsPackageReference>
+    <A365ContractsPackageVersion Condition="'$(A365ContractsPackageVersion)' == ''">$(MicrosoftOpenTelemetryPackageVersion)</A365ContractsPackageVersion>
+  </PropertyGroup>
+
   <!-- Source Link & deterministic builds -->
   <PropertyGroup>
     <Deterministic>true</Deterministic>

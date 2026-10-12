@@ -22,7 +22,7 @@ namespace Microsoft.OpenTelemetry.Agent365.Tests
         {
             DistroAssembly.GetName().Name.Should().Be("Microsoft.OpenTelemetry");
             typeof(EtwLoggingBuilder).Assembly.GetName().Name
-                .Should().Be("Microsoft.Agents.A365.Observability.Etw");
+                .Should().Be("Microsoft.OpenTelemetry.A365.Etw");
             DistroAssembly.GetForwardedTypes()
                 .Where(type => type.Namespace?.StartsWith(
                     "Microsoft.Agents.A365.Observability",

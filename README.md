@@ -355,6 +355,15 @@ dotnet build Microsoft.OpenTelemetry.slnx
 dotnet test Microsoft.OpenTelemetry.slnx
 ```
 
+By default, `Microsoft.OpenTelemetry` and `Microsoft.OpenTelemetry.A365.Etw` reference the in-repo
+`Microsoft.OpenTelemetry.A365.Contracts` project. To build them against a published Contracts package
+instead, set `UseA365ContractsPackageReference` (optionally with `A365ContractsPackageVersion`, which
+defaults to the repo package version):
+
+```bash
+dotnet build Microsoft.OpenTelemetry.slnx -p:UseA365ContractsPackageReference=true -p:A365ContractsPackageVersion=<version>
+```
+
 ## Microsoft Open Source Code of Conduct
 
 This project has adopted the

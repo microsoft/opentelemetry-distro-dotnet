@@ -10,7 +10,7 @@ namespace Microsoft.OpenTelemetry.Package.Tests;
 [TestClass]
 public sealed class PackageContentsTests
 {
-    private const string EtwAssemblyName = "Microsoft.Agents.A365.Observability.Etw";
+    private const string EtwAssemblyName = "Microsoft.OpenTelemetry.A365.Etw";
     private const string EtwPackageId = "Microsoft.OpenTelemetry.A365.Etw";
     private const string DistroPackageId = "Microsoft.OpenTelemetry";
     private static readonly string[] EmbeddedAssemblyNames =
@@ -20,7 +20,7 @@ public sealed class PackageContentsTests
     ];
 
     private const string ContractsAssemblyName =
-        "Microsoft.Agents.A365.Observability.Contracts";
+        "Microsoft.OpenTelemetry.A365.Contracts";
 
     [DataTestMethod]
     [DataRow("netstandard2.0")]

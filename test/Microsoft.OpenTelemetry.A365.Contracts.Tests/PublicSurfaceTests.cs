@@ -52,7 +52,7 @@ public class PublicSurfaceTests
     [TestMethod]
     public void SharedRuntimeTypes_AreOwnedByContractsAssembly()
     {
-        const string contractsAssemblyName = "Microsoft.Agents.A365.Observability.Contracts";
+        const string contractsAssemblyName = "Microsoft.OpenTelemetry.A365.Contracts";
         Type[] types =
         [
             typeof(ActivityExtensions),

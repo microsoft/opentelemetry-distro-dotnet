@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking change:** Rename the Agent365 Contracts and ETW assemblies to `Microsoft.OpenTelemetry.A365.Contracts` and `Microsoft.OpenTelemetry.A365.Etw` to match their package IDs. Namespaces are unchanged; applications must rebuild.
+- Add the `UseA365ContractsPackageReference` build property to build against a published `Microsoft.OpenTelemetry.A365.Contracts` package instead of the in-repo project.
+
 ## 1.2.0 - 2026-10-08
 
 - Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.10.0.

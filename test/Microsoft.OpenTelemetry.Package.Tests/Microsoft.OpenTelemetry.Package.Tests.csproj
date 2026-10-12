@@ -20,8 +20,8 @@
   </ItemGroup>
 
   <PropertyGroup>
-    <ContractsProjectPath>$(MSBuildProjectDirectory)\..\..\src\Microsoft.Agents.A365.Observability.Contracts\Microsoft.Agents.A365.Observability.Contracts.csproj</ContractsProjectPath>
-    <EtwProjectPath>$(MSBuildProjectDirectory)\..\..\src\Microsoft.Agents.A365.Observability.Etw\Microsoft.Agents.A365.Observability.Etw.csproj</EtwProjectPath>
+    <ContractsProjectPath>$(MSBuildProjectDirectory)\..\..\src\Microsoft.OpenTelemetry.A365.Contracts\Microsoft.OpenTelemetry.A365.Contracts.csproj</ContractsProjectPath>
+    <EtwProjectPath>$(MSBuildProjectDirectory)\..\..\src\Microsoft.OpenTelemetry.A365.Etw\Microsoft.OpenTelemetry.A365.Etw.csproj</EtwProjectPath>
     <DistroProjectPath>$(MSBuildProjectDirectory)\..\..\src\Microsoft.OpenTelemetry\Microsoft.OpenTelemetry.csproj</DistroProjectPath>
   </PropertyGroup>
 

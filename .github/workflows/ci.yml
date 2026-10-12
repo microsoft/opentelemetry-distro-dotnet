@@ -83,8 +83,8 @@ jobs:
 
       - name: Pack
         run: |
-          dotnet pack src/Microsoft.Agents.A365.Observability.Contracts/Microsoft.Agents.A365.Observability.Contracts.csproj --no-build --configuration Release --output ./packages
-          dotnet pack src/Microsoft.Agents.A365.Observability.Etw/Microsoft.Agents.A365.Observability.Etw.csproj --no-build --configuration Release --output ./packages
+          dotnet pack src/Microsoft.OpenTelemetry.A365.Contracts/Microsoft.OpenTelemetry.A365.Contracts.csproj --no-build --configuration Release --output ./packages
+          dotnet pack src/Microsoft.OpenTelemetry.A365.Etw/Microsoft.OpenTelemetry.A365.Etw.csproj --no-build --configuration Release --output ./packages
           dotnet pack src/Microsoft.OpenTelemetry/Microsoft.OpenTelemetry.csproj --no-build --configuration Release --output ./packages
 
       - name: Upload NuGet package

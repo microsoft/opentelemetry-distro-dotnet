@@ -11,7 +11,7 @@ namespace Microsoft.Agents.A365.Observability.Etw.Tests
         [TestMethod]
         public void EtwApis_AreOwnedByStandaloneEtwAssembly()
         {
-            var expectedAssemblyName = "Microsoft.Agents.A365.Observability.Etw";
+            var expectedAssemblyName = "Microsoft.OpenTelemetry.A365.Etw";
             var etwTypes = new[]
             {
                 typeof(A365EtwLogger<>),
