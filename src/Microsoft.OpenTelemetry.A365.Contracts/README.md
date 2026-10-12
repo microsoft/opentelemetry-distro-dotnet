@@ -14,4 +14,4 @@ dotnet add package Microsoft.OpenTelemetry
 
 See the [Microsoft.OpenTelemetry documentation](https://github.com/microsoft/opentelemetry-distro-dotnet#readme) for configuration and usage.
 
-For Microsoft internal standalone ETW integration scenarios, `Microsoft.OpenTelemetry.A365.Etw` also brings in the Contracts package automatically. See the [ETW package README](https://www.nuget.org/packages/Microsoft.OpenTelemetry.A365.Etw) for its intended audience.
+For Microsoft internal standalone ETW integration scenarios, `Microsoft.OpenTelemetry.A365.Etw` also brings in the Contracts package automatically. See the [ETW package README](https://github.com/microsoft/opentelemetry-distro-dotnet/blob/main/src/Microsoft.OpenTelemetry.A365.Etw/README.md) for its intended audience.
