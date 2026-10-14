@@ -28,11 +28,13 @@ run without writing a resolver first, see [Sample](#sample).
   [changelog](../CHANGELOG.md) lists the release that introduces it.
 - .NET 8 or later. Earlier target frameworks are not supported by the samples, which use C# 12
   primary constructors and collection expressions.
-- **Each destination must allow connection string authentication.** Routing identifies a component by
-  instrumentation key, so a component with
+- **Each destination must allow connection string authentication, unless you use Microsoft Entra ID.**
+  Routing identifies a component by instrumentation key. A component with
   [local authentication disabled](https://learn.microsoft.com/azure/azure-monitor/app/azure-ad-authentication#disable-local-authentication)
-  cannot receive routed telemetry, and Microsoft Entra ID authentication is unavailable while routing
-  is on.
+  can receive routed telemetry only through
+  [Microsoft Entra ID authentication](#microsoft-entra-id-authentication), which requires
+  `Azure.Monitor.OpenTelemetry.Exporter` 1.11.0-beta.1 or later (not yet released). With earlier
+  versions, Microsoft Entra ID authentication is unavailable while routing is on.
 - **Each destination needs an explicit ingestion endpoint.** See
   [Destinations and connection strings](#destinations-and-connection-strings).
 
@@ -45,6 +47,7 @@ Every routed item carries these attributes:
 | `microsoft.instrumentation_key` | Yes | The customer's instrumentation key. |
 | `microsoft.ingestion_endpoint` | Yes | The customer's ingestion endpoint. |
 | `microsoft.multi_endpoint_cloud_role` | No | Sets `ai.cloud.role`. Missing or blank becomes `unknown_service`. |
+| `microsoft.ingestion_auth` | No | `"aad"` sends the item with a Microsoft Entra ID token. Anything else uses the instrumentation key only. See [Microsoft Entra ID authentication](#microsoft-entra-id-authentication). |
 
 Values must be strings. The endpoint must be an absolute `https` URI without credentials, query
 string, or fragment.
@@ -320,6 +323,68 @@ second call throws. For the full list of settings routing changes, see
 Do not add Console, OTLP, or Agent365 alongside Azure Monitor without reading
 [Additional export targets](#additional-export-targets) first: routing does not govern them, and they
 receive every customer's telemetry.
+
+### Microsoft Entra ID authentication
+
+> Requires `Azure.Monitor.OpenTelemetry.Exporter` 1.11.0-beta.1 or later, which is not yet released.
+> With earlier versions, setting `AzureMonitor.Credential` while routing is on throws
+> `NotSupportedException` at startup.
+
+One credential authenticates every destination that uses Microsoft Entra ID. Set it once:
+
+```csharp
+.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.AzureMonitor;
+    o.AzureMonitor.Credential = new ManagedIdentityCredential(clientId);
+})
+```
+
+Mark each item whose destination uses Microsoft Entra ID with `microsoft.ingestion_auth = "aad"`,
+alongside the other routing attributes. Only marked items are sent with a token; everything else is
+sent with the instrumentation key only, even when a credential is set. A component with local
+authentication disabled rejects unmarked items.
+
+Store the choice with the destination and set the attribute in the same places as the others:
+
+```csharp
+public sealed record RoutingDestination(
+    string InstrumentationKey,
+    string IngestionEndpoint,
+    string? CloudRole,
+    bool UseEntraId = false);
+
+// Traces: in RoutingActivityProcessor.OnEnd.
+activity.SetTag("microsoft.ingestion_auth", destination?.UseEntraId == true ? "aad" : null);
+
+// Logs: add "microsoft.ingestion_auth" to RoutingKeys, then in RoutingLogProcessor.OnEnd:
+if (destination?.UseEntraId == true)
+{
+    attributes.Add(new("microsoft.ingestion_auth", "aad"));
+}
+
+// Metrics: alongside the routing dimensions.
+if (destination.UseEntraId)
+{
+    tags.Add("microsoft.ingestion_auth", "aad");
+}
+```
+
+- **Grant access.** The credential's identity needs the **Monitoring Metrics Publisher** role on every
+  component that receives marked telemetry. A new role assignment can take a few minutes to apply.
+- **Without a credential, marked items are dropped**, not sent without a token.
+- **Clouds other than Azure public cloud** need the audience set, because a routing application has no
+  connection string to carry it:
+
+  ```xml
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="Azure.Monitor.OpenTelemetry.Exporter.MultiEndpointAadAudience"
+                                    Value="https://monitor.azure.cn/" />
+  </ItemGroup>
+  ```
+
+AAD and instrumentation-key telemetry for the same ingestion endpoint are sent in separate requests and
+buffered separately.
 
 ## 6. Record metrics with routing dimensions
 
@@ -597,7 +662,9 @@ dotnet-trace collect --process-id <PID> --providers OpenTelemetry-AzureMonitor-E
 | Symptom | Check | Diagnostic evidence |
 |---|---|---|
 | Nothing reaches Azure Monitor | `Exporters` set; switch applied before any OpenTelemetry registration | `MultiEndpointRoutingEnabled` (Informational) confirms routing is active |
-| Startup throws | `AzureMonitor.Credential` is set | `NotSupportedException` at startup |
+| Startup throws | `AzureMonitor.Credential` is set (exporter 1.10.x and earlier) | `NotSupportedException` at startup |
+| Ingestion returns 401 or 403 for a destination | `microsoft.ingestion_auth` marking; the identity's role on the component; the audience outside public cloud | `RoutedAuthenticationFailed` (Warning) names the route and the likely fix |
+| Items marked `aad` disappear | A credential is set, and set the same way on every exporter | `RoutedAadTelemetryDroppedWithoutCredential`, `CachedTransmitterCredentialMismatch` (both Warning) |
 | Traces missing | Resolver returned a destination; child spans can reach the customer tag; sampling | `RoutedTelemetryRejected` (Verbose) names the reason; `RoutedExportSummary` (Informational) counts routed and dropped items |
 | Metrics missing | Dimensions supplied at measurement time; meter registered; views keep the dimensions; cardinality overflow | `RoutedMetricRejected` (Verbose), `RoutedInstrumentDropped` (Informational) |
 | Logs missing | Processor registered; attributes rather than scopes; resolver returned a destination | **Dropped log records emit no per-record event.** Compare expected counts against `RoutedGroupOutcome`, and assert on `LogRecord.Attributes` in a unit test |
@@ -606,8 +673,9 @@ dotnet-trace collect --process-id <PID> --providers OpenTelemetry-AzureMonitor-E
 | Live Metrics or standard metrics absent | Disabled automatically | `LiveMetricsDisabledForMultiEndpointRouting`, `StandardMetricsDisabledForMultiEndpointRouting` (Warning) |
 | Buffered telemetry lost | Partition cap or shared budget | `MultiEndpointPartitionCapReached`, `RoutedTelemetryEvicted`, `FailedToPersistRoutedTelemetry` |
 
-`RoutedGroupOutcome` reports item count and status per **ingestion endpoint**, not per customer, so
-customers sharing an endpoint are indistinguishable there. Use it as transport evidence, and the
+`RoutedGroupOutcome` reports item count and status per **route** - the ingestion endpoint, and from
+exporter 1.11.0-beta.1 whether the request used Microsoft Entra ID - not per customer, so customers
+sharing a route are indistinguishable there. Use it as transport evidence, and the
 marker queries in [Verify isolation with two customers](#8-verify-isolation-with-two-customers) to
 confirm delivery.
 
@@ -617,7 +685,7 @@ confirm delivery.
 
 | Setting | Default | Under routing |
 |---|---|---|
-| `AzureMonitor.Credential` | unset | **Must stay unset.** Throws `NotSupportedException` at startup |
+| `AzureMonitor.Credential` | unset | Exporter 1.10.x and earlier: **must stay unset**, throws `NotSupportedException` at startup. From 1.11.0-beta.1: used only for items marked `microsoft.ingestion_auth = "aad"` |
 | `Exporters` | auto-detected | **Must be set explicitly** when there is no connection string |
 | `AzureMonitor.ConnectionString` | from environment | Optional, and never a fallback for items without a valid route |
 | `AzureMonitor.TracesPerSecond` | `5.0` | Ignored. Rate limiting is per process, so one destination would consume another's allowance |
@@ -631,8 +699,9 @@ Sampling also affects logs when `EnableTraceBasedLogsSampler` is on, so review t
 ### Buffering and offline storage
 
 Offline storage is shared, not isolated by customer. It supports up to 64 partitions, keyed by
-normalized ingestion endpoint, within a shared 100 MiB budget. Customers whose components use the
-same endpoint share a partition, so this is not a 64-customer limit.
+normalized ingestion endpoint (and, from exporter 1.11.0-beta.1, by whether the destination uses
+Microsoft Entra ID), within a shared 100 MiB budget. Customers whose components use the same endpoint
+share a partition, so this is not a 64-customer limit.
 
 Telemetry for endpoints beyond the partition limit still transmits but has no offline fallback. When
 the shared budget is full, the oldest stored telemetry is evicted, which may belong to another
@@ -674,7 +743,9 @@ Four rules apply to this path:
 - **Do not mix the two styles.** Combining `UseAzureMonitorExporter` with the per-signal methods
   throws.
 
-Share one options callback across the three signals:
+Share one options callback across the three signals. The exporters share one connection, so with
+Microsoft Entra ID set `Credential` here; a different setting on one signal is ignored and reported as
+`CachedTransmitterCredentialMismatch`:
 
 ```csharp
 using Azure.Monitor.OpenTelemetry.Exporter;
