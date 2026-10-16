@@ -16,7 +16,12 @@
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails.AgentDetails(string? agentId = null, string? agentName = null, string? agentDescription = null, string? agenticUserId = null, string? agenticUserEmail = null, string? agentBlueprintId = null, string? tenantId = null, string? agentPlatformId = null, string? providerName = null, string? agentVersion = null) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails.Deconstruct(out string? agentId, out string? agentName, out string? agentDescription, out string? agenticUserId, out string? agenticUserEmail, out string? agentBlueprintId, out string? tenantId, out string? agentPlatformId, out string? agentVersion) -> void
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InferenceCallDetails.Deconstruct(out Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InferenceOperationType operationName, out string! model, out string! providerName, out int? inputTokens, out int? outputTokens, out string![]? finishReasons) -> void
-Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InferenceCallDetails.InferenceCallDetails(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InferenceOperationType operationName, string! model, string! providerName, int? inputTokens = null, int? outputTokens = null, string![]? finishReasons = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InferenceCallDetails.CacheReadInputTokens.get -> int?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InferenceCallDetails.CacheWriteInputTokens.get -> int?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InferenceCallDetails.Endpoint.get -> System.Uri?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InferenceCallDetails.InferenceCallDetails(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InferenceOperationType operationName, string! model, string! providerName, int? inputTokens = null, int? outputTokens = null, string![]? finishReasons = null, string? responseModel = null, int? cacheReadInputTokens = null, int? cacheWriteInputTokens = null, System.Uri? endpoint = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InferenceCallDetails.OperationNameValue.get -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.InferenceCallDetails.ResponseModel.get -> string?
 const Microsoft.Agents.A365.Observability.Runtime.DTOs.SpanKindConstants.Client = "Client" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.DTOs.SpanKindConstants.Consumer = "Consumer" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.DTOs.SpanKindConstants.Internal = "Internal" -> string!
@@ -70,6 +75,8 @@ const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryCo
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiRequestFrequencyPenaltyKey = "gen_ai.request.frequency_penalty" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiRequestMaxTokensKey = "gen_ai.request.max_tokens" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiRequestModelKey = "gen_ai.request.model" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiResponseModelKey = "gen_ai.response.model" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiUsageCacheWriteInputTokensKey = "gen_ai.usage.cache_write.input_tokens" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiRequestPresencePenaltyKey = "gen_ai.request.presence_penalty" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiRequestSeedKey = "gen_ai.request.seed" -> string!
 const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiRequestStopSequencesKey = "gen_ai.request.stop_sequences" -> string!
