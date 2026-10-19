@@ -2,11 +2,10 @@
 
 ## Unreleased
 
-- **Breaking change:** Rename the Agent365 Contracts and ETW assemblies to `Microsoft.OpenTelemetry.A365.Contracts` and `Microsoft.OpenTelemetry.A365.Etw` to match their package IDs. Namespaces are unchanged; applications must rebuild.
+## 1.2.0 - 2026-10-15
+
+- Microsoft OpenTelemetry is now split into three different assemblies: Microsoft.OpenTelemetry.A365.Contracts, Microsoft.OpenTelemetry.A365.Etw, and Microsoft.OpenTelemetry. Namespaces within the source code remain unchanged, the assembly names and folder structures are renamed.
 - Add the `UseA365ContractsPackageReference` build property to build against a published `Microsoft.OpenTelemetry.A365.Contracts` package instead of the in-repo project.
-
-## 1.2.0 - 2026-10-08
-
 - Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.10.0.
 - Update OpenTelemetry SDK and exporters to 1.19.1 and instrumentation packages to 1.19.0.
 - Report Live Metrics usage in Feature SDK Stats from the first outgoing active-collection request, without polling or adding network requests. Skip tracking when Live Metrics is disabled and stop inspecting requests after first use. Correlate the Agent Framework feature with instrumentation detected by the existing bounded activity processor.
