@@ -11,6 +11,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
     internal static class Agent365StorageDirectory
     {
         private const uint PrivateMode = 0x1C0; // 0700
+        private const uint AccessModeMask = 0x1FF;
         private const uint FileTypeMask = 0xF000;
         private const uint DirectoryType = 0x4000;
         private const uint SymbolicLinkType = 0xA000;
@@ -82,7 +83,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             var isDirectory = (mode & FileTypeMask) == DirectoryType;
             var trustedOwner = owner == userId || (!requirePrivate && owner == 0);
             var safePermissions = requirePrivate
-                ? (mode & 0xFFF) == PrivateMode
+                ? (mode & AccessModeMask) == PrivateMode
                 : (mode & 0x12) == 0 || (mode & StickyBit) != 0;
 
             if (!isDirectory || !trustedOwner || !safePermissions)
@@ -92,7 +93,61 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                     + "Use an application-owned private directory; existing permissions are not changed automatically.");
             }
 
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                ValidateMacOsAccessControl(path);
+            }
+
             return path;
+        }
+
+        private static void ValidateMacOsAccessControl(string path)
+        {
+            var acl = DarwinGetAcl(path, 0x100); // ACL_TYPE_EXTENDED
+            if (acl == IntPtr.Zero)
+            {
+                var error = Marshal.GetLastWin32Error();
+                // Darwin reports ENOENT when an existing directory has no extended ACL.
+                if (error == 2)
+                {
+                    return;
+                }
+
+                throw new IOException($"Could not inspect storage ACL '{path}'.", new Win32Exception(error));
+            }
+
+            try
+            {
+                // Darwin returns 0 for entries and -1/EINVAL at end, unlike Linux's ACL API.
+                var entryId = 0; // ACL_FIRST_ENTRY
+                while (DarwinGetAclEntry(acl, entryId, out var entry) == 0)
+                {
+                    if (DarwinGetAclTag(entry, out var tag) != 0)
+                    {
+                        throw new IOException($"Could not inspect storage ACL '{path}'.",
+                            new Win32Exception(Marshal.GetLastWin32Error()));
+                    }
+
+                    if (tag != 2) // ACL_EXTENDED_DENY
+                    {
+                        throw new UnauthorizedAccessException(
+                            $"Agent365 storage directory '{path}' has an extended allow or unsupported ACL. "
+                            + "Use a directory without extended allow ACLs; existing ACLs are not changed automatically.");
+                    }
+
+                    entryId = -1; // ACL_NEXT_ENTRY
+                }
+
+                var error = Marshal.GetLastWin32Error();
+                if (error != 22)
+                {
+                    throw new IOException($"Could not inspect storage ACL '{path}'.", new Win32Exception(error));
+                }
+            }
+            finally
+            {
+                DarwinFreeAcl(acl);
+            }
         }
 
         private static (uint Mode, uint Owner) ReadStatus(string path)
@@ -141,6 +196,18 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
 
         [DllImport("libc", EntryPoint = "lstat", CharSet = CharSet.Ansi, SetLastError = true)]
         private static extern int DarwinLStat(string path, [Out] byte[] status);
+
+        [DllImport("libc", EntryPoint = "acl_get_link_np", CharSet = CharSet.Ansi, SetLastError = true)]
+        private static extern IntPtr DarwinGetAcl(string path, int type);
+
+        [DllImport("libc", EntryPoint = "acl_get_entry", SetLastError = true)]
+        private static extern int DarwinGetAclEntry(IntPtr acl, int entryId, out IntPtr entry);
+
+        [DllImport("libc", EntryPoint = "acl_get_tag_type", SetLastError = true)]
+        private static extern int DarwinGetAclTag(IntPtr entry, out int tag);
+
+        [DllImport("libc", EntryPoint = "acl_free")]
+        private static extern int DarwinFreeAcl(IntPtr acl);
 
         [DllImport("libc", EntryPoint = "realpath", CharSet = CharSet.Ansi, SetLastError = true)]
         private static extern IntPtr ResolvePath(string path, IntPtr resolved);

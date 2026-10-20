@@ -154,13 +154,13 @@ public sealed class Agent365PersistentStorageTests
         if (!OperatingSystem.IsMacOS()) return;
 
         using var temp = new TemporaryDirectory();
-        string applicationDirectory;
-        using (var storage = Agent365PersistentStorage.Create(temp.Path))
+        var directory = temp.Path;
+        if (!onAncestor)
         {
-            applicationDirectory = storage.DirectoryPath;
+            using var storage = Agent365PersistentStorage.Create(temp.Path);
+            directory = storage.DirectoryPath;
         }
 
-        var directory = onAncestor ? temp.Path : applicationDirectory;
         const string entry = "everyone allow read,search,file_inherit,directory_inherit";
         ChangeMacOsAcl(directory, "+a", entry);
         try
@@ -170,6 +170,10 @@ public sealed class Agent365PersistentStorageTests
 
             create.Should().Throw<UnauthorizedAccessException>();
             File.GetUnixFileMode(directory).Should().Be(mode);
+            if (onAncestor)
+            {
+                Directory.Exists(Path.Combine(temp.Path, "Microsoft")).Should().BeFalse();
+            }
         }
         finally
         {

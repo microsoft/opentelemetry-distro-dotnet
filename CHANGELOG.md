@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Secure Agent365 offline storage on Linux and macOS by creating private cache directories with owner-only permissions before writing telemetry. Reject unsafe existing directories and writable ancestors rather than changing their permissions; initialization failures are logged and disable offline storage while online export continues. Existing safe cache paths and Windows inherited ACL behavior are preserved.
+- Secure Agent365 offline storage on Linux and macOS by creating private cache directories with owner-only permissions before writing telemetry. Reject unsafe existing directories, writable ancestors, and macOS extended allow ACLs rather than changing their permissions; initialization failures are logged and disable offline storage while online export continues. Existing safe cache paths, harmless inherited setgid flags, deny-only ACLs, and Windows inherited ACL behavior are preserved.
 
 ## 1.2.0 - 2026-10-15
 
