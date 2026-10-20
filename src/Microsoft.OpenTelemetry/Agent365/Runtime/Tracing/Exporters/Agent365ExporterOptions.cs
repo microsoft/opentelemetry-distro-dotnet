@@ -128,6 +128,13 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         /// Root directory for the on-disk store-and-forward pipeline. When null (default), a
         /// per-user/per-process location is resolved automatically (LOCALAPPDATA/TEMP on Windows,
         /// TMPDIR//var/tmp//tmp on Unix). Ignored when <see cref="DisableOfflineStorage"/> is true.
+        /// On Linux and macOS, SDK-owned subdirectories are created with owner-only access (0700).
+        /// Unsafe ownership, permissions, or symbolic links disable offline storage with an error log;
+        /// existing directories are not automatically chmod-ed. Shared temporary ancestors must have
+        /// the sticky bit. Linux ownership checks require libc/kernel statx support; unavailable
+        /// checks also disable offline storage with an error log. Windows directories retain inherited ACLs.
+        /// If an existing cache is rejected, configure a fresh application-owned root or review and
+        /// secure the existing cache before reuse. Do not change permissions on shared system directories.
         /// </summary>
         public string? StorageDirectory { get; set; }
     }

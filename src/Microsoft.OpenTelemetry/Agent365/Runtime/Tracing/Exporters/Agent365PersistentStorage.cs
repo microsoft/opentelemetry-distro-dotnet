@@ -70,8 +70,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 throw new ArgumentException("Root directory is required.", nameof(rootDirectory));
             }
 
-            var applicationDirectory = Path.Combine(rootDirectory, "Microsoft", "Agent365");
-            Directory.CreateDirectory(applicationDirectory);
+            var applicationDirectory = Agent365StorageDirectory.Create(rootDirectory);
 
             return new Agent365PersistentStorage(
                 new FileBlobProvider(
@@ -255,4 +254,3 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         }
     }
 }
-

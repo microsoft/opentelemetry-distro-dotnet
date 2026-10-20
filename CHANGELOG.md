@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Secure Agent365 offline storage on Linux and macOS by creating private cache directories with owner-only permissions before writing telemetry. Reject unsafe existing directories and writable ancestors rather than changing their permissions; initialization failures are logged and disable offline storage while online export continues. Existing safe cache paths and Windows inherited ACL behavior are preserved.
+
 ## 1.2.0 - 2026-10-15
 
 - Microsoft OpenTelemetry is now split into three different assemblies: Microsoft.OpenTelemetry.A365.Contracts, Microsoft.OpenTelemetry.A365.Etw, and Microsoft.OpenTelemetry. Namespaces within the source code remain unchanged, the assembly names and folder structures are renamed.

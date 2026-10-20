@@ -3,9 +3,12 @@
 
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using FluentAssertions;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
+using Microsoft.Extensions.Logging;
+using Moq;
 using OpenTelemetry.PersistentStorage.FileSystem;
 
 namespace Microsoft.OpenTelemetry.Agent365.Tests.Runtime.Tracing.Exporters;
@@ -30,6 +33,181 @@ public sealed class Agent365PersistentStorageTests
 
         storage.TryStore(expected).Should().BeTrue();
         storage.TryGetNext(out var stored).Should().BeTrue();
+        stored!.TryLease(TimeSpan.FromMinutes(2)).Should().BeTrue();
+        stored.Read(out var actual).Should().Be(Agent365StoredRecordReadResult.Success);
+        actual.Should().BeEquivalentTo(expected);
+    }
+
+    [TestMethod]
+    public void CreatesPrivateStorageDirectoriesOnUnix()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        using var temp = new TemporaryDirectory();
+        File.SetUnixFileMode(temp.Path, UnixFileMode.UserRead | UnixFileMode.UserWrite
+            | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute
+            | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+        var parentMode = File.GetUnixFileMode(temp.Path);
+        using var storage = Agent365PersistentStorage.Create(temp.Path);
+        const UnixFileMode privateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+
+        File.GetUnixFileMode(Path.Combine(temp.Path, "Microsoft")).Should().Be(privateMode);
+        File.GetUnixFileMode(storage.DirectoryPath).Should().Be(privateMode);
+        File.GetUnixFileMode(temp.Path).Should().Be(parentMode);
+    }
+
+    [TestMethod]
+    public void RejectsInsecureExistingStorageOnUnixWithoutChangingPermissions()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        using var temp = new TemporaryDirectory();
+        var applicationDirectory = Path.Combine(temp.Path, "Microsoft", "Agent365");
+        Directory.CreateDirectory(Path.Combine(temp.Path, "Microsoft"),
+            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        Directory.CreateDirectory(applicationDirectory);
+        const UnixFileMode insecureMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+            | UnixFileMode.UserExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute;
+        File.SetUnixFileMode(applicationDirectory, insecureMode);
+        var existingFile = Path.Combine(applicationDirectory, "existing-record");
+        File.WriteAllText(existingFile, "preserve");
+
+        var create = () => Agent365PersistentStorage.Create(temp.Path);
+
+        create.Should().Throw<UnauthorizedAccessException>();
+        File.GetUnixFileMode(applicationDirectory).Should().Be(insecureMode);
+        File.ReadAllText(existingFile).Should().Be("preserve");
+    }
+
+    [TestMethod]
+    public void RejectsSymbolicLinkStorageOnUnix()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        using var temp = new TemporaryDirectory();
+        using var target = new TemporaryDirectory();
+        Directory.CreateSymbolicLink(Path.Combine(temp.Path, "Microsoft"), target.Path);
+
+        var create = () => Agent365PersistentStorage.Create(temp.Path);
+
+        create.Should().Throw<UnauthorizedAccessException>();
+        Directory.GetFileSystemEntries(target.Path).Should().BeEmpty();
+    }
+
+    [TestMethod]
+    public void RejectsWritableStorageParentOnUnix()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        using var temp = new TemporaryDirectory();
+        File.SetUnixFileMode(temp.Path, UnixFileMode.UserRead | UnixFileMode.UserWrite
+            | UnixFileMode.UserExecute | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute);
+
+        var create = () => Agent365PersistentStorage.Create(temp.Path);
+
+        create.Should().Throw<UnauthorizedAccessException>();
+        Directory.GetFileSystemEntries(temp.Path).Should().BeEmpty();
+    }
+
+    [TestMethod]
+    public void SupportsStickySharedTemporaryParentOnUnix()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        using var temp = new TemporaryDirectory();
+        File.SetUnixFileMode(temp.Path, UnixFileMode.StickyBit | UnixFileMode.UserRead
+            | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupRead
+            | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute | UnixFileMode.OtherRead
+            | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute);
+
+        using var storage = Agent365PersistentStorage.Create(temp.Path);
+
+        storage.TryStore(CreateRecord()).Should().BeTrue();
+    }
+
+    [TestMethod]
+    public void RejectsStorageOwnedByAnotherUserOnLinux()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        if (GetEffectiveUserId() != 0)
+        {
+            Assert.Inconclusive("Changing ownership for this regression requires root.");
+        }
+
+        using var temp = new TemporaryDirectory();
+        string applicationDirectory;
+        using (var storage = Agent365PersistentStorage.Create(temp.Path))
+        {
+            applicationDirectory = storage.DirectoryPath;
+        }
+
+        ChangeOwner(applicationDirectory, 65534, uint.MaxValue).Should().Be(0);
+        var create = () => Agent365PersistentStorage.Create(temp.Path);
+
+        create.Should().Throw<UnauthorizedAccessException>();
+    }
+
+    [TestMethod]
+    public void AncestorLinkRetargetingCannotRedirectStorageOnLinux()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        if (GetEffectiveUserId() != 0)
+        {
+            Assert.Inconclusive("Creating a trusted root-owned ancestor link requires root.");
+        }
+
+        using var temp = new TemporaryDirectory();
+        using var safe = new TemporaryDirectory();
+        using var redirected = new TemporaryDirectory();
+        var intermediateLink = Path.Combine(temp.Path, "redirect");
+        var trustedLink = Path.Combine(temp.Path, "cache");
+        Directory.CreateSymbolicLink(intermediateLink, safe.Path);
+        Directory.CreateSymbolicLink(trustedLink, intermediateLink);
+        var redirectedCache = Path.Combine(redirected.Path, "Microsoft", "Agent365");
+        Directory.CreateDirectory(redirectedCache);
+
+        using var storage = Agent365PersistentStorage.Create(trustedLink);
+        Directory.Delete(intermediateLink);
+        Directory.CreateSymbolicLink(intermediateLink, redirected.Path);
+
+        storage.TryStore(CreateRecord()).Should().BeTrue();
+        Directory.GetFileSystemEntries(redirectedCache).Should().BeEmpty();
+        Directory.GetFiles(Path.Combine(safe.Path, "Microsoft", "Agent365")).Should().NotBeEmpty();
+    }
+
+    [TestMethod]
+    public void UnsafeStorageDisablesDurabilityAndLogsAnErrorOnUnix()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        using var temp = new TemporaryDirectory();
+        var root = Agent365StorageDirectoryResolver.Resolve(temp.Path);
+        Directory.CreateDirectory(Path.Combine(root, "Microsoft"));
+        File.SetUnixFileMode(Path.Combine(root, "Microsoft"), UnixFileMode.UserRead
+            | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.OtherRead);
+        var logger = new Mock<ILogger>();
+
+        using var storage = Agent365DurableDelivery.CreateStorage(
+            new Agent365ExporterOptions { StorageDirectory = temp.Path }, logger.Object);
+
+        storage.Should().BeOfType<DisabledAgent365Storage>();
+        logger.Invocations.Should().Contain(call => call.Method.Name == "Log"
+            && (LogLevel)call.Arguments[0] == LogLevel.Error
+            && call.Arguments[3] is UnauthorizedAccessException);
+    }
+
+    [TestMethod]
+    public void ReopensPrivateStorageAndReplaysExistingRecord()
+    {
+        using var temp = new TemporaryDirectory();
+        var expected = CreateRecord();
+        using (var storage = Agent365PersistentStorage.Create(temp.Path))
+        {
+            storage.TryStore(expected).Should().BeTrue();
+        }
+
+        using var reopened = Agent365PersistentStorage.Create(temp.Path);
+        reopened.TryGetNext(out var stored).Should().BeTrue();
         stored!.TryLease(TimeSpan.FromMinutes(2)).Should().BeTrue();
         stored.Read(out var actual).Should().Be(Agent365StoredRecordReadResult.Success);
         actual.Should().BeEquivalentTo(expected);
@@ -72,7 +250,9 @@ public sealed class Agent365PersistentStorageTests
     {
         using var temp = new TemporaryDirectory();
         var applicationDirectory = Path.Combine(temp.Path, "Microsoft", "Agent365");
-        Directory.CreateDirectory(applicationDirectory);
+        using (var initialStorage = Agent365PersistentStorage.Create(temp.Path))
+        {
+        }
 
         using (var provider = CreateProvider(applicationDirectory))
         {
@@ -216,6 +396,12 @@ public sealed class Agent365PersistentStorageTests
             (int)Agent365PersistentStorage.MaintenanceInterval.TotalMilliseconds,
             (long)Agent365PersistentStorage.Retention.TotalMilliseconds,
             (int)Agent365PersistentStorage.WriteTimeout.TotalMilliseconds);
+
+    [DllImport("libc", EntryPoint = "geteuid")]
+    private static extern uint GetEffectiveUserId();
+
+    [DllImport("libc", EntryPoint = "lchown", CharSet = CharSet.Ansi, SetLastError = true)]
+    private static extern int ChangeOwner(string path, uint owner, uint group);
 }
 
 internal sealed class TemporaryDirectory : IDisposable
@@ -223,7 +409,14 @@ internal sealed class TemporaryDirectory : IDisposable
     public TemporaryDirectory()
     {
         Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(Path);
+        if (OperatingSystem.IsWindows())
+        {
+            Directory.CreateDirectory(Path);
+        }
+        else
+        {
+            Directory.CreateDirectory(Path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
     }
 
     public string Path { get; }
