@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -126,6 +127,74 @@ public sealed class Agent365PersistentStorageTests
         using var storage = Agent365PersistentStorage.Create(temp.Path);
 
         storage.TryStore(CreateRecord()).Should().BeTrue();
+    }
+
+    [TestMethod]
+    public void SupportsSetGroupIdStorageParentOnUnix()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        using var temp = new TemporaryDirectory();
+        const UnixFileMode privateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+        File.SetUnixFileMode(temp.Path, privateMode | UnixFileMode.SetGroup);
+
+        using var storage = Agent365PersistentStorage.Create(temp.Path);
+
+        storage.TryStore(CreateRecord()).Should().BeTrue();
+        var mode = File.GetUnixFileMode(storage.DirectoryPath);
+        (mode & ~UnixFileMode.SetGroup).Should().Be(privateMode);
+        File.GetUnixFileMode(temp.Path).Should().Be(privateMode | UnixFileMode.SetGroup);
+    }
+
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void RejectsExtendedAllowAclOnMacOs(bool onAncestor)
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+
+        using var temp = new TemporaryDirectory();
+        string applicationDirectory;
+        using (var storage = Agent365PersistentStorage.Create(temp.Path))
+        {
+            applicationDirectory = storage.DirectoryPath;
+        }
+
+        var directory = onAncestor ? temp.Path : applicationDirectory;
+        const string entry = "everyone allow read,search,file_inherit,directory_inherit";
+        ChangeMacOsAcl(directory, "+a", entry);
+        try
+        {
+            var mode = File.GetUnixFileMode(directory);
+            var create = () => Agent365PersistentStorage.Create(temp.Path);
+
+            create.Should().Throw<UnauthorizedAccessException>();
+            File.GetUnixFileMode(directory).Should().Be(mode);
+        }
+        finally
+        {
+            ChangeMacOsAcl(directory, "-a", entry);
+        }
+    }
+
+    [TestMethod]
+    public void SupportsDenyOnlyAclOnMacOs()
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+
+        using var temp = new TemporaryDirectory();
+        const string entry = "everyone deny delete";
+        ChangeMacOsAcl(temp.Path, "+a", entry);
+        try
+        {
+            using var storage = Agent365PersistentStorage.Create(temp.Path);
+
+            storage.TryStore(CreateRecord()).Should().BeTrue();
+        }
+        finally
+        {
+            ChangeMacOsAcl(temp.Path, "-a", entry);
+        }
     }
 
     [TestMethod]
@@ -399,6 +468,22 @@ public sealed class Agent365PersistentStorageTests
             (int)Agent365PersistentStorage.MaintenanceInterval.TotalMilliseconds,
             (long)Agent365PersistentStorage.Retention.TotalMilliseconds,
             (int)Agent365PersistentStorage.WriteTimeout.TotalMilliseconds);
+
+    private static void ChangeMacOsAcl(string path, string action, string entry)
+    {
+        var startInfo = new ProcessStartInfo("/bin/chmod")
+        {
+            UseShellExecute = false,
+            RedirectStandardError = true,
+        };
+        startInfo.ArgumentList.Add(action);
+        startInfo.ArgumentList.Add(entry);
+        startInfo.ArgumentList.Add(path);
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Could not start chmod.");
+        var error = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        process.ExitCode.Should().Be(0, "chmod must succeed: {0}", error);
+    }
 
     [DllImport("libc", EntryPoint = "geteuid")]
     private static extern uint GetEffectiveUserId();
