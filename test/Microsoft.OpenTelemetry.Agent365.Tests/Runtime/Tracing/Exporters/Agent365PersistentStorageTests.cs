@@ -21,7 +21,10 @@ public sealed class Agent365PersistentStorageTests
     {
         using var temp = new TemporaryDirectory();
         using var storage = Agent365PersistentStorage.Create(temp.Path);
-        storage.DirectoryPath.Should().StartWith(temp.Path);
+
+        storage.TryStore(CreateRecord()).Should().BeTrue();
+
+        Directory.GetFiles(Path.Combine(temp.Path, "Microsoft", "Agent365")).Should().NotBeEmpty();
     }
 
     [TestMethod]
