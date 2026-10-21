@@ -120,23 +120,23 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
         /// When false (default), the exporter persists failed/deferred exports and drains them on a
         /// background cadence. If offline storage is enabled but its initialization fails, the exporter
         /// logs the error and continues as if this were set to <c>true</c>.
+        /// On Unix, enabling storage also requires a provisioned <see cref="StorageDirectory"/>.
         /// Default is false.
         /// </summary>
         public bool DisableOfflineStorage { get; set; }
 
         /// <summary>
-        /// Root directory for the on-disk store-and-forward pipeline. When null (default), a
-        /// per-user/per-process location is resolved automatically (LOCALAPPDATA/TEMP on Windows,
-        /// TMPDIR//var/tmp//tmp on Unix). Ignored when <see cref="DisableOfflineStorage"/> is true.
-        /// On Linux and macOS, SDK-owned subdirectories require owner-only access bits (0700);
-        /// harmless inherited setgid flags are retained. macOS extended allow ACLs are rejected on
-        /// cache directories and ancestors, while deny-only ACLs are allowed.
-        /// Unsafe ownership, permissions, or symbolic links disable offline storage with an error log;
-        /// existing directories are not automatically chmod-ed. Shared temporary ancestors must have
-        /// the sticky bit. Linux ownership checks require libc/kernel statx support; unavailable
-        /// checks also disable offline storage with an error log. Windows directories retain inherited ACLs.
-        /// If an existing cache is rejected, configure a fresh application-owned root or review and
-        /// secure the existing cache before reuse. Do not change permissions on shared system directories.
+        /// Root directory for the on-disk store-and-forward pipeline. On Windows, null (default)
+        /// resolves a per-user/per-process location under LOCALAPPDATA, TEMP, or the current directory.
+        /// On Unix, an absolute path to an existing application-owned private directory is required;
+        /// there is no automatic temporary-directory fallback. Missing or invalid configuration
+        /// disables offline storage with an error log while online export continues.
+        /// The deployment must provision and maintain ownership, permissions, and ACLs that restrict
+        /// access to the application's service account, including protection against path replacement.
+        /// The SDK does not validate or modify filesystem access controls. Use 0700 without
+        /// additional-user allow ACLs for a Unix root; do not change shared system directories.
+        /// Existing cache subdirectory names are preserved. Ignored when
+        /// <see cref="DisableOfflineStorage"/> is true.
         /// </summary>
         public string? StorageDirectory { get; set; }
     }

@@ -70,7 +70,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 throw new ArgumentException("Root directory is required.", nameof(rootDirectory));
             }
 
-            var applicationDirectory = Agent365StorageDirectory.Create(rootDirectory);
+            var applicationDirectory = Path.Combine(rootDirectory, "Microsoft", "Agent365");
+            Directory.CreateDirectory(applicationDirectory);
 
             return new Agent365PersistentStorage(
                 new FileBlobProvider(
@@ -168,11 +169,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
                 throw new ArgumentNullException(nameof(hashIdentity));
             }
 
-            var rootDirectory = !string.IsNullOrWhiteSpace(configuredRoot)
-                ? configuredRoot!
-                : isWindows()
-                    ? ResolveWindowsRoot(getEnvVar)
-                    : ResolveUnixRoot(getEnvVar);
+            var rootDirectory = isWindows()
+                ? !string.IsNullOrWhiteSpace(configuredRoot)
+                    ? configuredRoot!
+                    : ResolveWindowsRoot(getEnvVar)
+                : ResolveUnixRoot(configuredRoot);
 
             return Path.Combine(rootDirectory, hashIdentity());
         }
@@ -194,43 +195,28 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             return Environment.CurrentDirectory;
         }
 
-        private static string ResolveUnixRoot(Func<string, string?> getEnvVar)
+        private static string ResolveUnixRoot(string? configuredRoot)
         {
-            var tempDirectory = getEnvVar("TMPDIR");
-            if (!string.IsNullOrWhiteSpace(tempDirectory))
+            if (configuredRoot == null || string.IsNullOrWhiteSpace(configuredRoot))
             {
-                return tempDirectory!;
+                throw new InvalidOperationException(
+                    "Agent365 offline storage on Unix requires StorageDirectory to specify an existing "
+                    + "application-owned private directory. Provision its permissions before enabling storage.");
             }
 
-            if (TryCreateDirectory("/var/tmp"))
+            if (!Path.IsPathRooted(configuredRoot))
             {
-                return "/var/tmp";
+                throw new ArgumentException("Unix StorageDirectory must be an absolute path.", nameof(configuredRoot));
             }
 
-            if (TryCreateDirectory("/tmp"))
+            if (!Directory.Exists(configuredRoot))
             {
-                return "/tmp";
+                throw new DirectoryNotFoundException(
+                    $"Agent365 StorageDirectory '{configuredRoot}' does not exist. Provision an application-owned "
+                    + "private directory and its permissions before enabling storage.");
             }
 
-            return Environment.CurrentDirectory;
-        }
-
-        private static bool TryCreateDirectory(string path)
-        {
-            try
-            {
-                if (Directory.Exists(path))
-                {
-                    return true;
-                }
-
-                Directory.CreateDirectory(path);
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+            return configuredRoot;
         }
 
         private static string ComputeHashIdentity()
