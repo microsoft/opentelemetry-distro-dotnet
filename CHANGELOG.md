@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Breaking change on Unix:** Agent365 offline buffering now requires `StorageDirectory` to name an existing, absolute, application-owned private root. Automatic `TMPDIR`, `/var/tmp`, `/tmp`, and current-directory fallbacks are removed on Unix to avoid SDK-selected shared temporary storage. Customers provision and maintain filesystem ownership, permissions, and ACLs; the SDK does not validate or modify access controls. Missing or invalid configuration is logged and disables only offline buffering; online export continues. Windows defaults and cache subdirectory identities are unchanged. See [offline buffering and filesystem permissions](docs/agent365-getting-started.md#offline-buffering-and-filesystem-permissions) for configuration and migration guidance.
+
 ## 1.2.0 - 2026-10-15
 
 - Microsoft OpenTelemetry is now split into three different assemblies: Microsoft.OpenTelemetry.A365.Contracts, Microsoft.OpenTelemetry.A365.Etw, and Microsoft.OpenTelemetry. Namespaces within the source code remain unchanged, the assembly names and folder structures are renamed.
