@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Breaking change:** Update the vendored Azure resource detectors to `OpenTelemetry.Resources.Azure` `1.20.1-beta.1`, which aligns the detected resource attributes with OpenTelemetry Semantic Conventions v1.44.0. Cloud Role Name, Cloud Role Instance, and Application Version are unchanged. The following changes are visible in the resource attributes exported on the `_OTELRESOURCE_` metric:
+  - `cloud.platform` values changed from `azure_app_service`, `azure_container_apps`, and `azure_vm` to `azure.app_service`, `azure.container_apps`, and `azure.vm`.
+  - The App Service slot name is now reported as `deployment.environment.name` instead of `deployment.environment`.
+  - The Azure VM detector no longer reports `azure.vm.sku`, and `os.type` is now lowercase (for example `windows` instead of `Windows`).
+  - The Azure App Service and VM detectors now also report `cloud.account.id` and `azure.resource_group.name`, and the VM detector reports `host.image.id`, `host.image.name`, and `host.image.version`.
+- The vendored Azure VM resource detector now limits how much of the Azure Instance Metadata Service response is read ([GHSA-vc24-j8c5-2vw4](https://github.com/open-telemetry/opentelemetry-dotnet-contrib/security/advisories/GHSA-vc24-j8c5-2vw4)), applies its two second timeout to reading the response body, skips detection on Azure App Service, and retries detection after a failure instead of remembering the failure for the lifetime of the process.
+
 ## 1.2.0 - 2026-10-15
 
 - Microsoft OpenTelemetry is now split into three different assemblies: Microsoft.OpenTelemetry.A365.Contracts, Microsoft.OpenTelemetry.A365.Etw, and Microsoft.OpenTelemetry. Namespaces within the source code remain unchanged, the assembly names and folder structures are renamed.
