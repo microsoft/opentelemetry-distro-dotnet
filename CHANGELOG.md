@@ -1,9 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Add privacy-safe Model Observation attributes to inference telemetry, including the canonical served response model, cache read/write input-token counts, lowercase operation names, and endpoint host with an optional numeric non-default port. Attributes can be supplied when the inference scope starts or recorded after the response is available. ([#174](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/174))
+- Share canonical inference operation names across span names, span attributes, metrics, and DTOs. Undefined operation enum values fall back to `chat`; relative or hostless endpoints are omitted without throwing. Both cases emit diagnostic trace warnings.
 
 ## 1.2.0 - 2026-10-15
-
 - Microsoft OpenTelemetry is now split into three different assemblies: Microsoft.OpenTelemetry.A365.Contracts, Microsoft.OpenTelemetry.A365.Etw, and Microsoft.OpenTelemetry. Namespaces within the source code remain unchanged, the assembly names and folder structures are renamed.
 - Add the `UseA365ContractsPackageReference` build property to build against a published `Microsoft.OpenTelemetry.A365.Contracts` package instead of the in-repo project.
 - Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.10.0.

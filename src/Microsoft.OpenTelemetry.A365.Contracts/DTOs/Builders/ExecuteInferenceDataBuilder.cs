@@ -111,12 +111,24 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             IDictionary<string, object?> attributes,
             InferenceCallDetails inferenceCallDetails)
         {
-            AddIfNotNull(attributes, GenAiOperationNameKey, inferenceCallDetails.OperationName.ToString().ToLowerInvariant());
+            AddIfNotNull(attributes, GenAiOperationNameKey, inferenceCallDetails.OperationNameValue);
             AddIfNotNull(attributes, GenAiRequestModelKey, inferenceCallDetails.Model);
+            AddIfNotNull(attributes, GenAiResponseModelKey, inferenceCallDetails.ResponseModel);
             AddIfNotNull(attributes, GenAiProviderNameKey, inferenceCallDetails.ProviderName);
             AddIfNotNull(attributes, GenAiUsageInputTokensKey, inferenceCallDetails.InputTokens);
             AddIfNotNull(attributes, GenAiUsageOutputTokensKey, inferenceCallDetails.OutputTokens);
+            AddIfNotNull(attributes, GenAiUsageCacheReadInputTokensKey, inferenceCallDetails.CacheReadInputTokens);
+            AddIfNotNull(attributes, GenAiUsageCacheWriteInputTokensKey, inferenceCallDetails.CacheWriteInputTokens);
             AddIfNotNull(attributes, GenAiResponseFinishReasonsKey, inferenceCallDetails.FinishReasons);
+            if (inferenceCallDetails.Endpoint != null)
+            {
+                AddIfNotNull(attributes, ServerAddressKey, inferenceCallDetails.Endpoint.Host);
+                if (!inferenceCallDetails.Endpoint.IsDefaultPort)
+                {
+                    AddIfNotNull(attributes, ServerPortKey, inferenceCallDetails.Endpoint.Port);
+                }
+            }
         }
+
     }
 }

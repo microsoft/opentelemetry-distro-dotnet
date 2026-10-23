@@ -5,7 +5,7 @@ using System.Runtime.Serialization;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
 {
-    #pragma warning disable CS1591 // XML documentation not required for constant definitions.
+#pragma warning disable CS1591 // XML documentation not required for constant definitions.
     /// <summary>
     /// OpenTelemetry constant keys and values used across the Microsoft Agent 365 SDK.
     /// </summary>
@@ -30,6 +30,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
 
         public const string GenAiClientOperationDurationMetricName = "gen_ai.client.operation.duration";
         public const string GenAiRequestModelKey = "gen_ai.request.model";
+        public const string GenAiResponseModelKey = "gen_ai.response.model";
         public const string GenAiResponseFinishReasonsKey = "gen_ai.response.finish_reasons";
 
         // Request parameters (GenAI semantic conventions)
@@ -47,6 +48,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
 
         // Usage / response parameters (GenAI semantic conventions)
         public const string GenAiUsageCacheCreationInputTokensKey = "gen_ai.usage.cache_creation.input_tokens";
+        public const string GenAiUsageCacheWriteInputTokensKey = "gen_ai.usage.cache_write.input_tokens";
         public const string GenAiUsageCacheReadInputTokensKey = "gen_ai.usage.cache_read.input_tokens";
 
         public const string GenAiConversationIdKey = "gen_ai.conversation.id";
@@ -143,11 +145,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         public const string TelemetrySdkVersionKey = "telemetry.sdk.version";
         public const string TelemetrySdkNameValue = "microsoft-opentelemetry";
         public const string TelemetrySdkLanguageValue = "dotnet";
-        
+
         /// <summary>
         /// Gets the telemetry SDK version dynamically from the assembly.
         /// </summary>
-        public static string TelemetrySdkVersionValue => 
+        public static string TelemetrySdkVersionValue =>
             typeof(OpenTelemetryConstants).Assembly.GetName().Version?.ToString() ?? "unknown";
 
         #region Public Constants
@@ -173,7 +175,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// The error message key.
         /// </summary>
         public const string ErrorMessageKey = "error.message";
-        
+
         /// <summary>
         /// The error type key.
         /// </summary>
@@ -184,22 +186,22 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// The GenAI tool name key.
         /// </summary>
         public const string GenAiToolNameKey = "gen_ai.tool.name";
-        
+
         /// <summary>
         /// The GenAI tool call identifier key.
         /// </summary>
         public const string GenAiToolCallIdKey = "gen_ai.tool.call.id";
-        
+
         /// <summary>
         /// The GenAI tool description key.
         /// </summary>
         public const string GenAiToolDescriptionKey = "gen_ai.tool.description";
-        
+
         /// <summary>
         /// The GenAI tool arguments key.
         /// </summary>
         public const string GenAiToolArgumentsKey = "gen_ai.tool.call.arguments";
-        
+
         /// <summary>
         /// The GenAI tool type key.
         /// </summary>
@@ -250,7 +252,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// The threat diagnostics summary key.
         /// </summary>
         public const string ThreatDiagnosticsSummaryKey = "threat.diagnostics.summary";
-        
+
         /// <summary>
         /// The GenAI agent thought process key.
         /// </summary>
@@ -375,5 +377,5 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         public const string GenAiSecurityPolicyDecisionTypeKey = "microsoft.security.policy.decision.type";
         #endregion
     }
-    #pragma warning restore CS1591
+#pragma warning restore CS1591
 }
