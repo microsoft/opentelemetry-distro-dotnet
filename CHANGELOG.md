@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Breaking change:** Synced the vendored `OpenTelemetry.Resources.Azure` resource detectors to `1.20.1-beta.1`; resource attributes now follow semantic conventions v1.44.0 (`cloud.platform` values `azure_app_service`/`azure_container_apps`/`azure_vm` are now `azure.app_service`/`azure.container_apps`/`azure.vm`, and the App Service slot is reported as `deployment.environment.name` instead of `deployment.environment`).
+
 ## 1.2.0 - 2026-10-15
 
 - Microsoft OpenTelemetry is now split into three different assemblies: Microsoft.OpenTelemetry.A365.Contracts, Microsoft.OpenTelemetry.A365.Etw, and Microsoft.OpenTelemetry. Namespaces within the source code remain unchanged, the assembly names and folder structures are renamed.
