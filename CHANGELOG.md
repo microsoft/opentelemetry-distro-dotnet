@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix Agent365-only and no-exporter configurations suppressing independently registered OpenTelemetry log exporters. The provider-wide logging filter now applies only when `Instrumentation.EnableLogging` is explicitly disabled ([#182](https://github.com/microsoft/opentelemetry-distro-dotnet/issues/182)).
 - **Breaking change:** Synced the vendored `OpenTelemetry.Resources.Azure` resource detectors to `1.20.1-beta.1`; resource attributes now follow semantic conventions v1.44.0 (`cloud.platform` values `azure_app_service`/`azure_container_apps`/`azure_vm` are now `azure.app_service`/`azure.container_apps`/`azure.vm`, and the App Service slot is reported as `deployment.environment.name` instead of `deployment.environment`).
 
 ## 1.2.0 - 2026-10-15
