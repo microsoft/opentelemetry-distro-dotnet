@@ -221,6 +221,9 @@ builder.UseMicrosoftOpenTelemetry(o =>
     o.Agent365.MaxExportBatchSize = 512;
     o.Agent365.ScheduledDelayMilliseconds = 5000;
     o.Agent365.ExporterTimeoutMilliseconds = 30000;
+    o.Agent365.DisableOfflineStorage = false;
+    // Unix: set this to a pre-provisioned private root to enable offline buffering.
+    o.Agent365.StorageDirectory = null;
 
     // --- Instrumentation options (all default to true) ---
     o.Instrumentation.EnableTracing = true;

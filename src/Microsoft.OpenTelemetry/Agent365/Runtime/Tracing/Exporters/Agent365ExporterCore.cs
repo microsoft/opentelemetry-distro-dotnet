@@ -80,7 +80,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters
             // first attempt, or an injected fake is supplied) never creates the on-disk
             // FileBlobProvider and its maintenance timer. An injected storage is returned as-is.
             _storage = new Lazy<IAgent365PersistentStorage>(
-                () => storage ?? Agent365PersistentStorage.Create(Agent365StorageDirectoryResolver.Resolve(null)),
+                () => storage ?? Agent365DurableDelivery.CreateStorage(new Agent365ExporterOptions(), _logger),
                 LazyThreadSafetyMode.ExecutionAndPublication);
         }
 
