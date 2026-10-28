@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix Agent365-only and no-exporter configurations suppressing independently registered OpenTelemetry log exporters. The provider-wide logging filter now applies only when `Instrumentation.EnableLogging` is explicitly disabled ([#182](https://github.com/microsoft/opentelemetry-distro-dotnet/issues/182)).
 - **Breaking change on Unix:** Agent365 offline buffering now requires `StorageDirectory` to name an existing, absolute, application-owned private root. Automatic `TMPDIR`, `/var/tmp`, `/tmp`, and current-directory fallbacks are removed on Unix to avoid SDK-selected shared temporary storage. Customers provision and maintain filesystem ownership, permissions, and ACLs; the SDK does not validate or modify access controls. Missing or invalid configuration is logged and disables only offline buffering; online export continues. Windows defaults and cache subdirectory identities are unchanged. See [offline buffering and filesystem permissions](docs/agent365-getting-started.md#offline-buffering-and-filesystem-permissions) for configuration and migration guidance.
 - **Breaking change:** Synced the vendored `OpenTelemetry.Resources.Azure` resource detectors to `1.20.1-beta.1`; resource attributes now follow semantic conventions v1.44.0 (`cloud.platform` values `azure_app_service`/`azure_container_apps`/`azure_vm` are now `azure.app_service`/`azure.container_apps`/`azure.vm`, and the App Service slot is reported as `deployment.environment.name` instead of `deployment.environment`).
 
