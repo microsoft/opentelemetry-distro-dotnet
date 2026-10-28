@@ -143,6 +143,42 @@ Customize the Agent365 exporter behavior via `o.Agent365`:
 | `MaxExportBatchSize` | Maximum batch size for export operations. | `512` |
 | `ScheduledDelayMilliseconds` | Delay in milliseconds between export batches. | `5000` |
 | `ExporterTimeoutMilliseconds` | Timeout in milliseconds for the export operation. | `30000` |
+| `DisableOfflineStorage` | Disables on-disk buffering and replay. On Unix, leaving this `false` also requires a provisioned `StorageDirectory`. | `false` |
+| `StorageDirectory` | Storage root. Unix requires an existing, absolute, private directory provisioned by the deployment. Windows can resolve a default location. | `null` |
+
+### Offline buffering and filesystem permissions
+
+Agent365 can buffer undeliverable telemetry on disk for later replay. **On Unix, including Linux and macOS, this requires an explicitly configured, pre-existing private storage root.** The SDK does not select a shared temporary directory automatically. If the root is missing, relative, or not configured, initialization logs an error and disables offline buffering and its replay loop; online export continues. To intentionally run without disk buffering, set `o.Agent365.DisableOfflineStorage = true`.
+
+The deployment owns filesystem security, as with Azure Monitor's customer-configured storage. Provision a dedicated root owned by the application's service account, with access restricted to that account (normally Unix mode `0700`). Review extended ACLs, including inherited allow grants, and ensure untrusted users cannot replace the root or its ancestors. The SDK does not inspect or change ownership, permission bits, ACLs, or symbolic links. A configured path is trusted; pointing it at `/tmp` or another shared directory is not a secure configuration.
+
+For example, run the following **as the application's service account during deployment**, using a new application-specific location:
+
+```sh
+install -d -m 700 "$HOME/.local/state/my-agent/telemetry"
+```
+
+If the path already exists, review its ownership, permissions, and ACLs before reuse. Do not change permissions on shared system directories.
+
+Configure that same root when initializing the distro:
+
+```csharp
+using System;
+using System.IO;
+using Microsoft.OpenTelemetry;
+
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.Agent365;
+    o.Agent365.StorageDirectory = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".local", "state", "my-agent", "telemetry");
+});
+```
+
+The SDK creates its cache subdirectories beneath this root using normal filesystem inheritance. It does not change the customer's access controls. Windows retains the existing `LOCALAPPDATA`, `TEMP`, and current-directory fallback behavior and inherited ACLs.
+
+**Migration:** Unix applications that previously relied on automatic temporary storage must provision and configure a private root to retain offline buffering. Keeping the same explicitly configured root preserves the existing hashed cache location and replay. Records in a previous default temporary location are not automatically moved or replayed after switching roots; review and migrate any backlog during a controlled, stopped-application maintenance window.
 
 ### Azure Monitor options
 

@@ -912,8 +912,11 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
         //  11. E2E: EnableLogging kill switch suppresses log records
         // ══════════════════════════════════════════════════════════════
 
-        [Fact]
-        public void EnableLoggingFalse_NoLogRecordsExported()
+        [Theory]
+        [InlineData(ExportTarget.Console)]
+        [InlineData(ExportTarget.Agent365)]
+        [InlineData(ExportTarget.None)]
+        public void EnableLoggingFalse_NoLogRecordsExported(ExportTarget exporters)
         {
             var exportedLogs = new List<LogRecord>();
 
@@ -923,7 +926,7 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
                 .UseMicrosoftOpenTelemetry(o =>
                 {
                     o.Instrumentation.EnableLogging = false;
-                    o.Exporters = ExportTarget.Console;
+                    o.Exporters = exporters;
                 })
                 .WithLogging(logging => logging.AddInMemoryExporter(exportedLogs));
 
@@ -967,6 +970,60 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
 
             Assert.NotEmpty(exportedLogs);
             Assert.Contains(exportedLogs, r => r.Body?.ToString()?.Contains("captured") == true);
+        }
+
+        [Theory]
+        [InlineData(ExportTarget.Agent365, true, null)]
+        [InlineData(ExportTarget.Agent365, false, null)]
+        [InlineData(ExportTarget.Agent365, true, true)]
+        [InlineData(ExportTarget.Agent365, false, true)]
+        [InlineData(ExportTarget.None, true, null)]
+        [InlineData(ExportTarget.None, false, null)]
+        [InlineData(ExportTarget.None, true, true)]
+        [InlineData(ExportTarget.None, false, true)]
+        public void IndependentLoggingExporter_NoDistroLoggingExporter_PreservesApplicationFilters(
+            ExportTarget exporters, bool registerExporterFirst, bool? enableLogging)
+        {
+            var exportedLogs = new List<LogRecord>();
+            var services = new ServiceCollection();
+            services.AddLogging(logging =>
+            {
+                logging.AddFilter("RestrictedCategory", LogLevel.Warning);
+                logging.AddFilter<OpenTelemetryLoggerProvider>("BlockedCategory", LogLevel.None);
+            });
+
+            var builder = services.AddOpenTelemetry();
+            if (registerExporterFirst)
+            {
+                builder.WithLogging(logging => logging.AddInMemoryExporter(exportedLogs));
+            }
+
+            builder.UseMicrosoftOpenTelemetry(o =>
+            {
+                o.Exporters = exporters;
+                if (enableLogging.HasValue)
+                {
+                    o.Instrumentation.EnableLogging = enableLogging.Value;
+                }
+            });
+
+            if (!registerExporterFirst)
+            {
+                builder.WithLogging(logging => logging.AddInMemoryExporter(exportedLogs));
+            }
+
+            using var sp = services.BuildServiceProvider();
+            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+            loggerFactory.CreateLogger("TestCategory").LogInformation("Application log");
+            var restrictedLogger = loggerFactory.CreateLogger("RestrictedCategory");
+            restrictedLogger.LogInformation("Suppressed information");
+            restrictedLogger.LogWarning("Application warning");
+            loggerFactory.CreateLogger("BlockedCategory").LogCritical("Suppressed critical");
+            sp.GetRequiredService<LoggerProvider>().ForceFlush();
+
+            Assert.Collection(exportedLogs,
+                record => Assert.Equal("Application log", record.Body),
+                record => Assert.Equal("Application warning", record.Body));
         }
 
         [Fact]
