@@ -169,6 +169,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             OutputMessagesOperationName,
             ApplyGuardrailOperationName,
             ChatOperationName,
+            "text_completion",
+            "generate_content",
         };
 
         /// <summary>
