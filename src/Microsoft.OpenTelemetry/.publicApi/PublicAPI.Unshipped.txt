@@ -14,3 +14,6 @@ override Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters.Agent365E
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.OnForceFlush(int timeoutMilliseconds) -> bool
 override Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors.BatchActivityExportProcessorAsync.OnShutdown(int timeoutMilliseconds) -> bool
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.ExecuteToolScope.RecordResponse(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools.ExecuteToolCallResult? result) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InferenceScope.RecordCacheReadInputTokens(int cacheReadInputTokens) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InferenceScope.RecordCacheWriteInputTokens(int cacheWriteInputTokens) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.InferenceScope.RecordResponseModel(string! responseModel) -> void
