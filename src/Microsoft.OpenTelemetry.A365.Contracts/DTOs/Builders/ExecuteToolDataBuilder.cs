@@ -205,6 +205,14 @@ namespace Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders
             AddIfNotNull(attributes, OpenTelemetryConstants.GenAiToolCallIdKey, toolCallId);
             AddIfNotNull(attributes, OpenTelemetryConstants.GenAiToolDescriptionKey, description);
             AddIfNotNull(attributes, OpenTelemetryConstants.GenAiToolTypeKey, toolType);
+            if (toolCallDetails.RefinementDetails != null)
+            {
+                foreach (var attribute in toolCallDetails.RefinementDetails.GetAttributes())
+                {
+                    AddIfNotNull(attributes, attribute.Key, attribute.Value);
+                }
+            }
+
             if (endpoint != null)
             {
                 AddIfNotNull(attributes, OpenTelemetryConstants.ServerAddressKey, endpoint.Host);

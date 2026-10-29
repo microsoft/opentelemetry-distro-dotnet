@@ -11,6 +11,45 @@ namespace Microsoft.Agents.A365.Observability.Tests.Tracing.Contracts;
 public sealed class ToolCallDetailsTests
 {
     [TestMethod]
+    public void RefinementDetails_RejectsUndefinedKind()
+    {
+        var create = () => new ToolCallRefinementDetails((ToolCallRefinementKind)999);
+
+        create.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("kind");
+    }
+
+    [TestMethod]
+    [DataRow(ToolCallRefinementKind.LoadSkill)]
+    [DataRow(ToolCallRefinementKind.ReadSkillResource)]
+    public void RefinementDetails_RejectsProcessMetadataForNonCommandTools(ToolCallRefinementKind kind)
+    {
+        var withExecutableName = () => new ToolCallRefinementDetails(kind, executableName: "python");
+        var withExecutablePath = () => new ToolCallRefinementDetails(kind, executablePath: "/usr/bin/python");
+        var withExitCode = () => new ToolCallRefinementDetails(kind, exitCode: 0);
+
+        withExecutableName.Should().Throw<ArgumentException>();
+        withExecutablePath.Should().Throw<ArgumentException>();
+        withExitCode.Should().Throw<ArgumentException>();
+    }
+
+    [TestMethod]
+    public void ToolCallDetails_EqualityIncludesRefinementValues()
+    {
+        ToolCallDetails Create(string? resourceName) => new ToolCallDetails("read", arguments: null)
+        {
+            RefinementDetails = new ToolCallRefinementDetails(
+                ToolCallRefinementKind.ReadSkillResource, skillName: "code-review", resourceName: resourceName),
+        };
+
+        var left = Create("references/policy.md");
+        var right = Create("references/policy.md");
+        left.Should().Be(right);
+        left.GetHashCode().Should().Be(right.GetHashCode());
+        left.Should().NotBe(Create("references/other.md"));
+        left.Should().NotBe(new ToolCallDetails("read", arguments: null));
+    }
+
+    [TestMethod]
     public void ObjectInitializer_WithTransferDetails_ExposesTypedValues()
     {
         var targetAgent = new AgentDetails(

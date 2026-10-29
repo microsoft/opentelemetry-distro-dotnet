@@ -721,12 +721,66 @@ the required tool metadata
 `ToolCallDetails`, then attach `TransferDetails` with an object initializer for
 the explicit handoff metadata.
 
+#### Skill and command tool refinements
+
+When the tool API or runtime state explicitly identifies a skill operation,
+attach `ToolCallRefinementDetails` to the existing `ToolCallDetails`. This follows
+the [OpenTelemetry execute-tool refinements](https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-agent-spans.md#agent-skills);
+it does not create another span or infer behavior from tool names or arguments.
+
+```csharp
+var toolDetails = new ToolCallDetails("run_skill_script", arguments: "{}")
+{
+    RefinementDetails = new ToolCallRefinementDetails(
+        ToolCallRefinementKind.ExecuteCommand,
+        skillName: "code-review",
+        sourceUri: "file:///opt/skills/code-review",
+        resourceName: "scripts/check.py",
+        executableName: "python",
+        executablePath: "/usr/bin/python"),
+};
+
+using var scope = ExecuteToolScope.Start(request, toolDetails, agentDetails);
+// Execute the command, then record its reported exit code (including zero).
+scope.RecordProcessExitCode(exitCode);
+// Report failures separately through scope.RecordError(exception), as appropriate.
+```
+
+Use `LoadSkill` for a dedicated skill loader, `ReadSkillResource` for a dedicated
+resource reader, or `ExecuteCommand` for commands, including scripts bundled with
+a skill. Commands need not belong to a skill. Supply executable name/path only
+when the tool directly executes a single process, and an exit code only when the
+tool reports a single command or process status. Process metadata is rejected
+for the other refinement kinds.
+
+The optional attributes are `gen_ai.skill.name`, `gen_ai.skill.description`,
+`gen_ai.skill.source.uri`, `gen_ai.skill.resource.name`, `process.executable.name`,
+`process.executable.path`, and numeric `process.exit.code`. Empty strings are
+omitted. Supply names known at the start of execution even when the operation
+later fails. Descriptions and source URIs may contain sensitive information:
+remove credentials and access tokens before supplying a source URI, and use the
+skill's original source rather than its temporary materialization path. These
+explicitly supplied values are not automatically scrubbed.
+
+Activity names use `execute_tool {toolName} {skillName}` for loading a named
+skill. Resource readers and commands append `{skillName} {resourceName}` when
+both names are available, or just `{resourceName}` when only that name is known.
+Without a resource name, commands append the executable name if available;
+resource readers append nothing. Neither appends a skill name by itself.
+Missing metadata falls back to `execute_tool {toolName}`.
+
+Direct ETW logging accepts the same `ToolCallDetails` and emits the same
+attributes; pass a known exit code to the refinement constructor when logging a
+completed command. Its existing `ExecuteTool` event envelope name is unchanged.
+Exit codes do not automatically set an error status on either path.
+
 **Available methods:**
 
 | Method | Description |
 |---|---|
 | `RecordResponse(string)` | Record a string result. |
 | `RecordResponse(IDictionary<string, object>)` | Record a structured result. |
+| `RecordProcessExitCode(int)` | Record the exit code reported by a single command or process. |
 | `RecordThreatDiagnosticsSummary(ThreatDiagnosticsSummary)` | Record threat diagnostics. |
 
 ### Inference (`InferenceScope`)
