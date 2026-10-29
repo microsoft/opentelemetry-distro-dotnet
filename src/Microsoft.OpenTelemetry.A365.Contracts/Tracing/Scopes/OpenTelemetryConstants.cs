@@ -107,6 +107,16 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// </summary>
         public const string ChatOperationName = "chat";
 
+        /// <summary>
+        /// The operation name value for text completion spans.
+        /// </summary>
+        public const string TextCompletionOperationName = "text_completion";
+
+        /// <summary>
+        /// The operation name value for content generation spans.
+        /// </summary>
+        public const string GenerateContentOperationName = "generate_content";
+
         // Channel dimensions (renamed from gen_ai.channel.* to microsoft.channel.*)
         public const string ChannelNameKey = "microsoft.channel.name";
         public const string ChannelLinkKey = "microsoft.channel.link";
@@ -169,6 +179,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             OutputMessagesOperationName,
             ApplyGuardrailOperationName,
             ChatOperationName,
+            TextCompletionOperationName,
+            GenerateContentOperationName,
         };
 
         /// <summary>

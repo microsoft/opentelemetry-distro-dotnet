@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
 {
@@ -189,14 +190,14 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
             switch (operationName)
             {
                 case InferenceOperationType.Chat:
-                    return "chat";
+                    return OpenTelemetryConstants.ChatOperationName;
                 case InferenceOperationType.TextCompletion:
-                    return "text_completion";
+                    return OpenTelemetryConstants.TextCompletionOperationName;
                 case InferenceOperationType.GenerateContent:
-                    return "generate_content";
+                    return OpenTelemetryConstants.GenerateContentOperationName;
                 default:
                     Trace.TraceWarning("An undefined inference operation was supplied; operation telemetry will default to chat.");
-                    return "chat";
+                    return OpenTelemetryConstants.ChatOperationName;
             }
         }
     }

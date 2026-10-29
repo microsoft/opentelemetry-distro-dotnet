@@ -214,8 +214,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.IntegrationTests
             toolThreatSummaryJson.Should().Contain("\"diagnostics\":null");
         }
 
-        [TestMethod]
-        public async Task AddTracing_And_InferenceScope_ExporterMakesExpectedRequest()
+        [DataTestMethod]
+        [DataRow(InferenceOperationType.Chat, "chat")]
+        [DataRow(InferenceOperationType.TextCompletion, "text_completion")]
+        [DataRow(InferenceOperationType.GenerateContent, "generate_content")]
+        public async Task AddTracing_And_InferenceScope_ExporterMakesExpectedRequest(InferenceOperationType operationName, string expectedOperationName)
         {
             // Arrange
             this.SetupExporterTest();
@@ -231,7 +234,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.IntegrationTests
                 tenantId: Guid.NewGuid().ToString());
 
             var inferenceDetails= new InferenceCallDetails(
-                operationName: InferenceOperationType.Chat,
+                operationName: operationName,
                 model: "gpt-4",
                 providerName: "OpenAI",
                 inputTokens: 42,
@@ -276,7 +279,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.IntegrationTests
                 .GetProperty("spans")[0]
                 .GetProperty("attributes");
 
-            this.GetAttribute(attributes, "gen_ai.operation.name").Should().Be("chat");
+            this.GetAttribute(attributes, "gen_ai.operation.name").Should().Be(expectedOperationName);
             this.GetAttribute(attributes, "gen_ai.agent.id").Should().Be(expectedAgentDetails.AgentId);
             this.GetAttribute(attributes, "gen_ai.agent.name").Should().Be(expectedAgentDetails.AgentName);
             this.GetAttribute(attributes, "gen_ai.agent.description").Should().Be(expectedAgentDetails.AgentDescription);
