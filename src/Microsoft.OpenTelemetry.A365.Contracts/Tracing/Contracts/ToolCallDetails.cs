@@ -119,6 +119,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         public TransferDetails? TransferDetails { get; set; }
 
         /// <summary>
+        /// Gets or sets explicit skill or command refinement metadata for this tool execution.
+        /// </summary>
+        public IExecuteToolRefinementDetails? RefinementDetails { get; set; }
+
+        /// <summary>
         /// Gets the identifier for the tool call, when provided.
         /// </summary>
         public string? ToolCallId { get; }
@@ -170,6 +175,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
                    ReferenceEquals(ArgumentsObject, other.ArgumentsObject) &&
                    ReferenceEquals(ToolCallArguments, other.ToolCallArguments) &&
                    EqualityComparer<TransferDetails?>.Default.Equals(TransferDetails, other.TransferDetails) &&
+                   EqualityComparer<IExecuteToolRefinementDetails?>.Default.Equals(RefinementDetails, other.RefinementDetails) &&
                    string.Equals(ToolCallId, other.ToolCallId, StringComparison.Ordinal) &&
                    string.Equals(Description, other.Description, StringComparison.Ordinal) &&
                    string.Equals(ToolType, other.ToolType, StringComparison.Ordinal) &&
@@ -193,6 +199,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
                 hash = (hash * 31) + (ArgumentsObject != null ? System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(ArgumentsObject) : 0);
                 hash = (hash * 31) + (ToolCallArguments != null ? System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(ToolCallArguments) : 0);
                 hash = (hash * 31) + (TransferDetails?.GetHashCode() ?? 0);
+                hash = (hash * 31) + (RefinementDetails?.GetHashCode() ?? 0);
                 hash = (hash * 31) + (ToolCallId != null ? StringComparer.Ordinal.GetHashCode(ToolCallId) : 0);
                 hash = (hash * 31) + (Description != null ? StringComparer.Ordinal.GetHashCode(Description) : 0);
                 hash = (hash * 31) + (ToolType != null ? StringComparer.Ordinal.GetHashCode(ToolType) : 0);

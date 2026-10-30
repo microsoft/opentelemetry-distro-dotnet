@@ -20,6 +20,134 @@ using System.Diagnostics.Tracing;
 [TestClass]
 public sealed class ExecuteToolScopeTest : ActivityTest
 {
+    [TestMethod]
+    [DataRow(SkillRefinementKind.LoadSkill, "code-review", null, "execute_tool custom_tool code-review")]
+    [DataRow(SkillRefinementKind.LoadSkill, null, null, "execute_tool custom_tool")]
+    [DataRow(SkillRefinementKind.ReadSkillResource, "code-review", "references/policy.md", "execute_tool custom_tool code-review references/policy.md")]
+    [DataRow(SkillRefinementKind.ReadSkillResource, null, "references/policy.md", "execute_tool custom_tool references/policy.md")]
+    [DataRow(SkillRefinementKind.ReadSkillResource, "code-review", null, "execute_tool custom_tool")]
+    [DataRow(SkillRefinementKind.ReadSkillResource, null, null, "execute_tool custom_tool")]
+    [DataRow(SkillRefinementKind.LoadSkill, " ", null, "execute_tool custom_tool")]
+    public void Start_WithSkillRefinement_UsesConventionSpanName(
+        SkillRefinementKind kind, string? skillName, string? resourceName, string expectedName)
+    {
+        var details = new ToolCallDetails("custom_tool", arguments: null)
+        {
+            RefinementDetails = new SkillRefinementDetails(kind, skillName: skillName, resourceName: resourceName),
+        };
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(Util.GetDefaultRequest(), details, Util.GetAgentDetails());
+        });
+
+        activity.DisplayName.Should().Be(expectedName);
+        activity.Kind.Should().Be(System.Diagnostics.ActivityKind.Internal);
+        activity.ShouldHaveTag("gen_ai.operation.name", "execute_tool");
+        activity.ShouldHaveTag("gen_ai.tool.name", "custom_tool");
+    }
+
+    [TestMethod]
+    [DataRow("code-review", "scripts/check.py", "python", "execute_tool custom_tool code-review scripts/check.py")]
+    [DataRow(null, "scripts/check.py", "python", "execute_tool custom_tool scripts/check.py")]
+    [DataRow("code-review", null, "python", "execute_tool custom_tool python")]
+    [DataRow("code-review", null, null, "execute_tool custom_tool")]
+    [DataRow(null, null, null, "execute_tool custom_tool")]
+    public void Start_WithCommandRefinement_UsesConventionSpanName(
+        string? skillName, string? resourceName, string? executableName, string expectedName)
+    {
+        var details = new ToolCallDetails("custom_tool", arguments: null)
+        {
+            RefinementDetails = new ExecuteCommandRefinementDetails(
+                skillName: skillName, resourceName: resourceName, executableName: executableName),
+        };
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(Util.GetDefaultRequest(), details, Util.GetAgentDetails());
+        });
+
+        activity.DisplayName.Should().Be(expectedName);
+        activity.Kind.Should().Be(System.Diagnostics.ActivityKind.Internal);
+        activity.ShouldHaveTag("gen_ai.operation.name", "execute_tool");
+        activity.ShouldHaveTag("gen_ai.tool.name", "custom_tool");
+    }
+
+    [TestMethod]
+    [DataRow(0)]
+    [DataRow(2)]
+    public void Start_WithCommandRefinement_EmitsSameAttributesAsDirectEtwEvenOnFailure(int exitCode)
+    {
+        var details = new ToolCallDetails("run", arguments: null)
+        {
+            RefinementDetails = new ExecuteCommandRefinementDetails(
+                skillName: "code-review",
+                description: "Review changes",
+                sourceUri: "file:///opt/skills/code-review",
+                resourceName: "scripts/check.py",
+                executableName: "python",
+                executablePath: "/usr/bin/python",
+                exitCode: exitCode),
+        };
+        var error = new InvalidOperationException("Command failed");
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(Util.GetDefaultRequest(), details, Util.GetAgentDetails());
+            scope.RecordError(error);
+        });
+        var data = Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.ExecuteToolDataBuilder.Build(
+            details, Util.GetAgentDetails(), "conversation", error: error);
+        var expected = new Dictionary<string, object>
+        {
+            ["gen_ai.skill.name"] = "code-review",
+            ["gen_ai.skill.description"] = "Review changes",
+            ["gen_ai.skill.source.uri"] = "file:///opt/skills/code-review",
+            ["gen_ai.skill.resource.name"] = "scripts/check.py",
+            ["process.executable.name"] = "python",
+            ["process.executable.path"] = "/usr/bin/python",
+            ["process.exit.code"] = exitCode,
+        };
+
+        foreach (var attribute in expected)
+        {
+            activity.GetTagItem(attribute.Key).Should().Be(attribute.Value);
+            data.Attributes.Should().ContainKey(attribute.Key).WhoseValue.Should().Be(attribute.Value);
+        }
+
+        activity.Status.Should().Be(System.Diagnostics.ActivityStatusCode.Error);
+        data.Name.Should().Be("ExecuteTool");
+    }
+
+    [TestMethod]
+    public void Start_WithoutExplicitRefinement_DoesNotInferSkillFromToolName()
+    {
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(), new ToolCallDetails("load_skill", "{\"name\":\"code-review\"}"), Util.GetAgentDetails());
+        });
+
+        activity.DisplayName.Should().Be("execute_tool load_skill");
+        activity.TagObjects.Should().NotContain(tag => tag.Key.StartsWith("gen_ai.skill.", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    [DataRow(0)]
+    [DataRow(2)]
+    public void RecordProcessExitCode_AfterCommandCompletes_RecordsNumericExitCode(int exitCode)
+    {
+        var details = new ToolCallDetails("shell", arguments: null)
+        {
+            RefinementDetails = new ExecuteCommandRefinementDetails(executableName: "python"),
+        };
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(Util.GetDefaultRequest(), details, Util.GetAgentDetails());
+            scope.RecordProcessExitCode(exitCode);
+        });
+
+        activity.GetTagItem("process.exit.code").Should().Be(exitCode);
+    }
+
     private sealed class TestEventListener : EventListener
     {
         public List<EventWrittenEventArgs> Events { get; } = new();

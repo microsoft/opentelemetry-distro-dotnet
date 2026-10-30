@@ -1,4 +1,45 @@
 #nullable enable
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails.Description.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails.Equals(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails? other) -> bool
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails.ExecutableName.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails.ExecutablePath.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails.ExecuteCommandRefinementDetails(string? executableName = null, string? executablePath = null, int? exitCode = null, string? skillName = null, string? description = null, string? sourceUri = null, string? resourceName = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails.ExitCode.get -> int?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails.GetAttributes() -> System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, object!>>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails.GetSpanName(string! toolName) -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails.ResourceName.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails.SkillName.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails.SourceUri.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.IExecuteToolRefinementDetails
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.IExecuteToolRefinementDetails.GetAttributes() -> System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, object!>>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.IExecuteToolRefinementDetails.GetSpanName(string! toolName) -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementDetails
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementDetails.Description.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementDetails.Equals(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementDetails? other) -> bool
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementDetails.GetAttributes() -> System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, object!>>!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementDetails.GetSpanName(string! toolName) -> string!
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementDetails.Kind.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementKind
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementDetails.ResourceName.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementDetails.SkillName.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementDetails.SkillRefinementDetails(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementKind kind, string? skillName = null, string? description = null, string? sourceUri = null, string? resourceName = null) -> void
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementDetails.SourceUri.get -> string?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementKind
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementKind.LoadSkill = 0 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementKind
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementKind.ReadSkillResource = 1 -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementKind
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.RefinementDetails.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.IExecuteToolRefinementDetails?
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ToolCallDetails.RefinementDetails.set -> void
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiSkillDescriptionKey = "gen_ai.skill.description" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiSkillNameKey = "gen_ai.skill.name" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiSkillResourceNameKey = "gen_ai.skill.resource.name" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.GenAiSkillSourceUriKey = "gen_ai.skill.source.uri" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.ProcessExecutableNameKey = "process.executable.name" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.ProcessExecutablePathKey = "process.executable.path" -> string!
+const Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes.OpenTelemetryConstants.ProcessExitCodeKey = "process.exit.code" -> string!
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails.Equals(object? obj) -> bool
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails.GetHashCode() -> int
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementDetails.Equals(object? obj) -> bool
+override Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.SkillRefinementDetails.GetHashCode() -> int
 *REMOVED*Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails.AgentClientIP.get -> System.Net.IPAddress?
 *REMOVED*Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails.AgentDetails(string? agentId = null, string? agentName = null, string? agentDescription = null, string? agenticUserId = null, string? agenticUserEmail = null, string? agentBlueprintId = null, string? tenantId = null, Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentType? agentType = null, System.Net.IPAddress? agentClientIP = null, string? agentPlatformId = null, string? providerName = null, string? agentVersion = null) -> void
 *REMOVED*Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentDetails.AgentType.get -> Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.AgentType?

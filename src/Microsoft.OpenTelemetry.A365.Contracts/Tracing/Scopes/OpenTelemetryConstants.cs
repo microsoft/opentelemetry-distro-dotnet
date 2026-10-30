@@ -224,6 +224,27 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// </summary>
         public const string GenAiToolCallResultKey = "gen_ai.tool.call.result";
 
+        /// <summary>The Agent Skill name key.</summary>
+        public const string GenAiSkillNameKey = "gen_ai.skill.name";
+
+        /// <summary>The Agent Skill description key.</summary>
+        public const string GenAiSkillDescriptionKey = "gen_ai.skill.description";
+
+        /// <summary>The Agent Skill source URI key.</summary>
+        public const string GenAiSkillSourceUriKey = "gen_ai.skill.source.uri";
+
+        /// <summary>The skill-relative resource name key.</summary>
+        public const string GenAiSkillResourceNameKey = "gen_ai.skill.resource.name";
+
+        /// <summary>The directly executed process name key.</summary>
+        public const string ProcessExecutableNameKey = "process.executable.name";
+
+        /// <summary>The directly executed process path key.</summary>
+        public const string ProcessExecutablePathKey = "process.executable.path";
+
+        /// <summary>The reported command or process exit code key.</summary>
+        public const string ProcessExitCodeKey = "process.exit.code";
+
         /// <summary>
         /// The explicit transfer mode key for execute-tool spans.
         /// </summary>
