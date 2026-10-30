@@ -121,7 +121,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// <summary>
         /// Gets or sets explicit skill or command refinement metadata for this tool execution.
         /// </summary>
-        public ToolCallRefinementDetails? RefinementDetails { get; set; }
+        public IExecuteToolRefinementDetails? RefinementDetails { get; set; }
 
         /// <summary>
         /// Gets the identifier for the tool call, when provided.
@@ -175,7 +175,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
                    ReferenceEquals(ArgumentsObject, other.ArgumentsObject) &&
                    ReferenceEquals(ToolCallArguments, other.ToolCallArguments) &&
                    EqualityComparer<TransferDetails?>.Default.Equals(TransferDetails, other.TransferDetails) &&
-                   EqualityComparer<ToolCallRefinementDetails?>.Default.Equals(RefinementDetails, other.RefinementDetails) &&
+                   EqualityComparer<IExecuteToolRefinementDetails?>.Default.Equals(RefinementDetails, other.RefinementDetails) &&
                    string.Equals(ToolCallId, other.ToolCallId, StringComparison.Ordinal) &&
                    string.Equals(Description, other.Description, StringComparison.Ordinal) &&
                    string.Equals(ToolType, other.ToolType, StringComparison.Ordinal) &&

@@ -21,27 +21,46 @@ using System.Diagnostics.Tracing;
 public sealed class ExecuteToolScopeTest : ActivityTest
 {
     [TestMethod]
-    [DataRow(ToolCallRefinementKind.LoadSkill, "code-review", null, null, "execute_tool custom_tool code-review")]
-    [DataRow(ToolCallRefinementKind.LoadSkill, null, null, null, "execute_tool custom_tool")]
-    [DataRow(ToolCallRefinementKind.ReadSkillResource, "code-review", "references/policy.md", null, "execute_tool custom_tool code-review references/policy.md")]
-    [DataRow(ToolCallRefinementKind.ReadSkillResource, null, "references/policy.md", null, "execute_tool custom_tool references/policy.md")]
-    [DataRow(ToolCallRefinementKind.ReadSkillResource, "code-review", null, null, "execute_tool custom_tool")]
-    [DataRow(ToolCallRefinementKind.ReadSkillResource, null, null, null, "execute_tool custom_tool")]
-    [DataRow(ToolCallRefinementKind.ExecuteCommand, "code-review", "scripts/check.py", "python", "execute_tool custom_tool code-review scripts/check.py")]
-    [DataRow(ToolCallRefinementKind.ExecuteCommand, null, "scripts/check.py", "python", "execute_tool custom_tool scripts/check.py")]
-    [DataRow(ToolCallRefinementKind.ExecuteCommand, "code-review", null, "python", "execute_tool custom_tool python")]
-    [DataRow(ToolCallRefinementKind.ExecuteCommand, "code-review", null, null, "execute_tool custom_tool")]
-    [DataRow(ToolCallRefinementKind.ExecuteCommand, null, null, null, "execute_tool custom_tool")]
-    [DataRow(ToolCallRefinementKind.LoadSkill, " ", null, null, "execute_tool custom_tool")]
-    public void Start_WithRefinement_UsesConventionSpanName(
-        ToolCallRefinementKind kind, string? skillName, string? resourceName, string? executableName, string expectedName)
+    [DataRow(SkillRefinementKind.LoadSkill, "code-review", null, "execute_tool custom_tool code-review")]
+    [DataRow(SkillRefinementKind.LoadSkill, null, null, "execute_tool custom_tool")]
+    [DataRow(SkillRefinementKind.ReadSkillResource, "code-review", "references/policy.md", "execute_tool custom_tool code-review references/policy.md")]
+    [DataRow(SkillRefinementKind.ReadSkillResource, null, "references/policy.md", "execute_tool custom_tool references/policy.md")]
+    [DataRow(SkillRefinementKind.ReadSkillResource, "code-review", null, "execute_tool custom_tool")]
+    [DataRow(SkillRefinementKind.ReadSkillResource, null, null, "execute_tool custom_tool")]
+    [DataRow(SkillRefinementKind.LoadSkill, " ", null, "execute_tool custom_tool")]
+    public void Start_WithSkillRefinement_UsesConventionSpanName(
+        SkillRefinementKind kind, string? skillName, string? resourceName, string expectedName)
     {
         var details = new ToolCallDetails("custom_tool", arguments: null)
         {
-            RefinementDetails = new ToolCallRefinementDetails(
-                kind, skillName: skillName, resourceName: resourceName, executableName: executableName),
+            RefinementDetails = new SkillRefinementDetails(kind, skillName: skillName, resourceName: resourceName),
         };
 
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(Util.GetDefaultRequest(), details, Util.GetAgentDetails());
+        });
+
+        activity.DisplayName.Should().Be(expectedName);
+        activity.Kind.Should().Be(System.Diagnostics.ActivityKind.Internal);
+        activity.ShouldHaveTag("gen_ai.operation.name", "execute_tool");
+        activity.ShouldHaveTag("gen_ai.tool.name", "custom_tool");
+    }
+
+    [TestMethod]
+    [DataRow("code-review", "scripts/check.py", "python", "execute_tool custom_tool code-review scripts/check.py")]
+    [DataRow(null, "scripts/check.py", "python", "execute_tool custom_tool scripts/check.py")]
+    [DataRow("code-review", null, "python", "execute_tool custom_tool python")]
+    [DataRow("code-review", null, null, "execute_tool custom_tool")]
+    [DataRow(null, null, null, "execute_tool custom_tool")]
+    public void Start_WithCommandRefinement_UsesConventionSpanName(
+        string? skillName, string? resourceName, string? executableName, string expectedName)
+    {
+        var details = new ToolCallDetails("custom_tool", arguments: null)
+        {
+            RefinementDetails = new ExecuteCommandRefinementDetails(
+                skillName: skillName, resourceName: resourceName, executableName: executableName),
+        };
         var activity = ListenForActivity(() =>
         {
             using var scope = ExecuteToolScope.Start(Util.GetDefaultRequest(), details, Util.GetAgentDetails());
@@ -60,8 +79,7 @@ public sealed class ExecuteToolScopeTest : ActivityTest
     {
         var details = new ToolCallDetails("run", arguments: null)
         {
-            RefinementDetails = new ToolCallRefinementDetails(
-                ToolCallRefinementKind.ExecuteCommand,
+            RefinementDetails = new ExecuteCommandRefinementDetails(
                 skillName: "code-review",
                 description: "Review changes",
                 sourceUri: "file:///opt/skills/code-review",
@@ -119,7 +137,7 @@ public sealed class ExecuteToolScopeTest : ActivityTest
     {
         var details = new ToolCallDetails("shell", arguments: null)
         {
-            RefinementDetails = new ToolCallRefinementDetails(ToolCallRefinementKind.ExecuteCommand, executableName: "python"),
+            RefinementDetails = new ExecuteCommandRefinementDetails(executableName: "python"),
         };
         var activity = ListenForActivity(() =>
         {

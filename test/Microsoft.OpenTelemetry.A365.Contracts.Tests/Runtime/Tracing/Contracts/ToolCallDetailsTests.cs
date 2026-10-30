@@ -11,25 +11,28 @@ namespace Microsoft.Agents.A365.Observability.Tests.Tracing.Contracts;
 public sealed class ToolCallDetailsTests
 {
     [TestMethod]
-    public void RefinementDetails_RejectsUndefinedKind()
+    public void SkillRefinementDetails_RejectsUndefinedKind()
     {
-        var create = () => new ToolCallRefinementDetails((ToolCallRefinementKind)999);
+        var create = () => new SkillRefinementDetails((SkillRefinementKind)999);
 
         create.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("kind");
     }
 
     [TestMethod]
-    [DataRow(ToolCallRefinementKind.LoadSkill)]
-    [DataRow(ToolCallRefinementKind.ReadSkillResource)]
-    public void RefinementDetails_RejectsProcessMetadataForNonCommandTools(ToolCallRefinementKind kind)
+    [DataRow(0)]
+    [DataRow(2)]
+    public void CommandRefinementDetails_WithoutSkill_EmitsOnlyProcessMetadata(int exitCode)
     {
-        var withExecutableName = () => new ToolCallRefinementDetails(kind, executableName: "python");
-        var withExecutablePath = () => new ToolCallRefinementDetails(kind, executablePath: "/usr/bin/python");
-        var withExitCode = () => new ToolCallRefinementDetails(kind, exitCode: 0);
+        IExecuteToolRefinementDetails refinement = new ExecuteCommandRefinementDetails(
+            executableName: "python", executablePath: "/usr/bin/python", exitCode: exitCode);
 
-        withExecutableName.Should().Throw<ArgumentException>();
-        withExecutablePath.Should().Throw<ArgumentException>();
-        withExitCode.Should().Throw<ArgumentException>();
+        refinement.GetAttributes().ToDictionary(attribute => attribute.Key, attribute => attribute.Value)
+            .Should().BeEquivalentTo(new Dictionary<string, object>
+            {
+                ["process.executable.name"] = "python",
+                ["process.executable.path"] = "/usr/bin/python",
+                ["process.exit.code"] = exitCode,
+            });
     }
 
     [TestMethod]
@@ -37,8 +40,8 @@ public sealed class ToolCallDetailsTests
     {
         ToolCallDetails Create(string? resourceName) => new ToolCallDetails("read", arguments: null)
         {
-            RefinementDetails = new ToolCallRefinementDetails(
-                ToolCallRefinementKind.ReadSkillResource, skillName: "code-review", resourceName: resourceName),
+            RefinementDetails = new SkillRefinementDetails(
+                SkillRefinementKind.ReadSkillResource, skillName: "code-review", resourceName: resourceName),
         };
 
         var left = Create("references/policy.md");
@@ -47,6 +50,23 @@ public sealed class ToolCallDetailsTests
         left.GetHashCode().Should().Be(right.GetHashCode());
         left.Should().NotBe(Create("references/other.md"));
         left.Should().NotBe(new ToolCallDetails("read", arguments: null));
+    }
+
+    [TestMethod]
+    public void RefinementEquality_DistinguishesSkillKindsAndCommandExecutions()
+    {
+        IExecuteToolRefinementDetails load = new SkillRefinementDetails(SkillRefinementKind.LoadSkill, skillName: "review");
+        IExecuteToolRefinementDetails read = new SkillRefinementDetails(SkillRefinementKind.ReadSkillResource, skillName: "review");
+        IExecuteToolRefinementDetails command = new ExecuteCommandRefinementDetails(skillName: "review");
+        IExecuteToolRefinementDetails sameCommand = new ExecuteCommandRefinementDetails(skillName: "review");
+        IExecuteToolRefinementDetails differentCommand = new ExecuteCommandRefinementDetails(skillName: "review", exitCode: 0);
+
+        load.Should().NotBe(read);
+        read.Should().NotBe(command);
+        command.Should().NotBe(read);
+        command.Should().Be(sameCommand);
+        command.GetHashCode().Should().Be(sameCommand.GetHashCode());
+        command.Should().NotBe(differentCommand);
     }
 
     [TestMethod]

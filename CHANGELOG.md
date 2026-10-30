@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-- Add explicit skill-loading, skill-resource-reading, and command refinements to execute-tool telemetry through `ToolCallDetails.RefinementDetails`. Share skill/process attributes between Activity and direct ETW paths, use semantic-convention Activity span names, and support recording process exit codes after execution. Ordinary tool calls remain unchanged.
+- Add explicit skill-loading, skill-resource-reading, and command refinements to execute-tool telemetry through `ToolCallDetails.RefinementDetails`, using separate `SkillRefinementDetails` and `ExecuteCommandRefinementDetails` types. Share skill/process attributes between Activity and direct ETW paths, use semantic-convention Activity span names, and support recording process exit codes after execution. Ordinary tool calls remain unchanged.
 - Fix Agent365 tracing filters and export to accept `text_completion` and `generate_content` inference operations, preserving case-insensitive operation matching. Expose both operation names as public constants alongside `ChatOperationName`.
 - Add privacy-safe Model Observation attributes to inference telemetry, including the canonical served response model, cache read/write input-token counts, lowercase operation names, and endpoint host with an optional numeric non-default port. Attributes can be supplied when the inference scope starts or recorded after the response is available. ([#174](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/174))
 - Share canonical inference operation names across span names, span attributes, metrics, and DTOs. Undefined operation enum values fall back to `chat`; relative or hostless endpoints are omitted without throwing. Both cases emit diagnostic trace warnings.

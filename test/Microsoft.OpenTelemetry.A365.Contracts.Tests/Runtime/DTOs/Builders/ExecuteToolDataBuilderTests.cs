@@ -17,14 +17,13 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
     public class ExecuteToolDataBuilderTests
     {
         [TestMethod]
-        [DataRow(ToolCallRefinementKind.LoadSkill)]
-        [DataRow(ToolCallRefinementKind.ReadSkillResource)]
-        [DataRow(ToolCallRefinementKind.ExecuteCommand)]
-        public void Build_WithRefinement_EmitsOnlyAvailableMetadataAndProtectsItFromExtraAttributes(ToolCallRefinementKind kind)
+        [DataRow(SkillRefinementKind.LoadSkill)]
+        [DataRow(SkillRefinementKind.ReadSkillResource)]
+        public void Build_WithSkillRefinement_EmitsOnlyAvailableMetadataAndProtectsItFromExtraAttributes(SkillRefinementKind kind)
         {
             var details = new ToolCallDetails("custom", arguments: null)
             {
-                RefinementDetails = new ToolCallRefinementDetails(kind, skillName: "code-review"),
+                RefinementDetails = new SkillRefinementDetails(kind, skillName: "code-review"),
             };
             var data = ExecuteToolDataBuilder.Build(
                 details, new AgentDetails("agent"), "conversation",
@@ -41,8 +40,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
         {
             var details = new ToolCallDetails("read", new ExecuteToolCallArguments())
             {
-                RefinementDetails = new ToolCallRefinementDetails(
-                    ToolCallRefinementKind.ReadSkillResource, resourceName: "references/policy.md"),
+                RefinementDetails = new SkillRefinementDetails(
+                    SkillRefinementKind.ReadSkillResource, resourceName: "references/policy.md"),
             };
 
             var data = ExecuteToolDataBuilder.Build(

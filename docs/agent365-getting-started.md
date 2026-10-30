@@ -724,15 +724,27 @@ the explicit handoff metadata.
 #### Skill and command tool refinements
 
 When the tool API or runtime state explicitly identifies a skill operation,
-attach `ToolCallRefinementDetails` to the existing `ToolCallDetails`. This follows
+attach `SkillRefinementDetails` or `ExecuteCommandRefinementDetails` to the
+existing `ToolCallDetails.RefinementDetails` property. This follows
 the [OpenTelemetry execute-tool refinements](https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-agent-spans.md#agent-skills);
 it does not create another span or infer behavior from tool names or arguments.
 
 ```csharp
+var loadDetails = new ToolCallDetails("load_skill", arguments: "{}")
+{
+    RefinementDetails = new SkillRefinementDetails(
+        SkillRefinementKind.LoadSkill,
+        skillName: "code-review",
+        sourceUri: "file:///opt/skills/code-review"),
+};
+```
+
+Commands can optionally carry skill metadata when executing a bundled script:
+
+```csharp
 var toolDetails = new ToolCallDetails("run_skill_script", arguments: "{}")
 {
-    RefinementDetails = new ToolCallRefinementDetails(
-        ToolCallRefinementKind.ExecuteCommand,
+    RefinementDetails = new ExecuteCommandRefinementDetails(
         skillName: "code-review",
         sourceUri: "file:///opt/skills/code-review",
         resourceName: "scripts/check.py",
@@ -746,12 +758,15 @@ scope.RecordProcessExitCode(exitCode);
 // Report failures separately through scope.RecordError(exception), as appropriate.
 ```
 
-Use `LoadSkill` for a dedicated skill loader, `ReadSkillResource` for a dedicated
-resource reader, or `ExecuteCommand` for commands, including scripts bundled with
-a skill. Commands need not belong to a skill. Supply executable name/path only
+Use `SkillRefinementKind.LoadSkill` for a dedicated skill loader or
+`SkillRefinementKind.ReadSkillResource` for a dedicated resource reader.
+`SkillRefinementDetails` accepts only skill metadata.
+Use `ExecuteCommandRefinementDetails` for commands, including scripts bundled
+with a skill. Commands need not belong to a skill. The two sealed types implement
+`IExecuteToolRefinementDetails` without a shared base class.
+Supply executable name/path only
 when the tool directly executes a single process, and an exit code only when the
-tool reports a single command or process status. Process metadata is rejected
-for the other refinement kinds.
+tool reports a single command or process status.
 
 The optional attributes are `gen_ai.skill.name`, `gen_ai.skill.description`,
 `gen_ai.skill.source.uri`, `gen_ai.skill.resource.name`, `process.executable.name`,
