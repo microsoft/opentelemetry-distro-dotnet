@@ -46,7 +46,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         private ExecuteToolScope(Request request, ToolCallDetails details, AgentDetails agentDetails, UserDetails? userDetails, SpanDetails? spanDetails, ThreatDiagnosticsSummary? threatDiagnosticsSummary)
             : base(
                 operationName: OpenTelemetryConstants.ExecuteToolOperationName,
-                activityName: $"{OpenTelemetryConstants.ExecuteToolOperationName} {details.ToolName}",
+                activityName: details.RefinementDetails?.GetSpanName(details.ToolName)
+                    ?? $"{OpenTelemetryConstants.ExecuteToolOperationName} {details.ToolName}",
                 agentDetails: agentDetails,
                 request: request,
                 spanDetails: new SpanDetails(spanDetails?.SpanKind ?? ActivityKind.Internal, spanDetails?.ParentContext, spanDetails?.StartTime, spanDetails?.EndTime, spanDetails?.SpanLinks),
@@ -86,6 +87,14 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             SetTagMaybe(OpenTelemetryConstants.GenAiToolCallIdKey, toolCallId);
             SetTagMaybe(OpenTelemetryConstants.GenAiToolDescriptionKey, description);
 
+            if (details.RefinementDetails != null)
+            {
+                foreach (var attribute in details.RefinementDetails.GetAttributes())
+                {
+                    SetTagMaybe(attribute.Key, attribute.Value);
+                }
+            }
+
             var transferDetails = details.TransferDetails;
             if (transferDetails != null)
             {
@@ -115,6 +124,16 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
                 }
             }
 
+        }
+
+        /// <summary>
+        /// Records the exit code reported by a single command or process after execution.
+        /// </summary>
+        /// <param name="exitCode">The reported exit code, including zero for success.</param>
+        /// <remarks>Use for command tool executions. This does not infer or change the span's error status.</remarks>
+        public void RecordProcessExitCode(int exitCode)
+        {
+            SetTagMaybe(OpenTelemetryConstants.ProcessExitCodeKey, exitCode);
         }
 
         /// <summary>

@@ -44,19 +44,30 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
 
         private InferenceScope(Request request, InferenceCallDetails details, AgentDetails agentDetails, UserDetails? userDetails, SpanDetails? spanDetails)
             : base(
-                operationName: details.OperationName.ToString(),
-                activityName: $"{details.OperationName} {details.Model}",
+                operationName: details.OperationNameValue,
+                activityName: $"{details.OperationNameValue} {details.Model}",
                 agentDetails: agentDetails,
                 request: request,
                 spanDetails: spanDetails ?? new SpanDetails(ActivityKind.Client),
                 userDetails: userDetails)
         {
-            SetTagMaybe(GenAiOperationNameKey, details.OperationName.ToString());
             SetTagMaybe(GenAiRequestModelKey, details.Model);
+            SetTagMaybe(GenAiResponseModelKey, details.ResponseModel);
             SetTagMaybe(GenAiProviderNameKey, details.ProviderName);
             SetTagMaybe(GenAiUsageInputTokensKey, details.InputTokens);
             SetTagMaybe(GenAiUsageOutputTokensKey, details.OutputTokens);
+            SetTagMaybe(GenAiUsageCacheReadInputTokensKey, details.CacheReadInputTokens);
+            SetTagMaybe(GenAiUsageCacheWriteInputTokensKey, details.CacheWriteInputTokens);
             SetTagMaybe(GenAiResponseFinishReasonsKey, details.FinishReasons);
+
+            if (details.Endpoint != null)
+            {
+                SetTagMaybe(ServerAddressKey, details.Endpoint.Host);
+                if (!details.Endpoint.IsDefaultPort)
+                {
+                    SetTagMaybe(ServerPortKey, details.Endpoint.Port);
+                }
+            }
 
             if (request?.InputContent != null)
             {
@@ -124,6 +135,30 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         }
 
         /// <summary>
+        /// Records the canonical model name returned by the provider.
+        /// </summary>
+        public void RecordResponseModel(string responseModel)
+        {
+            SetTagMaybe(GenAiResponseModelKey, responseModel);
+        }
+
+        /// <summary>
+        /// Records the number of input tokens read from cache.
+        /// </summary>
+        public void RecordCacheReadInputTokens(int cacheReadInputTokens)
+        {
+            SetTagMaybe(GenAiUsageCacheReadInputTokensKey, cacheReadInputTokens);
+        }
+
+        /// <summary>
+        /// Records the number of input tokens written to cache.
+        /// </summary>
+        public void RecordCacheWriteInputTokens(int cacheWriteInputTokens)
+        {
+            SetTagMaybe(GenAiUsageCacheWriteInputTokensKey, cacheWriteInputTokens);
+        }
+
+        /// <summary>
         /// Records the finish reasons for telemetry tracking.
         /// </summary>
         public void RecordFinishReasons(string[] finishReasons)
@@ -144,5 +179,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
                 SetTagMaybe(GenAiAgentThoughtProcessKey, thoughtProcess);
             }
         }
+
     }
 }

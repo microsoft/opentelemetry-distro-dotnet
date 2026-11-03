@@ -143,6 +143,42 @@ Customize the Agent365 exporter behavior via `o.Agent365`:
 | `MaxExportBatchSize` | Maximum batch size for export operations. | `512` |
 | `ScheduledDelayMilliseconds` | Delay in milliseconds between export batches. | `5000` |
 | `ExporterTimeoutMilliseconds` | Timeout in milliseconds for the export operation. | `30000` |
+| `DisableOfflineStorage` | Disables on-disk buffering and replay. On Unix, leaving this `false` also requires a provisioned `StorageDirectory`. | `false` |
+| `StorageDirectory` | Storage root. Unix requires an existing, absolute, private directory provisioned by the deployment. Windows can resolve a default location. | `null` |
+
+### Offline buffering and filesystem permissions
+
+Agent365 can buffer undeliverable telemetry on disk for later replay. **On Unix, including Linux and macOS, this requires an explicitly configured, pre-existing private storage root.** The SDK does not select a shared temporary directory automatically. If the root is missing, relative, or not configured, initialization logs an error and disables offline buffering and its replay loop; online export continues. To intentionally run without disk buffering, set `o.Agent365.DisableOfflineStorage = true`.
+
+The deployment owns filesystem security, as with Azure Monitor's customer-configured storage. Provision a dedicated root owned by the application's service account, with access restricted to that account (normally Unix mode `0700`). Review extended ACLs, including inherited allow grants, and ensure untrusted users cannot replace the root or its ancestors. The SDK does not inspect or change ownership, permission bits, ACLs, or symbolic links. A configured path is trusted; pointing it at `/tmp` or another shared directory is not a secure configuration.
+
+For example, run the following **as the application's service account during deployment**, using a new application-specific location:
+
+```sh
+install -d -m 700 "$HOME/.local/state/my-agent/telemetry"
+```
+
+If the path already exists, review its ownership, permissions, and ACLs before reuse. Do not change permissions on shared system directories.
+
+Configure that same root when initializing the distro:
+
+```csharp
+using System;
+using System.IO;
+using Microsoft.OpenTelemetry;
+
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.Agent365;
+    o.Agent365.StorageDirectory = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".local", "state", "my-agent", "telemetry");
+});
+```
+
+The SDK creates its cache subdirectories beneath this root using normal filesystem inheritance. It does not change the customer's access controls. Windows retains the existing `LOCALAPPDATA`, `TEMP`, and current-directory fallback behavior and inherited ACLs.
+
+**Migration:** Unix applications that previously relied on automatic temporary storage must provision and configure a private root to retain offline buffering. Keeping the same explicitly configured root preserves the existing hashed cache location and replay. Records in a previous default temporary location are not automatically moved or replayed after switching roots; review and migrate any backlog during a controlled, stopped-application maintenance window.
 
 ### Azure Monitor options
 
@@ -685,12 +721,81 @@ the required tool metadata
 `ToolCallDetails`, then attach `TransferDetails` with an object initializer for
 the explicit handoff metadata.
 
+#### Skill and command tool refinements
+
+When the tool API or runtime state explicitly identifies a skill operation,
+attach `SkillRefinementDetails` or `ExecuteCommandRefinementDetails` to the
+existing `ToolCallDetails.RefinementDetails` property. This follows
+the [OpenTelemetry execute-tool refinements](https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-agent-spans.md#agent-skills);
+it does not create another span or infer behavior from tool names or arguments.
+
+```csharp
+var loadDetails = new ToolCallDetails("load_skill", arguments: "{}")
+{
+    RefinementDetails = new SkillRefinementDetails(
+        SkillRefinementKind.LoadSkill,
+        skillName: "code-review",
+        sourceUri: "file:///opt/skills/code-review"),
+};
+```
+
+Commands can optionally carry skill metadata when executing a bundled script:
+
+```csharp
+var toolDetails = new ToolCallDetails("run_skill_script", arguments: "{}")
+{
+    RefinementDetails = new ExecuteCommandRefinementDetails(
+        skillName: "code-review",
+        sourceUri: "file:///opt/skills/code-review",
+        resourceName: "scripts/check.py",
+        executableName: "python",
+        executablePath: "/usr/bin/python"),
+};
+
+using var scope = ExecuteToolScope.Start(request, toolDetails, agentDetails);
+// Execute the command, then record its reported exit code (including zero).
+scope.RecordProcessExitCode(exitCode);
+// Report failures separately through scope.RecordError(exception), as appropriate.
+```
+
+Use `SkillRefinementKind.LoadSkill` for a dedicated skill loader or
+`SkillRefinementKind.ReadSkillResource` for a dedicated resource reader.
+`SkillRefinementDetails` accepts only skill metadata.
+Use `ExecuteCommandRefinementDetails` for commands, including scripts bundled
+with a skill. Commands need not belong to a skill. The two sealed types implement
+`IExecuteToolRefinementDetails` without a shared base class.
+Supply executable name/path only
+when the tool directly executes a single process, and an exit code only when the
+tool reports a single command or process status.
+
+The optional attributes are `gen_ai.skill.name`, `gen_ai.skill.description`,
+`gen_ai.skill.source.uri`, `gen_ai.skill.resource.name`, `process.executable.name`,
+`process.executable.path`, and numeric `process.exit.code`. Empty strings are
+omitted. Supply names known at the start of execution even when the operation
+later fails. Descriptions and source URIs may contain sensitive information:
+remove credentials and access tokens before supplying a source URI, and use the
+skill's original source rather than its temporary materialization path. These
+explicitly supplied values are not automatically scrubbed.
+
+Activity names use `execute_tool {toolName} {skillName}` for loading a named
+skill. Resource readers and commands append `{skillName} {resourceName}` when
+both names are available, or just `{resourceName}` when only that name is known.
+Without a resource name, commands append the executable name if available;
+resource readers append nothing. Neither appends a skill name by itself.
+Missing metadata falls back to `execute_tool {toolName}`.
+
+Direct ETW logging accepts the same `ToolCallDetails` and emits the same
+attributes; pass a known exit code to the refinement constructor when logging a
+completed command. Its existing `ExecuteTool` event envelope name is unchanged.
+Exit codes do not automatically set an error status on either path.
+
 **Available methods:**
 
 | Method | Description |
 |---|---|
 | `RecordResponse(string)` | Record a string result. |
 | `RecordResponse(IDictionary<string, object>)` | Record a structured result. |
+| `RecordProcessExitCode(int)` | Record the exit code reported by a single command or process. |
 | `RecordThreatDiagnosticsSummary(ThreatDiagnosticsSummary)` | Record threat diagnostics. |
 
 ### Inference (`InferenceScope`)

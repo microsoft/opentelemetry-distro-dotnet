@@ -17,6 +17,41 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.DTOs.Builders
     public class ExecuteToolDataBuilderTests
     {
         [TestMethod]
+        [DataRow(SkillRefinementKind.LoadSkill)]
+        [DataRow(SkillRefinementKind.ReadSkillResource)]
+        public void Build_WithSkillRefinement_EmitsOnlyAvailableMetadataAndProtectsItFromExtraAttributes(SkillRefinementKind kind)
+        {
+            var details = new ToolCallDetails("custom", arguments: null)
+            {
+                RefinementDetails = new SkillRefinementDetails(kind, skillName: "code-review"),
+            };
+            var data = ExecuteToolDataBuilder.Build(
+                details, new AgentDetails("agent"), "conversation",
+                extraAttributes: new Dictionary<string, object?> { ["gen_ai.skill.name"] = "override" });
+
+            data.Attributes.Should().ContainKey("gen_ai.skill.name").WhoseValue.Should().Be("code-review");
+            data.Attributes.Keys.Where(key => key.StartsWith("gen_ai.skill.") || key.StartsWith("process."))
+                .Should().BeEquivalentTo(new[] { "gen_ai.skill.name" });
+            data.Attributes.Should().ContainKey("gen_ai.operation.name").WhoseValue.Should().Be("execute_tool");
+        }
+
+        [TestMethod]
+        public void Build_WithTypedResultAndRefinement_RetainsBoth()
+        {
+            var details = new ToolCallDetails("read", new ExecuteToolCallArguments())
+            {
+                RefinementDetails = new SkillRefinementDetails(
+                    SkillRefinementKind.ReadSkillResource, resourceName: "references/policy.md"),
+            };
+
+            var data = ExecuteToolDataBuilder.Build(
+                details, new ExecuteToolCallResult(), new AgentDetails("agent"), "conversation");
+
+            data.Attributes.Should().ContainKey("gen_ai.skill.resource.name").WhoseValue.Should().Be("references/policy.md");
+            data.Attributes.Should().ContainKey("gen_ai.tool.call.result");
+        }
+
+        [TestMethod]
         public void Build_WithMinimalParameters_SetsBasicAttributes()
         {
             // Arrange

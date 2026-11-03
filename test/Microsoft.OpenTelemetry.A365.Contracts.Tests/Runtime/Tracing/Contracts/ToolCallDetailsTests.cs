@@ -11,6 +11,65 @@ namespace Microsoft.Agents.A365.Observability.Tests.Tracing.Contracts;
 public sealed class ToolCallDetailsTests
 {
     [TestMethod]
+    public void SkillRefinementDetails_RejectsUndefinedKind()
+    {
+        var create = () => new SkillRefinementDetails((SkillRefinementKind)999);
+
+        create.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("kind");
+    }
+
+    [TestMethod]
+    [DataRow(0)]
+    [DataRow(2)]
+    public void CommandRefinementDetails_WithoutSkill_EmitsOnlyProcessMetadata(int exitCode)
+    {
+        IExecuteToolRefinementDetails refinement = new ExecuteCommandRefinementDetails(
+            executableName: "python", executablePath: "/usr/bin/python", exitCode: exitCode);
+
+        refinement.GetAttributes().ToDictionary(attribute => attribute.Key, attribute => attribute.Value)
+            .Should().BeEquivalentTo(new Dictionary<string, object>
+            {
+                ["process.executable.name"] = "python",
+                ["process.executable.path"] = "/usr/bin/python",
+                ["process.exit.code"] = exitCode,
+            });
+    }
+
+    [TestMethod]
+    public void ToolCallDetails_EqualityIncludesRefinementValues()
+    {
+        ToolCallDetails Create(string? resourceName) => new ToolCallDetails("read", arguments: null)
+        {
+            RefinementDetails = new SkillRefinementDetails(
+                SkillRefinementKind.ReadSkillResource, skillName: "code-review", resourceName: resourceName),
+        };
+
+        var left = Create("references/policy.md");
+        var right = Create("references/policy.md");
+        left.Should().Be(right);
+        left.GetHashCode().Should().Be(right.GetHashCode());
+        left.Should().NotBe(Create("references/other.md"));
+        left.Should().NotBe(new ToolCallDetails("read", arguments: null));
+    }
+
+    [TestMethod]
+    public void RefinementEquality_DistinguishesSkillKindsAndCommandExecutions()
+    {
+        IExecuteToolRefinementDetails load = new SkillRefinementDetails(SkillRefinementKind.LoadSkill, skillName: "review");
+        IExecuteToolRefinementDetails read = new SkillRefinementDetails(SkillRefinementKind.ReadSkillResource, skillName: "review");
+        IExecuteToolRefinementDetails command = new ExecuteCommandRefinementDetails(skillName: "review");
+        IExecuteToolRefinementDetails sameCommand = new ExecuteCommandRefinementDetails(skillName: "review");
+        IExecuteToolRefinementDetails differentCommand = new ExecuteCommandRefinementDetails(skillName: "review", exitCode: 0);
+
+        load.Should().NotBe(read);
+        read.Should().NotBe(command);
+        command.Should().NotBe(read);
+        command.Should().Be(sameCommand);
+        command.GetHashCode().Should().Be(sameCommand.GetHashCode());
+        command.Should().NotBe(differentCommand);
+    }
+
+    [TestMethod]
     public void ObjectInitializer_WithTransferDetails_ExposesTypedValues()
     {
         var targetAgent = new AgentDetails(

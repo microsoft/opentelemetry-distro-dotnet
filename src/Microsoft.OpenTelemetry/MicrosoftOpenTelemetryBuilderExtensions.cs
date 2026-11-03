@@ -270,10 +270,10 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         }
 
         // --- Logging kill switch ---
-        // When effective logging is disabled, suppress all log records from reaching
-        // OpenTelemetryLoggerProvider (affects Azure Monitor, OTLP, Console, etc.).
+        // Only explicitly disabling logging should suppress the shared provider.
+        // No distro-owned logging exporter does not mean no independent exporters.
         // This is a provider-scoped ILogger filter — other loggers are not affected.
-        if (!effectiveInstrumentation.EnableLogging)
+        if (!options.Instrumentation.EnableLogging)
         {
             builder.Services.AddLogging(logging =>
             {

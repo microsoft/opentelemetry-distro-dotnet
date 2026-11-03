@@ -5,7 +5,7 @@ using System.Runtime.Serialization;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
 {
-    #pragma warning disable CS1591 // XML documentation not required for constant definitions.
+#pragma warning disable CS1591 // XML documentation not required for constant definitions.
     /// <summary>
     /// OpenTelemetry constant keys and values used across the Microsoft Agent 365 SDK.
     /// </summary>
@@ -30,6 +30,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
 
         public const string GenAiClientOperationDurationMetricName = "gen_ai.client.operation.duration";
         public const string GenAiRequestModelKey = "gen_ai.request.model";
+        public const string GenAiResponseModelKey = "gen_ai.response.model";
         public const string GenAiResponseFinishReasonsKey = "gen_ai.response.finish_reasons";
 
         // Request parameters (GenAI semantic conventions)
@@ -47,6 +48,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
 
         // Usage / response parameters (GenAI semantic conventions)
         public const string GenAiUsageCacheCreationInputTokensKey = "gen_ai.usage.cache_creation.input_tokens";
+        public const string GenAiUsageCacheWriteInputTokensKey = "gen_ai.usage.cache_write.input_tokens";
         public const string GenAiUsageCacheReadInputTokensKey = "gen_ai.usage.cache_read.input_tokens";
 
         public const string GenAiConversationIdKey = "gen_ai.conversation.id";
@@ -105,6 +107,16 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// </summary>
         public const string ChatOperationName = "chat";
 
+        /// <summary>
+        /// The operation name value for text completion spans.
+        /// </summary>
+        public const string TextCompletionOperationName = "text_completion";
+
+        /// <summary>
+        /// The operation name value for content generation spans.
+        /// </summary>
+        public const string GenerateContentOperationName = "generate_content";
+
         // Channel dimensions (renamed from gen_ai.channel.* to microsoft.channel.*)
         public const string ChannelNameKey = "microsoft.channel.name";
         public const string ChannelLinkKey = "microsoft.channel.link";
@@ -143,11 +155,11 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         public const string TelemetrySdkVersionKey = "telemetry.sdk.version";
         public const string TelemetrySdkNameValue = "microsoft-opentelemetry";
         public const string TelemetrySdkLanguageValue = "dotnet";
-        
+
         /// <summary>
         /// Gets the telemetry SDK version dynamically from the assembly.
         /// </summary>
-        public static string TelemetrySdkVersionValue => 
+        public static string TelemetrySdkVersionValue =>
             typeof(OpenTelemetryConstants).Assembly.GetName().Version?.ToString() ?? "unknown";
 
         #region Public Constants
@@ -167,13 +179,15 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             OutputMessagesOperationName,
             ApplyGuardrailOperationName,
             ChatOperationName,
+            TextCompletionOperationName,
+            GenerateContentOperationName,
         };
 
         /// <summary>
         /// The error message key.
         /// </summary>
         public const string ErrorMessageKey = "error.message";
-        
+
         /// <summary>
         /// The error type key.
         /// </summary>
@@ -184,22 +198,22 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// The GenAI tool name key.
         /// </summary>
         public const string GenAiToolNameKey = "gen_ai.tool.name";
-        
+
         /// <summary>
         /// The GenAI tool call identifier key.
         /// </summary>
         public const string GenAiToolCallIdKey = "gen_ai.tool.call.id";
-        
+
         /// <summary>
         /// The GenAI tool description key.
         /// </summary>
         public const string GenAiToolDescriptionKey = "gen_ai.tool.description";
-        
+
         /// <summary>
         /// The GenAI tool arguments key.
         /// </summary>
         public const string GenAiToolArgumentsKey = "gen_ai.tool.call.arguments";
-        
+
         /// <summary>
         /// The GenAI tool type key.
         /// </summary>
@@ -209,6 +223,27 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// The GenAI tool call result key.
         /// </summary>
         public const string GenAiToolCallResultKey = "gen_ai.tool.call.result";
+
+        /// <summary>The Agent Skill name key.</summary>
+        public const string GenAiSkillNameKey = "gen_ai.skill.name";
+
+        /// <summary>The Agent Skill description key.</summary>
+        public const string GenAiSkillDescriptionKey = "gen_ai.skill.description";
+
+        /// <summary>The Agent Skill source URI key.</summary>
+        public const string GenAiSkillSourceUriKey = "gen_ai.skill.source.uri";
+
+        /// <summary>The skill-relative resource name key.</summary>
+        public const string GenAiSkillResourceNameKey = "gen_ai.skill.resource.name";
+
+        /// <summary>The directly executed process name key.</summary>
+        public const string ProcessExecutableNameKey = "process.executable.name";
+
+        /// <summary>The directly executed process path key.</summary>
+        public const string ProcessExecutablePathKey = "process.executable.path";
+
+        /// <summary>The reported command or process exit code key.</summary>
+        public const string ProcessExitCodeKey = "process.exit.code";
 
         /// <summary>
         /// The explicit transfer mode key for execute-tool spans.
@@ -250,7 +285,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// The threat diagnostics summary key.
         /// </summary>
         public const string ThreatDiagnosticsSummaryKey = "threat.diagnostics.summary";
-        
+
         /// <summary>
         /// The GenAI agent thought process key.
         /// </summary>
@@ -375,5 +410,5 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         public const string GenAiSecurityPolicyDecisionTypeKey = "microsoft.security.policy.decision.type";
         #endregion
     }
-    #pragma warning restore CS1591
+#pragma warning restore CS1591
 }

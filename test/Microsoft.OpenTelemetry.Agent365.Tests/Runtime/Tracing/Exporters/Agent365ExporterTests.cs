@@ -262,6 +262,23 @@ public sealed class Agent365ExporterTests
         groups.Should().Contain(g => g.TenantId == "tenant-1" && g.AgentId == "agent-1" && g.Activities.Count == 1);
     }
 
+    [DataTestMethod]
+    [DataRow("text_completion")]
+    [DataRow("generate_content")]
+    [DataRow("TEXT_COMPLETION")]
+    [DataRow("GENERATE_CONTENT")]
+    public void PartitionByIdentity_IncludesNonChatInferenceSpans(string operationName)
+    {
+        using var inferenceSpan = CreateActivity("tenant-1", "agent-1", operationName);
+
+        var batch = CreateBatch(inferenceSpan);
+
+        var groups = _agent365ExporterCore.PartitionByIdentity(in batch);
+
+        groups.Should().ContainSingle()
+            .Which.Activities.Should().ContainSingle().Which.Should().BeSameAs(inferenceSpan);
+    }
+
     [TestMethod]
     public void Agent365ExporterOptions_DefaultBatchingParameters_AreSet()
     {
