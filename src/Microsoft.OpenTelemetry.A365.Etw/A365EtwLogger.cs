@@ -4,6 +4,7 @@
 using Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.Tools;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -244,7 +245,8 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
             Channel? channel = null,
             CallerDetails? callerDetails = null,
             string? traceId = null,
-            Exception? error = null)
+            Exception? error = null,
+            IEnumerable<GuardrailFinding>? findings = null)
         {
             var data = ApplyGuardrailDataBuilder.Build(
                 guardrailDetails,
@@ -259,10 +261,35 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
                 traceId: traceId,
                 error: error);
 
+            var logData = data.ToDictionary();
+            if (findings != null)
+            {
+                var events = new List<Dictionary<string, object?>>();
+                foreach (var finding in findings)
+                {
+                    if (finding == null)
+                    {
+                        throw new ArgumentException("Security findings must not contain null entries.", nameof(findings));
+                    }
+
+                    events.Add(new Dictionary<string, object?>
+                    {
+                        ["name"] = OpenTelemetryConstants.GenAiSecurityFindingEventName,
+                        ["timeUnixNano"] = EtwExportFormatter.ToUnixNanos(DateTime.UtcNow),
+                        ["attributes"] = finding.GetAttributes(),
+                    });
+                }
+
+                if (events.Count > 0)
+                {
+                    logData["Events"] = events;
+                }
+            }
+
             logger.Log(
                 LogLevel.Information,
                 ApplyGuardrailEventId,
-                data.ToDictionary(),
+                logData,
                 null,
                 LogFormatter
             );

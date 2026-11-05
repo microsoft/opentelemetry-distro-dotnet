@@ -15,6 +15,40 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
     public class EtwExportFormatterTests
     {
         [TestMethod]
+        public void FormatLogData_WithFindingEvents_PreservesEventAttributes()
+        {
+            var data = new ApplyGuardrailData("parent").ToDictionary();
+            data["Events"] = new[]
+            {
+                new
+                {
+                    name = "microsoft.security.finding",
+                    timeUnixNano = 10_000_000_000UL,
+                    attributes = new Dictionary<string, object>
+                    {
+                        ["microsoft.security.risk.category"] = "prompt_injection",
+                        ["microsoft.security.risk.severity"] = "high",
+                        ["microsoft.security.risk.score"] = 0.9,
+                        ["microsoft.security.risk.metadata"] = new[] { "position:input[0].content" },
+                    },
+                },
+            };
+
+            var json = new EtwExportFormatter().FormatLogData(data);
+
+            using var document = JsonDocument.Parse(json);
+            var finding = document.RootElement.GetProperty("Events")[0];
+            finding.GetProperty("name").GetString().Should().Be("microsoft.security.finding");
+            finding.GetProperty("timeUnixNano").GetUInt64().Should().Be(10_000_000_000UL);
+            var attributes = finding.GetProperty("attributes");
+            attributes.GetProperty("microsoft.security.risk.category").GetString().Should().Be("prompt_injection");
+            attributes.GetProperty("microsoft.security.risk.severity").GetString().Should().Be("high");
+            attributes.GetProperty("microsoft.security.risk.score").GetDouble().Should().Be(0.9);
+            attributes.GetProperty("microsoft.security.risk.metadata")[0].GetString()
+                .Should().Be("position:input[0].content");
+        }
+
+        [TestMethod]
         public void FormatLogData_WithErrorStatus_PreservesExistingJsonShape()
         {
             var data = new InvokeAgentData(
@@ -105,6 +139,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
             var root = document.RootElement;
             root.TryGetProperty("ParentSpanId", out _).Should().BeFalse();
             root.TryGetProperty("TraceId", out _).Should().BeFalse();
+            root.TryGetProperty("Events", out _).Should().BeFalse();
             root.GetProperty("SpanId").GetString().Should().Be("span");
         }
     }

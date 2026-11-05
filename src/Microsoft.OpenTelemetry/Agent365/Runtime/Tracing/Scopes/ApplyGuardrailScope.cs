@@ -132,42 +132,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
                 throw new ArgumentNullException(nameof(finding));
             }
 
-            var tags = new ActivityTagsCollection
-            {
-                { OpenTelemetryConstants.GenAiSecurityRiskCategoryKey, finding.RiskCategory },
-                { OpenTelemetryConstants.GenAiSecurityRiskSeverityKey, finding.RiskSeverity }
-            };
-
-            if (finding.PolicyDecisionType != null)
-            {
-                tags.Add(OpenTelemetryConstants.GenAiSecurityPolicyDecisionTypeKey, finding.PolicyDecisionType);
-            }
-
-            if (finding.PolicyId != null)
-            {
-                tags.Add(OpenTelemetryConstants.GenAiSecurityPolicyIdKey, finding.PolicyId);
-            }
-
-            if (finding.PolicyName != null)
-            {
-                tags.Add(OpenTelemetryConstants.GenAiSecurityPolicyNameKey, finding.PolicyName);
-            }
-
-            if (finding.PolicyVersion != null)
-            {
-                tags.Add(OpenTelemetryConstants.GenAiSecurityPolicyVersionKey, finding.PolicyVersion);
-            }
-
-            if (finding.RiskScore.HasValue)
-            {
-                tags.Add(OpenTelemetryConstants.GenAiSecurityRiskScoreKey, finding.RiskScore.Value);
-            }
-
-            if (finding.RiskMetadata != null)
-            {
-                tags.Add(OpenTelemetryConstants.GenAiSecurityRiskMetadataKey, finding.RiskMetadata);
-            }
-
+            var tags = new ActivityTagsCollection(finding.GetAttributes());
             var activityEvent = new ActivityEvent(OpenTelemetryConstants.GenAiSecurityFindingEventName, tags: tags);
             AddEvent(activityEvent);
         }

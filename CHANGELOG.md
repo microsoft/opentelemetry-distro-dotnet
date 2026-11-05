@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Add optional security findings to `IA365EtwLogger.LogApplyGuardrail` and `A365EtwLogger.LogApplyGuardrail`, emitted as `microsoft.security.finding` events with risk and policy attributes in the existing ETW JSON log. Calls without findings retain their payload shape. Consumers must rebuild against the updated method signature; custom interface implementations must add the optional `findings` parameter.
 - Update OpenTelemetry SDK and exporters to 1.20.1.
 - Add explicit skill-loading, skill-resource-reading, and command refinements to execute-tool telemetry through `ToolCallDetails.RefinementDetails`, using separate `SkillRefinementDetails` and `ExecuteCommandRefinementDetails` types. Share skill/process attributes between Activity and direct ETW paths, use semantic-convention Activity span names, and support recording process exit codes after execution. Ordinary tool calls remain unchanged.
 - Fix Agent365 tracing filters and export to accept `text_completion` and `generate_content` inference operations, preserving case-insensitive operation matching. Expose both operation names as public constants alongside `ChatOperationName`.

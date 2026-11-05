@@ -1,4 +1,5 @@
 #nullable enable
+Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.GuardrailFinding.GetAttributes() -> System.Collections.Generic.IDictionary<string!, object?>!
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails.Description.get -> string?
 Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails.Equals(Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts.ExecuteCommandRefinementDetails? other) -> bool

@@ -143,12 +143,120 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tests.Etw
                 Channel? channel = null,
                 CallerDetails? callerDetails = null,
                 string? traceId = null,
-                Exception? error = null)
+                Exception? error = null,
+                IEnumerable<GuardrailFinding>? findings = null)
             {
             }
         }
 
         private ServiceProvider BuildProvider() => new ServiceCollection().AddLoggingWithEtw().BuildServiceProvider();
+
+        [TestMethod]
+        public void Logs_ApplyGuardrail_WithMultipleFindings()
+        {
+            using var listener = new TestEventListener();
+            listener.EnableEvents(EtwEventSource.Log, EventLevel.Informational);
+            using var provider = BuildProvider();
+            var logger = provider.GetRequiredService<IA365EtwLogger<EtwLoggerTests>>();
+            var details = new GuardrailDetails("tool_call", GuardrailDecisionType.Deny, guardianName: "guardian");
+            var findings = new[]
+            {
+                new GuardrailFinding(
+                    "prompt_injection", "high",
+                    policyDecisionType: "deny",
+                    policyId: "policy-1",
+                    policyName: "Injection policy",
+                    policyVersion: "1.0",
+                    riskScore: 0.9,
+                    riskMetadata: new[] { "position:input[0].content", "count:1" }),
+                new GuardrailFinding("pii", "medium", riskScore: 0),
+            };
+            var before = DateTimeOffset.UtcNow;
+
+            logger.LogApplyGuardrail(
+                details, new AgentDetails("agent-id"), "conversation", "parent",
+                spanId: "span", traceId: "trace",
+                error: new InvalidOperationException("evaluation failed"),
+                findings: findings);
+
+            var after = DateTimeOffset.UtcNow;
+            var evt = listener.Events.Single(e => e.EventId == 2000);
+            using var document = JsonDocument.Parse((string)evt.Payload![0]!);
+            var root = document.RootElement;
+            root.GetProperty("Name").GetString().Should().Be("ApplyGuardrail");
+            root.GetProperty("SpanId").GetString().Should().Be("span");
+            root.GetProperty("ParentSpanId").GetString().Should().Be("parent");
+            root.GetProperty("TraceId").GetString().Should().Be("trace");
+            root.GetProperty("Status").GetProperty("code").GetInt32().Should().Be(2);
+            root.GetProperty("Attributes").GetProperty("microsoft.security.decision.type").GetString().Should().Be("deny");
+            root.GetProperty("Attributes").GetProperty("error.type").GetString().Should().Be(typeof(InvalidOperationException).FullName);
+            var events = root.GetProperty("Events");
+            events.GetArrayLength().Should().Be(2);
+            foreach (var finding in events.EnumerateArray())
+            {
+                finding.GetProperty("name").GetString().Should().Be("microsoft.security.finding");
+                var timestamp = finding.GetProperty("timeUnixNano").GetUInt64();
+                timestamp.Should().BeInRange(
+                    (ulong)((before.UtcTicks - DateTimeOffset.UnixEpoch.UtcTicks) * 100),
+                    (ulong)((after.UtcTicks - DateTimeOffset.UnixEpoch.UtcTicks) * 100));
+            }
+
+            var attributes = events[0].GetProperty("attributes");
+            attributes.GetProperty("microsoft.security.risk.category").GetString().Should().Be("prompt_injection");
+            attributes.GetProperty("microsoft.security.risk.severity").GetString().Should().Be("high");
+            attributes.GetProperty("microsoft.security.policy.decision.type").GetString().Should().Be("deny");
+            attributes.GetProperty("microsoft.security.policy.id").GetString().Should().Be("policy-1");
+            attributes.GetProperty("microsoft.security.policy.name").GetString().Should().Be("Injection policy");
+            attributes.GetProperty("microsoft.security.policy.version").GetString().Should().Be("1.0");
+            attributes.GetProperty("microsoft.security.risk.score").GetDouble().Should().Be(0.9);
+            attributes.GetProperty("microsoft.security.risk.metadata").EnumerateArray()
+                .Select(value => value.GetString()).Should().Equal("position:input[0].content", "count:1");
+            var secondAttributes = events[1].GetProperty("attributes");
+            secondAttributes.EnumerateObject().Select(property => property.Name).Should().BeEquivalentTo(
+                "microsoft.security.risk.category", "microsoft.security.risk.severity", "microsoft.security.risk.score");
+            secondAttributes.GetProperty("microsoft.security.risk.category").GetString().Should().Be("pii");
+            secondAttributes.GetProperty("microsoft.security.risk.severity").GetString().Should().Be("medium");
+            secondAttributes.GetProperty("microsoft.security.risk.score").GetDouble().Should().Be(0);
+        }
+
+        [TestMethod]
+        [DataRow(false)]
+        [DataRow(true)]
+        public void Logs_ApplyGuardrail_WithoutFindings_PreservesPayload(bool empty)
+        {
+            using var listener = new TestEventListener();
+            listener.EnableEvents(EtwEventSource.Log, EventLevel.Informational);
+            using var provider = BuildProvider();
+            var logger = provider.GetRequiredService<IA365EtwLogger<EtwLoggerTests>>();
+
+            logger.LogApplyGuardrail(
+                new GuardrailDetails("tool_call", GuardrailDecisionType.Allow),
+                new AgentDetails("agent-id"), "conversation", "parent",
+                findings: empty ? Array.Empty<GuardrailFinding>() : null);
+
+            var evt = listener.Events.Single(e => e.EventId == 2000);
+            using var document = JsonDocument.Parse((string)evt.Payload![0]!);
+            var root = document.RootElement;
+            root.TryGetProperty("Events", out _).Should().BeFalse();
+            root.GetProperty("Attributes").GetProperty("microsoft.security.decision.type").GetString().Should().Be("allow");
+        }
+
+        [TestMethod]
+        public void Logs_ApplyGuardrail_WithNullFinding_ThrowsBeforeEmitting()
+        {
+            using var listener = new TestEventListener();
+            listener.EnableEvents(EtwEventSource.Log, EventLevel.Informational);
+            using var provider = BuildProvider();
+            var logger = provider.GetRequiredService<IA365EtwLogger<EtwLoggerTests>>();
+
+            Action log = () => logger.LogApplyGuardrail(
+                new GuardrailDetails("tool_call", GuardrailDecisionType.Allow),
+                new AgentDetails("agent-id"), "conversation", "parent",
+                findings: new GuardrailFinding[] { new GuardrailFinding("pii", "low"), null! });
+
+            log.Should().Throw<ArgumentException>().WithParameterName("findings");
+            listener.Events.Should().NotContain(e => e.EventId == 2000);
+        }
 
         [TestMethod]
         public void Logs_InvokeAgent_Event()

@@ -25,6 +25,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
             {
                 Name = data["Name"],
                 Attributes = data["Attributes"],
+                Events = data.TryGetValue("Events", out var events) ? events : null,
                 StartTimeUnixNano = data.TryGetValue("StartTime", out var startTimeObj) && startTimeObj != null
                     ? ToUnixNanos(((DateTimeOffset)startTimeObj).UtcDateTime)
                     : 0,
@@ -50,7 +51,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Etw
             });
         }
 
-        private static ulong ToUnixNanos(DateTime utc)
+        internal static ulong ToUnixNanos(DateTime utc)
         {
             var value = utc.Kind == DateTimeKind.Utc ? utc : utc.ToUniversalTime();
             var unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);

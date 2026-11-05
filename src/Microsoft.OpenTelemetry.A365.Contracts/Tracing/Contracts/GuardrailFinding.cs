@@ -2,6 +2,8 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
+using Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes;
 
 namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
 {
@@ -90,6 +92,51 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts
         /// Example values: "field:bcc", "pattern:ssn", "count:3", "position:input[0].content".
         /// </remarks>
         public string[]? RiskMetadata { get; }
+
+        /// <summary>
+        /// Gets the security finding attributes shared by tracing and direct ETW logging.
+        /// </summary>
+        /// <returns>The required risk attributes and any supplied optional attributes.</returns>
+        public IDictionary<string, object?> GetAttributes()
+        {
+            var attributes = new Dictionary<string, object?>
+            {
+                [OpenTelemetryConstants.GenAiSecurityRiskCategoryKey] = RiskCategory,
+                [OpenTelemetryConstants.GenAiSecurityRiskSeverityKey] = RiskSeverity,
+            };
+
+            if (PolicyDecisionType != null)
+            {
+                attributes.Add(OpenTelemetryConstants.GenAiSecurityPolicyDecisionTypeKey, PolicyDecisionType);
+            }
+
+            if (PolicyId != null)
+            {
+                attributes.Add(OpenTelemetryConstants.GenAiSecurityPolicyIdKey, PolicyId);
+            }
+
+            if (PolicyName != null)
+            {
+                attributes.Add(OpenTelemetryConstants.GenAiSecurityPolicyNameKey, PolicyName);
+            }
+
+            if (PolicyVersion != null)
+            {
+                attributes.Add(OpenTelemetryConstants.GenAiSecurityPolicyVersionKey, PolicyVersion);
+            }
+
+            if (RiskScore.HasValue)
+            {
+                attributes.Add(OpenTelemetryConstants.GenAiSecurityRiskScoreKey, RiskScore.Value);
+            }
+
+            if (RiskMetadata != null)
+            {
+                attributes.Add(OpenTelemetryConstants.GenAiSecurityRiskMetadataKey, RiskMetadata);
+            }
+
+            return attributes;
+        }
 
         /// <inheritdoc/>
         public bool Equals(GuardrailFinding? other)
