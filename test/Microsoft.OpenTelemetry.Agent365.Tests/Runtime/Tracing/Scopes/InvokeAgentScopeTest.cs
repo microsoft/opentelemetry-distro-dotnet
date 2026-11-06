@@ -160,6 +160,21 @@ public sealed class InvokeAgentScopeTest : ActivityTest
     }
 
     [TestMethod]
+    public void DefaultHttpsEndpoint_OmitsServerPort()
+    {
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = InvokeAgentScope.Start(
+                Util.GetDefaultRequest(),
+                new InvokeAgentScopeDetails(new Uri("https://example.com")),
+                TestAgentDetails);
+        });
+
+        activity.ShouldHaveTag(ServerAddressKey, "example.com");
+        activity.GetTagItem(ServerPortKey).Should().BeNull();
+    }
+
+    [TestMethod]
     public void ThreatDiagnosticsSummary_IsSetCorrectly_WhenProvided()
     {
         // Arrange
