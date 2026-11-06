@@ -33,8 +33,8 @@ internal static class A365CertificationRuleCatalog
                 operationName: null,
                 OpenTelemetryConstants.TenantIdKey,
                 suppressible: false,
-                ValidateRoutingTenantId,
-                "Set AgentDetails.TenantId or provide microsoft.tenant.id through A365 baggage."),
+                ValidateTenantId,
+                "Set AgentDetails.TenantId and ensure microsoft.tenant.id is recorded as a span attribute."),
             CreateRule(
                 A365ValidationRuleIds.AgentIdentityRequired,
                 operationName: null,
@@ -98,30 +98,33 @@ internal static class A365CertificationRuleCatalog
                 OpenTelemetryConstants.ServerAddressKey,
                 NetworkOperations,
                 "Set the scope endpoint or server.address through A365 baggage."),
+            CreateRule(
+                A365ValidationRuleIds.OperationNameRequired,
+                operationName: null,
+                OpenTelemetryConstants.GenAiOperationNameKey,
+                suppressible: true,
+                span => ValidateRequiredString(span, OpenTelemetryConstants.GenAiOperationNameKey),
+                "Record gen_ai.operation.name as a span attribute, not only in baggage."),
             CreateStorePublishingRule(
                 A365ValidationRuleIds.InputMessagesRequired,
                 OpenTelemetryConstants.GenAiInputMessagesKey,
                 InputMessageOperations,
-                "Record input messages on invoke_agent and chat spans."),
+                "Record input messages on invoke_agent and inference spans."),
             CreateStorePublishingRule(
                 A365ValidationRuleIds.OutputMessagesRequired,
                 OpenTelemetryConstants.GenAiOutputMessagesKey,
                 OutputMessageOperations,
-                "Record output messages on invoke_agent, chat, and output_messages spans."),
-            CreateRule(
+                "Record output messages on invoke_agent, inference, and output_messages spans."),
+            CreateStorePublishingRule(
                 A365ValidationRuleIds.InferenceModelRequired,
-                OpenTelemetryConstants.ChatOperationName,
                 OpenTelemetryConstants.GenAiRequestModelKey,
-                suppressible: true,
-                span => ValidateRequiredString(span, OpenTelemetryConstants.GenAiRequestModelKey),
-                "Set InferenceCallDetails.Model for chat/inference spans."),
-            CreateRule(
+                InferenceOperations,
+                "Set InferenceCallDetails.Model for inference spans."),
+            CreateStorePublishingRule(
                 A365ValidationRuleIds.InferenceProviderRequired,
-                OpenTelemetryConstants.ChatOperationName,
                 OpenTelemetryConstants.GenAiProviderNameKey,
-                suppressible: true,
-                span => ValidateRequiredString(span, OpenTelemetryConstants.GenAiProviderNameKey),
-                "Set InferenceCallDetails.ProviderName for chat/inference spans."),
+                InferenceOperations,
+                "Set InferenceCallDetails.ProviderName for inference spans."),
             CreateRule(
                 A365ValidationRuleIds.ToolNameRequired,
                 OpenTelemetryConstants.ExecuteToolOperationName,
@@ -188,6 +191,8 @@ internal static class A365CertificationRuleCatalog
         OpenTelemetryConstants.InvokeAgentOperationName,
         OpenTelemetryConstants.ExecuteToolOperationName,
         OpenTelemetryConstants.ChatOperationName,
+        OpenTelemetryConstants.TextCompletionOperationName,
+        OpenTelemetryConstants.GenerateContentOperationName,
         OpenTelemetryConstants.OutputMessagesOperationName,
     };
 
@@ -200,13 +205,24 @@ internal static class A365CertificationRuleCatalog
     {
         OpenTelemetryConstants.InvokeAgentOperationName,
         OpenTelemetryConstants.ChatOperationName,
+        OpenTelemetryConstants.TextCompletionOperationName,
+        OpenTelemetryConstants.GenerateContentOperationName,
     };
 
     private static readonly string[] OutputMessageOperations =
     {
         OpenTelemetryConstants.InvokeAgentOperationName,
         OpenTelemetryConstants.ChatOperationName,
+        OpenTelemetryConstants.TextCompletionOperationName,
+        OpenTelemetryConstants.GenerateContentOperationName,
         OpenTelemetryConstants.OutputMessagesOperationName,
+    };
+
+    private static readonly string[] InferenceOperations =
+    {
+        OpenTelemetryConstants.ChatOperationName,
+        OpenTelemetryConstants.TextCompletionOperationName,
+        OpenTelemetryConstants.GenerateContentOperationName,
     };
 
     internal static bool TryGetRule(string ruleId, out A365ValidationRule rule)
@@ -277,17 +293,14 @@ internal static class A365CertificationRuleCatalog
     }
 
     /// <summary>
-    /// Validates the tenant identifier the A365 exporter would route this span
-    /// with. Unlike payload attributes, routing identity is resolved by the
-    /// exporter through <c>GetAttributeOrBaggage</c> before serialization, so
-    /// a tenant supplied only through <see cref="System.Diagnostics.Activity"/>
-    /// baggage still routes the export and therefore satisfies this rule.
+    /// Validates both tenant routing identity and the required payload tag.
+    /// Baggage alone can route an export but cannot satisfy its payload contract.
     /// </summary>
-    private static string? ValidateRoutingTenantId(A365SpanSnapshot span)
+    private static string? ValidateTenantId(A365SpanSnapshot span)
     {
         return string.IsNullOrWhiteSpace(span.RoutingTenantId) ?
             $"Missing {OpenTelemetryConstants.TenantIdKey}" :
-            null;
+            ValidateRequiredString(span, OpenTelemetryConstants.TenantIdKey);
     }
 
     /// <summary>

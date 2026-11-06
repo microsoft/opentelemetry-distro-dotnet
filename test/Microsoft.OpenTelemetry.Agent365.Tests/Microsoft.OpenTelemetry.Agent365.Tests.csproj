@@ -49,6 +49,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Microsoft.OpenTelemetry\Microsoft.OpenTelemetry.csproj" />
+    <ProjectReference Include="..\..\src\Microsoft.OpenTelemetry.A365.Etw\Microsoft.OpenTelemetry.A365.Etw.csproj" />
   </ItemGroup>
 
 </Project>

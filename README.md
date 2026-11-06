@@ -221,6 +221,9 @@ builder.UseMicrosoftOpenTelemetry(o =>
     o.Agent365.MaxExportBatchSize = 512;
     o.Agent365.ScheduledDelayMilliseconds = 5000;
     o.Agent365.ExporterTimeoutMilliseconds = 30000;
+    o.Agent365.DisableOfflineStorage = false;
+    // Unix: set this to a pre-provisioned private root to enable offline buffering.
+    o.Agent365.StorageDirectory = null;
 
     // --- Instrumentation options (all default to true) ---
     o.Instrumentation.EnableTracing = true;
@@ -280,6 +283,7 @@ builder.Services.AddLogging(logging => logging.AddConsole());
 ## Documentation
 
 - [Azure Monitor Getting Started](docs/azure-monitor-getting-started.md) — Send traces, metrics, and logs to Application Insights
+- [Multi-Endpoint Routing](docs/multi-endpoint-routing.md) — Route telemetry to several Application Insights components from one application (preview)
 - [Agent Framework Getting Started](docs/agent-framework-getting-started.md) — Instrument Agent Framework agents with Azure Monitor and OTLP
 - [Customization Guide](docs/customization.md) — Resource configuration, enrichment, filtering, and OTLP exporter tuning
 - [Agent 365 Getting Started](docs/agent365-getting-started.md) — Add Agent365 observability using the distro
@@ -292,8 +296,11 @@ builder.Services.AddLogging(logging => logging.AddConsole());
 
 - [Azure.Monitor.OpenTelemetry.AspNetCore.Demo](examples/Azure.Monitor.OpenTelemetry.AspNetCore.Demo) — ASP.NET Core → Azure Monitor
 - [Microsoft.OpenTelemetry.Agent365.Demo](examples/Microsoft.OpenTelemetry.Agent365.Demo) — Agent Framework app → Agent365
+- [Agent365 S2S Observability Sample](examples/Microsoft.OpenTelemetry.Agent365.S2S.Demo/README.md)
 - [Microsoft.OpenTelemetry.AgentFramework.Demo](examples/Microsoft.OpenTelemetry.AgentFramework.Demo) — Agent Framework → OTLP / Azure Monitor
 - [Microsoft.OpenTelemetry.Fabric.Demo](examples/Microsoft.OpenTelemetry.Fabric.Demo) — ASP.NET Core → OTLP → OTel Collector → Microsoft Fabric / Azure Data Explorer
+- [Microsoft.OpenTelemetry.MultiEndpoint.AspNetCore.Demo](examples/Microsoft.OpenTelemetry.MultiEndpoint.AspNetCore.Demo) — ASP.NET Core → one Application Insights component per customer
+- [Microsoft.OpenTelemetry.MultiEndpoint.Console.Demo](examples/Microsoft.OpenTelemetry.MultiEndpoint.Console.Demo) — Console app → two Application Insights components
 
 ## AI-Assisted Setup & Migration Skills
 
@@ -349,6 +356,15 @@ The skill automatically detects your app type and provides the correct guidance.
 ```bash
 dotnet build Microsoft.OpenTelemetry.slnx
 dotnet test Microsoft.OpenTelemetry.slnx
+```
+
+By default, `Microsoft.OpenTelemetry` and `Microsoft.OpenTelemetry.A365.Etw` reference the in-repo
+`Microsoft.OpenTelemetry.A365.Contracts` project. To build them against a published Contracts package
+instead, set `UseA365ContractsPackageReference` (optionally with `A365ContractsPackageVersion`, which
+defaults to the repo package version):
+
+```bash
+dotnet build Microsoft.OpenTelemetry.slnx -p:UseA365ContractsPackageReference=true -p:A365ContractsPackageVersion=<version>
 ```
 
 ## Microsoft Open Source Code of Conduct

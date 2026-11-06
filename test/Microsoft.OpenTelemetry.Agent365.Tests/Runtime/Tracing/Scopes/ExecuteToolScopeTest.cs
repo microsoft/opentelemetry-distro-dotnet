@@ -20,6 +20,134 @@ using System.Diagnostics.Tracing;
 [TestClass]
 public sealed class ExecuteToolScopeTest : ActivityTest
 {
+    [TestMethod]
+    [DataRow(SkillRefinementKind.LoadSkill, "code-review", null, "execute_tool custom_tool code-review")]
+    [DataRow(SkillRefinementKind.LoadSkill, null, null, "execute_tool custom_tool")]
+    [DataRow(SkillRefinementKind.ReadSkillResource, "code-review", "references/policy.md", "execute_tool custom_tool code-review references/policy.md")]
+    [DataRow(SkillRefinementKind.ReadSkillResource, null, "references/policy.md", "execute_tool custom_tool references/policy.md")]
+    [DataRow(SkillRefinementKind.ReadSkillResource, "code-review", null, "execute_tool custom_tool")]
+    [DataRow(SkillRefinementKind.ReadSkillResource, null, null, "execute_tool custom_tool")]
+    [DataRow(SkillRefinementKind.LoadSkill, " ", null, "execute_tool custom_tool")]
+    public void Start_WithSkillRefinement_UsesConventionSpanName(
+        SkillRefinementKind kind, string? skillName, string? resourceName, string expectedName)
+    {
+        var details = new ToolCallDetails("custom_tool", arguments: null)
+        {
+            RefinementDetails = new SkillRefinementDetails(kind, skillName: skillName, resourceName: resourceName),
+        };
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(Util.GetDefaultRequest(), details, Util.GetAgentDetails());
+        });
+
+        activity.DisplayName.Should().Be(expectedName);
+        activity.Kind.Should().Be(System.Diagnostics.ActivityKind.Internal);
+        activity.ShouldHaveTag("gen_ai.operation.name", "execute_tool");
+        activity.ShouldHaveTag("gen_ai.tool.name", "custom_tool");
+    }
+
+    [TestMethod]
+    [DataRow("code-review", "scripts/check.py", "python", "execute_tool custom_tool code-review scripts/check.py")]
+    [DataRow(null, "scripts/check.py", "python", "execute_tool custom_tool scripts/check.py")]
+    [DataRow("code-review", null, "python", "execute_tool custom_tool python")]
+    [DataRow("code-review", null, null, "execute_tool custom_tool")]
+    [DataRow(null, null, null, "execute_tool custom_tool")]
+    public void Start_WithCommandRefinement_UsesConventionSpanName(
+        string? skillName, string? resourceName, string? executableName, string expectedName)
+    {
+        var details = new ToolCallDetails("custom_tool", arguments: null)
+        {
+            RefinementDetails = new ExecuteCommandRefinementDetails(
+                skillName: skillName, resourceName: resourceName, executableName: executableName),
+        };
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(Util.GetDefaultRequest(), details, Util.GetAgentDetails());
+        });
+
+        activity.DisplayName.Should().Be(expectedName);
+        activity.Kind.Should().Be(System.Diagnostics.ActivityKind.Internal);
+        activity.ShouldHaveTag("gen_ai.operation.name", "execute_tool");
+        activity.ShouldHaveTag("gen_ai.tool.name", "custom_tool");
+    }
+
+    [TestMethod]
+    [DataRow(0)]
+    [DataRow(2)]
+    public void Start_WithCommandRefinement_EmitsSameAttributesAsDirectEtwEvenOnFailure(int exitCode)
+    {
+        var details = new ToolCallDetails("run", arguments: null)
+        {
+            RefinementDetails = new ExecuteCommandRefinementDetails(
+                skillName: "code-review",
+                description: "Review changes",
+                sourceUri: "file:///opt/skills/code-review",
+                resourceName: "scripts/check.py",
+                executableName: "python",
+                executablePath: "/usr/bin/python",
+                exitCode: exitCode),
+        };
+        var error = new InvalidOperationException("Command failed");
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(Util.GetDefaultRequest(), details, Util.GetAgentDetails());
+            scope.RecordError(error);
+        });
+        var data = Microsoft.Agents.A365.Observability.Runtime.DTOs.Builders.ExecuteToolDataBuilder.Build(
+            details, Util.GetAgentDetails(), "conversation", error: error);
+        var expected = new Dictionary<string, object>
+        {
+            ["gen_ai.skill.name"] = "code-review",
+            ["gen_ai.skill.description"] = "Review changes",
+            ["gen_ai.skill.source.uri"] = "file:///opt/skills/code-review",
+            ["gen_ai.skill.resource.name"] = "scripts/check.py",
+            ["process.executable.name"] = "python",
+            ["process.executable.path"] = "/usr/bin/python",
+            ["process.exit.code"] = exitCode,
+        };
+
+        foreach (var attribute in expected)
+        {
+            activity.GetTagItem(attribute.Key).Should().Be(attribute.Value);
+            data.Attributes.Should().ContainKey(attribute.Key).WhoseValue.Should().Be(attribute.Value);
+        }
+
+        activity.Status.Should().Be(System.Diagnostics.ActivityStatusCode.Error);
+        data.Name.Should().Be("ExecuteTool");
+    }
+
+    [TestMethod]
+    public void Start_WithoutExplicitRefinement_DoesNotInferSkillFromToolName()
+    {
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(), new ToolCallDetails("load_skill", "{\"name\":\"code-review\"}"), Util.GetAgentDetails());
+        });
+
+        activity.DisplayName.Should().Be("execute_tool load_skill");
+        activity.TagObjects.Should().NotContain(tag => tag.Key.StartsWith("gen_ai.skill.", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    [DataRow(0)]
+    [DataRow(2)]
+    public void RecordProcessExitCode_AfterCommandCompletes_RecordsNumericExitCode(int exitCode)
+    {
+        var details = new ToolCallDetails("shell", arguments: null)
+        {
+            RefinementDetails = new ExecuteCommandRefinementDetails(executableName: "python"),
+        };
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(Util.GetDefaultRequest(), details, Util.GetAgentDetails());
+            scope.RecordProcessExitCode(exitCode);
+        });
+
+        activity.GetTagItem("process.exit.code").Should().Be(exitCode);
+    }
+
     private sealed class TestEventListener : EventListener
     {
         public List<EventWrittenEventArgs> Events { get; } = new();
@@ -37,6 +165,24 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         });
         
         activity.ShouldHaveTagContaining(OpenTelemetryConstants.GenAiToolArgumentsKey, expected);
+    }
+
+    [TestMethod]
+    public void Start_WithEndpoint_SetsFullUrlAndServerAttributes()
+    {
+        var endpoint = new Uri("https://user:password@example.com:7071/tools/search?mode=fast&sig=secret&access_token=token");
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails("TestTool", "args", endpoint: endpoint),
+                Util.GetAgentDetails());
+        });
+
+        activity.ShouldHaveTag(OpenTelemetryConstants.ServerAddressKey, "example.com");
+        activity.ShouldHaveTag(OpenTelemetryConstants.ServerPortKey, "7071");
+        activity.ShouldHaveTag(OpenTelemetryConstants.UrlFullKey, endpoint.AbsoluteUri);
     }
 
     [TestMethod]
@@ -134,6 +280,21 @@ public sealed class ExecuteToolScopeTest : ActivityTest
     }
 
     [TestMethod]
+    public void Start_SetsOperationSource_WhenProvidedOnRequest()
+    {
+        var operationSource = OperationSource.SDK.ToString();
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                new Request(operationSource: operationSource),
+                new ToolCallDetails("TestTool", "args"),
+                Util.GetAgentDetails());
+        });
+
+        activity.ShouldHaveTag(OpenTelemetryConstants.ServiceNameKey, operationSource);
+    }
+
+    [TestMethod]
     public void Start_SetsChannel_Tags()
     {
         var metadata = new Channel(name: "ChannelY", link: "https://channel/link/y");
@@ -148,6 +309,187 @@ public sealed class ExecuteToolScopeTest : ActivityTest
 
         activity.ShouldHaveTag(OpenTelemetryConstants.ChannelNameKey, metadata.Name!);
         activity.ShouldHaveTag(OpenTelemetryConstants.ChannelLinkKey, metadata.Link!);
+    }
+
+    [TestMethod]
+    public void Start_WithTransferDetails_SetsExplicitTransferAttributes()
+    {
+        var sourceAgent = new AgentDetails(agentId: "source-agent-id", agentName: "Source Agent");
+        var targetAgent = new AgentDetails(
+            agentId: "weather-agent-id",
+            agentName: "Weather Agent",
+            agentBlueprintId: "weather-blueprint",
+            agentPlatformId: "weather-platform",
+            agentVersion: "2026.09.10");
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails(
+                    "handoff",
+                    arguments: null)
+                {
+                    TransferDetails = new TransferDetails(
+                        TransferMode.ReturnToCaller,
+                        targetAgent),
+                },
+                sourceAgent);
+        });
+
+        activity.ShouldHaveTag(OpenTelemetryConstants.GenAiAgentIdKey, "source-agent-id");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferModeKey, "return_to_caller");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetTypeKey, "agent");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetAgentIdKey, "weather-agent-id");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetAgentNameKey, "Weather Agent");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey, "weather-blueprint");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey, "weather-platform");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetAgentVersionKey, "2026.09.10");
+        activity.Tags
+            .Where(tag => tag.Key.StartsWith("microsoft.a365.transfer.target.", StringComparison.Ordinal))
+            .Select(tag => tag.Key)
+            .Should()
+            .BeEquivalentTo(new[]
+            {
+                OpenTelemetryConstants.TransferTargetTypeKey,
+                OpenTelemetryConstants.TransferTargetAgentIdKey,
+                OpenTelemetryConstants.TransferTargetAgentNameKey,
+                OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey,
+                OpenTelemetryConstants.TransferTargetAgentPlatformIdKey,
+                OpenTelemetryConstants.TransferTargetAgentVersionKey,
+            });
+        activity.Tags
+            .Select(tag => tag.Key)
+            .Should()
+            .NotContain(key => key.StartsWith("gen_ai.transfer.", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void Start_WithoutTransferDetails_OmitsTransferAttributes()
+    {
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails("ordinary-tool", (string?)null),
+                Util.GetAgentDetails());
+        });
+
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferModeKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetTypeKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentIdKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentNameKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentVersionKey);
+    }
+
+    [TestMethod]
+    public void Start_WithTransferModeOnly_OmitsAllTargetAgentAttributes()
+    {
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails("handoff", arguments: null)
+                {
+                    TransferDetails = new TransferDetails(TransferMode.PassControl),
+                },
+                Util.GetAgentDetails());
+        });
+
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferModeKey, "pass_control");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetTypeKey, "agent");
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentIdKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentNameKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentVersionKey);
+        activity.Tags
+            .Where(tag => tag.Key.StartsWith("microsoft.a365.transfer.target.", StringComparison.Ordinal))
+            .Select(tag => tag.Key)
+            .Should()
+            .BeEquivalentTo(new[]
+            {
+                OpenTelemetryConstants.TransferTargetTypeKey,
+            });
+        activity.Tags
+            .Select(tag => tag.Key)
+            .Should()
+            .NotContain(key => key.StartsWith("gen_ai.transfer.", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void Start_WithPartialTargetAgentDetails_OmitsNullTargetAgentAttributes()
+    {
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = ExecuteToolScope.Start(
+                Util.GetDefaultRequest(),
+                new ToolCallDetails(
+                    "handoff",
+                    arguments: null)
+                {
+                    TransferDetails = new TransferDetails(
+                        TransferMode.ReturnToCaller,
+                        new AgentDetails(
+                            agentId: "weather-agent-id",
+                            agentVersion: "2026.09.11")),
+                },
+                Util.GetAgentDetails());
+        });
+
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferModeKey, "return_to_caller");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetAgentIdKey, "weather-agent-id");
+        activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetAgentVersionKey, "2026.09.11");
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentNameKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey);
+        activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey);
+    }
+
+    [TestMethod]
+    public void Start_WithExplicitNonAgentTransferTargetTypes_SetsOnlyTargetTypeAttribute()
+    {
+        void AssertTargetType(TransferTargetType targetType, string expectedValue)
+        {
+            var activity = ListenForActivity(() =>
+            {
+                using var scope = ExecuteToolScope.Start(
+                    Util.GetDefaultRequest(),
+                    new ToolCallDetails(
+                        "handoff",
+                        arguments: null)
+                    {
+                        TransferDetails = new TransferDetails(
+                            TransferMode.PassControl,
+                            targetType),
+                    },
+                    Util.GetAgentDetails());
+            });
+
+            activity.ShouldHaveTag(OpenTelemetryConstants.TransferModeKey, "pass_control");
+            activity.ShouldHaveTag(OpenTelemetryConstants.TransferTargetTypeKey, expectedValue);
+            activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentIdKey);
+            activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentNameKey);
+            activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey);
+            activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey);
+            activity.Tags.Should().NotContainKey(OpenTelemetryConstants.TransferTargetAgentVersionKey);
+            activity.Tags
+                .Where(tag => tag.Key.StartsWith("microsoft.a365.transfer.target.", StringComparison.Ordinal))
+                .Select(tag => tag.Key)
+                .Should()
+                .BeEquivalentTo(new[]
+                {
+                    OpenTelemetryConstants.TransferTargetTypeKey,
+                });
+            activity.Tags
+                .Select(tag => tag.Key)
+                .Should()
+                .NotContain(key => key.StartsWith("gen_ai.transfer.", StringComparison.Ordinal));
+        }
+
+        AssertTargetType(TransferTargetType.Human, "human");
+        AssertTargetType(TransferTargetType.Workflow, "workflow");
     }
 
     [TestMethod]
@@ -277,6 +619,7 @@ public sealed class ExecuteToolScopeTest : ActivityTest
             Action = ToolCallAction.Read,
             Parameters = new Dictionary<string, object?> { ["location"] = "Seattle" },
             Resources = new List<ToolCallResource>(),
+            AdditionalProperties = { ["provider_option"] = true },
         };
 
         var activity = ListenForActivity(() =>
@@ -292,6 +635,8 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         using var document = JsonDocument.Parse(json!);
         document.RootElement.GetProperty("action").GetString().Should().Be("read");
         document.RootElement.GetProperty("schema_version").GetString().Should().Be("1.0");
+        document.RootElement.GetProperty("metadata")
+            .GetProperty("provider_option").GetBoolean().Should().BeTrue();
     }
 
     [TestMethod]
@@ -348,6 +693,7 @@ public sealed class ExecuteToolScopeTest : ActivityTest
                 HasMore = false,
                 TotalCount = 0,
             },
+            AdditionalProperties = { ["provider_summary"] = "ok" },
         };
 
         var activity = ListenForActivity(() =>
@@ -365,6 +711,8 @@ public sealed class ExecuteToolScopeTest : ActivityTest
         document.RootElement.GetProperty("schema_version").GetString().Should().Be("1.0");
         document.RootElement.GetProperty("outcome")
             .GetProperty("status").GetString().Should().Be("success");
+        document.RootElement.GetProperty("metadata")
+            .GetProperty("provider_summary").GetString().Should().Be("ok");
     }
 
     [TestMethod]
@@ -448,7 +796,10 @@ public sealed class ExecuteToolScopeTest : ActivityTest
                 TotalCount = 1,
             },
         };
-        var details = new ToolCallDetails("sharepoint_get_document", arguments);
+        var details = new ToolCallDetails(
+            "sharepoint_get_document",
+            arguments,
+            endpoint: new Uri("https://user:password@example.com/tools?sig=secret"));
 
         var activity = ListenForActivity(() =>
         {
@@ -477,6 +828,10 @@ public sealed class ExecuteToolScopeTest : ActivityTest
             JsonNode.Parse(scopeResultJson!),
             JsonNode.Parse(etwAttributes.GetProperty(OpenTelemetryConstants.GenAiToolCallResultKey).GetString()!))
             .Should().BeTrue();
+        activity.Tags.Single(pair => pair.Key == OpenTelemetryConstants.UrlFullKey).Value
+            .Should().Be(details.Endpoint!.AbsoluteUri);
+        etwAttributes.GetProperty(OpenTelemetryConstants.UrlFullKey).GetString()
+            .Should().Be(details.Endpoint.AbsoluteUri);
     }
 
     [TestMethod]

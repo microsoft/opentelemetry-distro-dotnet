@@ -40,11 +40,18 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         /// <param name="operationName">The name of the operation being traced.</param>
         /// <param name="activityName">The name of the activity for display purposes.</param>
         /// <param name="agentDetails">Optional agent details. Tenant ID is read from <see cref="AgentDetails.TenantId"/>.</param>
+        /// <param name="request">Optional request context used for shared span attributes.</param>
         /// <param name="spanDetails">Optional span configuration including parent context, start/end times,
         /// span kind, and span links. Subclasses may override <see cref="SpanDetails.SpanKind"/> before calling this constructor;
         /// defaults to <see cref="ActivityKind.Client"/>.</param>
         /// <param name="userDetails">Optional human caller identity details (id, email, name, client IP).</param>
-        protected OpenTelemetryScope(string operationName, string activityName, AgentDetails agentDetails, SpanDetails? spanDetails = null, UserDetails? userDetails = null)
+        protected OpenTelemetryScope(
+            string operationName,
+            string activityName,
+            AgentDetails agentDetails,
+            Request? request,
+            SpanDetails? spanDetails = null,
+            UserDetails? userDetails = null)
         {
             var kind = spanDetails?.SpanKind ?? ActivityKind.Client;
             var parentContext = spanDetails?.ParentContext;
@@ -93,6 +100,19 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
                 SetTagMaybe(UserEmailKey, userDetails.UserEmail);
                 SetTagMaybe(UserNameKey, userDetails.UserName);
                 SetTagMaybe(CallerClientIpKey, userDetails.UserClientIP?.ToString());
+            }
+
+            if (request != null)
+            {
+                SetTagMaybe(SessionIdKey, request.SessionId);
+                SetTagMaybe(GenAiConversationIdKey, request.ConversationId);
+                SetTagMaybe(ServiceNameKey, request.OperationSource);
+
+                if (request.Channel != null)
+                {
+                    SetTagMaybe(ChannelNameKey, request.Channel.Name);
+                    SetTagMaybe(ChannelLinkKey, request.Channel.Link);
+                }
             }
 
             // Only start the stopwatch if no custom start time is provided

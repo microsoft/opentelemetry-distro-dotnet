@@ -3,7 +3,11 @@
     {
       "src": [
         {
-          "files": ["src/Microsoft.OpenTelemetry/Microsoft.OpenTelemetry.csproj"],
+          "files": [
+            "src/Microsoft.OpenTelemetry/Microsoft.OpenTelemetry.csproj",
+            "src/Microsoft.OpenTelemetry.A365.Contracts/Microsoft.OpenTelemetry.A365.Contracts.csproj",
+            "src/Microsoft.OpenTelemetry.A365.Etw/Microsoft.OpenTelemetry.A365.Etw.csproj"
+          ],
           "src": "."
         }
       ],

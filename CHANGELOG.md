@@ -1,15 +1,51 @@
 # Changelog
 
 ## Unreleased
+- Update OpenTelemetry SDK and exporters to 1.20.1.
+- Add explicit skill-loading, skill-resource-reading, and command refinements to execute-tool telemetry through `ToolCallDetails.RefinementDetails`, using separate `SkillRefinementDetails` and `ExecuteCommandRefinementDetails` types. Share skill/process attributes between Activity and direct ETW paths, use semantic-convention Activity span names, and support recording process exit codes after execution. Ordinary tool calls remain unchanged.
+- Fix Agent365 tracing filters and export to accept `text_completion` and `generate_content` inference operations, preserving case-insensitive operation matching. Expose both operation names as public constants alongside `ChatOperationName`.
+- Add privacy-safe Model Observation attributes to inference telemetry, including the canonical served response model, cache read/write input-token counts, lowercase operation names, and endpoint host with an optional numeric non-default port. Attributes can be supplied when the inference scope starts or recorded after the response is available. ([#174](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/174))
+- Share canonical inference operation names across span names, span attributes, metrics, and DTOs. Undefined operation enum values fall back to `chat`; relative or hostless endpoints are omitted without throwing. Both cases emit diagnostic trace warnings.
+- Add an in-process Agent 365 instrumentation validator for development-time integration tests, with store-publishing required-attribute rules covering all supported inference operations, actionable reports, and reasoned suppressions for legitimately unavailable values.
+- Fix Agent365-only and no-exporter configurations suppressing independently registered OpenTelemetry log exporters. The provider-wide logging filter now applies only when `Instrumentation.EnableLogging` is explicitly disabled ([#182](https://github.com/microsoft/opentelemetry-distro-dotnet/issues/182)).
+- **Breaking change on Unix:** Agent365 offline buffering now requires `StorageDirectory` to name an existing, absolute, application-owned private root. Automatic `TMPDIR`, `/var/tmp`, `/tmp`, and current-directory fallbacks are removed on Unix to avoid SDK-selected shared temporary storage. Customers provision and maintain filesystem ownership, permissions, and ACLs; the SDK does not validate or modify access controls. Missing or invalid configuration is logged and disables only offline buffering; online export continues. Windows defaults and cache subdirectory identities are unchanged. See [offline buffering and filesystem permissions](docs/agent365-getting-started.md#offline-buffering-and-filesystem-permissions) for configuration and migration guidance.
+- **Breaking change:** Synced the vendored `OpenTelemetry.Resources.Azure` resource detectors to `1.20.1-beta.1`; resource attributes now follow semantic conventions v1.44.0 (`cloud.platform` values `azure_app_service`/`azure_container_apps`/`azure_vm` are now `azure.app_service`/`azure.container_apps`/`azure.vm`, and the App Service slot is reported as `deployment.environment.name` instead of `deployment.environment`).
 
-- Add an in-process Agent 365 instrumentation validator for development-time integration tests, with store-publishing required-attribute rules, actionable reports, and reasoned suppressions for legitimately unavailable values.
+## 1.2.0 - 2026-10-15
+- Microsoft OpenTelemetry is now split into three different assemblies: Microsoft.OpenTelemetry.A365.Contracts, Microsoft.OpenTelemetry.A365.Etw, and Microsoft.OpenTelemetry. Namespaces within the source code remain unchanged, the assembly names and folder structures are renamed.
+- Add the `UseA365ContractsPackageReference` build property to build against a published `Microsoft.OpenTelemetry.A365.Contracts` package instead of the in-repo project.
+- Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.10.0.
+- Update OpenTelemetry SDK and exporters to 1.19.1 and instrumentation packages to 1.19.0.
+- Report Live Metrics usage in Feature SDK Stats from the first outgoing active-collection request, without polling or adding network requests. Skip tracking when Live Metrics is disabled and stop inspecting requests after first use. Correlate the Agent Framework feature with instrumentation detected by the existing bounded activity processor.
+- **Breaking change:** Reduce default HTTP client metric volume while retaining request latency, count, and failure dimensions through `http.client.request.duration`. Other `System.Net.Http` metrics are now opt-in through OpenTelemetry `AddView`; dashboards and alerts using them must [explicitly enable collection](docs/customization.md#http-client-metrics). HTTP dependency tracing and server metrics are unchanged. No new public API is introduced.
+- Added standalone Agent365 Contracts and ETW packages. ETW-specific APIs and processors are owned by `Microsoft.Agents.A365.Observability.Etw`, while runtime code shared with `Microsoft.OpenTelemetry` is owned by Contracts. The Contracts implementation surface is public, and applications must rebuild when upgrading because moved Agent365 types are no longer forwarded from `Microsoft.OpenTelemetry`.
+- **Breaking change:** Remove the `AgentType` contract and the `AgentDetails.AgentType`, `AgentDetails.AgentClientIP`, and `InferenceCallDetails.ResponseId` members, with their constructor and deconstruction parameters ([#165](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/165)).
+- Nest execute-tool `AdditionalProperties` under `metadata` in typed JSON payloads ([#166](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/166)).
+- Add a `url.full` attribute to execute-tool spans and ETW payloads while retaining the host-only `server.address` attribute ([#170](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/170)).
+
+## 1.2.0-beta.1 - 2026-09-18
+- Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.10.0-beta.1, which makes multi-endpoint routing available: one exporter can send telemetry to several Application Insights components. It is off by default and enabled with the `Azure.Monitor.OpenTelemetry.EnableMultiEndpointRouting` switch, after which each item is sent to the component named by its `microsoft.instrumentation_key` and `microsoft.ingestion_endpoint` attributes, and an item carrying neither is dropped rather than sent to the application's own component.
+- Add an ASP.NET Core sample that routes each customer's traces, logs, and metrics to that customer's Application Insights component, including the ASP.NET Core and HttpClient request-duration metrics.
+- Add a console sample that routes traces, logs, and metrics to multiple Application Insights endpoints.
+- Isolate Agent365 exporter failures by tenant ([#158](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/158))
+- Support tracing A2A via execute tool span.
+- Add a self-contained Agent365 service-to-service sample that uses app-only MSAL authentication and emits manual Invoke Agent, Inference, and Execute Tool spans without the Agents Framework ([#155](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/155))
+- Log successful Agent365 export responses with the HTTP status code and correlation ID ([#155](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/155))
+- Report enabled distro trace instrumentations in SDK Stats when they produce a completed activity during a bounded 10-minute startup window, including legacy HTTP and ASP.NET Core activity sources ([#146](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/146))
+
+## 1.1.0 - 2026-09-08
+
+- InvokeAgentScope now defaults omitted span kind to ActivityKind.Internal while preserving explicit overrides.
 - Add extensible, dictionary-backed JSON schema models for `gen_ai.tool.call.arguments` and `gen_ai.tool.call.result`, including `schema_version` on both payloads and typed Execute Tool span and ETW APIs.
 - Add a thread-safe SDK Stats usage foundation that independently emits feature (`type=0`) and instrumentation (`type=1`) masks at the next scheduled long-interval export.
 - Shift Microsoft distro Feature SDK Stats flags to bits 8–21, reserving bits 0–7 for existing .NET `Track*` feature mappings and preventing backend bitmap conflicts.
-- Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.8.3.
+- Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.9.0.
+- Update `OpenTelemetry`, `OpenTelemetry.Extensions.Hosting`, `OpenTelemetry.Instrumentation.AspNetCore`, `OpenTelemetry.Instrumentation.Http`, `OpenTelemetry.Instrumentation.SqlClient`, `OpenTelemetry.Exporter.Console`, `OpenTelemetry.Exporter.OpenTelemetryProtocol`, and `OpenTelemetry.Exporter.InMemory` to 1.18.0, and `OpenTelemetry.PersistentStorage.FileSystem` to 1.1.1. Updates `Agent365PersistentStorage.TryStore` to bind to the non-obsolete `TryCreateBlob(ReadOnlySpan<byte>, ...)` overload required by the `PersistentStorage.FileSystem` 1.1.1 API.
 - Add durable Agent365 store-and-forward delivery with bounded local storage, restart replay, adaptive shared backoff, and draining shutdown for the asynchronous processor.
 - Customer SDK Stats are now on by default; the distro reports the `CustomerSdkStats` feature bit unless `APPLICATIONINSIGHTS_SDKSTATS_DISABLED=true`.
 - Prefix the distro-owned SDK Stats `version` dimension with the `mot` component label (e.g. `mot1.0.6`) so Feature and Network SDK Stats report the highest-level emitting component per the SDK Version spec, matching the Azure Monitor exporter's format.
+- Fix the SDKStats `os` dimension to fall back to the running process OS (instead of emitting `"unknown"`) when IMDS `azInst_osType` is null, empty, or the literal `"Unknown"`, and honor `APPLICATIONINSIGHTS_SDKSTATS_DISABLED_ALL` and `APPLICATIONINSIGHTS_STATS_LONG_EXPORT_INTERVAL` at the distro's internal SDKStats gating points ([#136](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/136))
+- Patch the transitive `Microsoft.Bcl.Memory` dependency (pulled in at 10.0.2 via `Microsoft.Agents.Builder`) to 10.0.7 ([#150](https://github.com/microsoft/opentelemetry-distro-dotnet/pull/150))
 
 ## 1.0.7 - 2026-07-13
 

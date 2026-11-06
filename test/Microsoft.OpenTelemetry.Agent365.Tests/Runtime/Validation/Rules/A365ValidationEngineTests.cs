@@ -94,10 +94,13 @@ public sealed class A365ValidationEngineTests
             f.AttributeName == ServerPortKey);
     }
 
-    [TestMethod]
-    public void Validate_ValidChatSpan_HasNoFindings()
+    [DataTestMethod]
+    [DataRow(ChatOperationName)]
+    [DataRow(TextCompletionOperationName)]
+    [DataRow(GenerateContentOperationName)]
+    public void Validate_ValidInferenceSpan_HasNoFindings(string operationName)
     {
-        var span = CreateSpan("chat", CreateStorePublishingAttributes("chat"));
+        var span = CreateSpan(operationName, CreateStorePublishingAttributes(ChatOperationName));
 
         var results = A365ValidationEngine.Validate(
             new[] { span },
@@ -105,6 +108,36 @@ public sealed class A365ValidationEngineTests
 
         results.Should().HaveCount(1);
         results.Single().Findings.Should().BeEmpty();
+    }
+
+    [DataTestMethod]
+    [DataRow(TextCompletionOperationName, GenAiRequestModelKey, A365ValidationRuleIds.InferenceModelRequired)]
+    [DataRow(GenerateContentOperationName, GenAiRequestModelKey, A365ValidationRuleIds.InferenceModelRequired)]
+    [DataRow(TextCompletionOperationName, GenAiProviderNameKey, A365ValidationRuleIds.InferenceProviderRequired)]
+    [DataRow(GenerateContentOperationName, GenAiProviderNameKey, A365ValidationRuleIds.InferenceProviderRequired)]
+    [DataRow(TextCompletionOperationName, GenAiAgentIdKey, A365ValidationRuleIds.AgentIdRequired)]
+    [DataRow(GenerateContentOperationName, GenAiAgentIdKey, A365ValidationRuleIds.AgentIdRequired)]
+    [DataRow(TextCompletionOperationName, GenAiInputMessagesKey, A365ValidationRuleIds.InputMessagesRequired)]
+    [DataRow(GenerateContentOperationName, GenAiOutputMessagesKey, A365ValidationRuleIds.OutputMessagesRequired)]
+    [DataRow("GENERATE_CONTENT", GenAiRequestModelKey, A365ValidationRuleIds.InferenceModelRequired)]
+    public void Validate_InferenceOperation_RequiredAttributesAreEnforced(
+        string operationName,
+        string attributeName,
+        string ruleId)
+    {
+        var attributes = CreateStorePublishingAttributes(ChatOperationName);
+        attributes[AgentPlatformIdKey] = "platform-agent";
+        attributes.Remove(attributeName);
+
+        var result = A365ValidationEngine.Validate(
+            new[] { CreateSpan(operationName, attributes) },
+            new A365ValidationOptions()).Single();
+
+        result.Findings.Should().ContainSingle()
+            .Which.Should().Match<A365ValidationFinding>(finding =>
+                finding.RuleId == ruleId &&
+                finding.AttributeName == attributeName &&
+                finding.Message == $"Missing {attributeName}");
     }
 
     [TestMethod]
@@ -297,7 +330,7 @@ public sealed class A365ValidationEngineTests
     }
 
     [TestMethod]
-    public void Validate_InferenceRules_ApplyOnlyToChat()
+    public void Validate_InferenceRules_DoNotApplyToExecuteTool()
     {
         var result = A365ValidationEngine.Validate(
             new[] { CreateValidCommonSpan("execute_tool") },

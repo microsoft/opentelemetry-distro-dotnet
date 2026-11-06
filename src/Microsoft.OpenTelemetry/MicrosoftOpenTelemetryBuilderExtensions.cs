@@ -186,6 +186,10 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
             o.EnableTraceBasedLogsSampler = options.AzureMonitor.EnableTraceBasedLogsSampler;
             o.SamplingRatio = options.AzureMonitor.SamplingRatio;
             o.TracesPerSecond = options.AzureMonitor.TracesPerSecond;
+            if (options.AzureMonitor.ExplicitTransport is { } transport)
+            {
+                o.SetTransport(transport);
+            }
         }, effectiveInstrumentation);
 
         // --- Agent365 (always: scopes + baggage + span processors; exporter gated by Exporters flag) ---
@@ -266,10 +270,10 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         }
 
         // --- Logging kill switch ---
-        // When effective logging is disabled, suppress all log records from reaching
-        // OpenTelemetryLoggerProvider (affects Azure Monitor, OTLP, Console, etc.).
+        // Only explicitly disabling logging should suppress the shared provider.
+        // No distro-owned logging exporter does not mean no independent exporters.
         // This is a provider-scoped ILogger filter — other loggers are not affected.
-        if (!effectiveInstrumentation.EnableLogging)
+        if (!options.Instrumentation.EnableLogging)
         {
             builder.Services.AddLogging(logging =>
             {
@@ -330,7 +334,12 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         // when AzureMonitor is selected) and after the AppContext switch above is set (so
         // SDK Stats routes to the distro-owned ingestion endpoint).
         SdkStatsPin.EnsureIfApplicable(exporters);
-        RegisterDistroFeatureSdkStats(builder.Services, options, exporters, a365OnlyMode);
+        RegisterDistroFeatureSdkStats(
+            builder.Services,
+            options,
+            effectiveInstrumentation,
+            exporters,
+            a365OnlyMode);
 
         return builder;
     }
@@ -348,6 +357,7 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
     private static void RegisterDistroFeatureSdkStats(
         IServiceCollection services,
         MicrosoftOpenTelemetryOptions options,
+        InstrumentationOptions instrumentationOptions,
         ExportTarget effectiveExporters,
         bool a365OnlyMode)
     {
@@ -386,6 +396,17 @@ public static class MicrosoftOpenTelemetryBuilderExtensions
         {
             AzureMonitorAspNetCoreEventSource.Log.DistroFeatureSdkStatsDisabledByEnvVar();
             return;
+        }
+
+        var enabledInstrumentations =
+            DistroInstrumentationUsageProcessor.GetEnabledInstrumentations(instrumentationOptions);
+
+        if (instrumentationOptions.EnableTracing
+            && enabledInstrumentations != DistroInstrumentation.None)
+        {
+            services.ConfigureOpenTelemetryTracerProvider((_, tracing) =>
+                tracing.AddProcessor(
+                    new DistroInstrumentationUsageProcessor(enabledInstrumentations)));
         }
 
         // Defer snapshot construction until the MeterProvider builds: by then the exporter's

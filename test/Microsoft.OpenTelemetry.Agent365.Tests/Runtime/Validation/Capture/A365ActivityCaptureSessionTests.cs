@@ -1022,6 +1022,60 @@ public sealed class A365ActivityCaptureSessionTests
     }
 
     [TestMethod]
+    public async Task CompleteAsync_SpanStopsEarlyInPollingInterval_UsesAccumulatedQuietTime()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_SpanStopsEarlyInPollingInterval_UsesAccumulatedQuietTime));
+        using var activity = source.StartActivity("chat model");
+        activity.Should().NotBeNull();
+        activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
+
+        var completion = session.CompleteAsync(ShortTimeout, CancellationToken.None);
+        await Task.Delay(40);
+        activity.Stop();
+
+        var result = await completion;
+
+        result.TimedOut.Should().BeFalse(
+            "more than 250ms of uninterrupted quiet remains after the span stops");
+        result.Spans.Should().ContainSingle();
+        result.TimedOutSpans.Should().BeEmpty();
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_OperationNormalizedByLaterListener_RestartsQuietPeriod()
+    {
+        using var session = new A365ActivityCaptureSession(null);
+        using var source = new ActivitySource(
+            nameof(CompleteAsync_OperationNormalizedByLaterListener_RestartsQuietPeriod));
+        using var normalizer = new ActivityListener
+        {
+            ShouldListenTo = candidate => candidate.Name == source.Name,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
+                ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = activity =>
+                activity.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat"),
+        };
+        ActivitySource.AddActivityListener(normalizer);
+
+        var lateSpan = Task.Run(async () =>
+        {
+            await Task.Delay(180);
+            using var activity = source.StartActivity("chat.completions model");
+            activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, "chat.completions");
+        });
+
+        var result = await session.CompleteAsync(TimeSpan.FromMilliseconds(350), CancellationToken.None);
+        await lateSpan;
+
+        result.TimedOut.Should().BeTrue(
+            "a normalized span stopped too late to leave 250ms of quiet before the deadline");
+        result.Spans.Should().ContainSingle()
+            .Which.OperationName.Should().Be("chat");
+    }
+
+    [TestMethod]
     public async Task CompleteAsync_ResidualWindowShorterThanQuietPeriod_DoesNotDeclareSuccess()
     {
         using var session = new A365ActivityCaptureSession(null);

@@ -67,10 +67,12 @@ internal sealed class A365ActivityCaptureSession : IDisposable
 
     private readonly ConcurrentDictionary<Activity, byte> active = new();
     private readonly ConcurrentQueue<Activity> completed = new();
+    private readonly ConcurrentDictionary<Activity, long> unclassifiedCompleted = new();
     private readonly ConcurrentDictionary<Activity, Lazy<FilterDecision>> filterDecisions = new();
     private readonly Func<A365SpanSnapshot, bool>? spanFilter;
     private readonly ActivityListener listener;
     private long eligibleChangeVersion;
+    private long lastEligibleChangeTimestamp;
 
     /// <summary>
     /// Whether the session has left the listening state. Written only under
@@ -112,7 +114,7 @@ internal sealed class A365ActivityCaptureSession : IDisposable
     /// Gets or sets a test-only synchronization hook. When set, it is invoked
     /// synchronously inside <see cref="OnStopped"/>, while the closure gate is
     /// held, after a stopping activity has been made durably observable
-    /// (queued to the completed set when eligible) but before it is removed
+    /// (queued to the completed set) but before it is removed
     /// from the active set. Production code never sets this; it exists solely
     /// so regression tests can deterministically hold the gate across that
     /// transition -- for example to force a stop callback to win the gate
@@ -159,7 +161,8 @@ internal sealed class A365ActivityCaptureSession : IDisposable
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        Stopwatch? stopwatch = null;
+        var waitStartedAt = Stopwatch.GetTimestamp();
+        var stopwatch = Stopwatch.StartNew();
 
         while (true)
         {
@@ -175,28 +178,12 @@ internal sealed class A365ActivityCaptureSession : IDisposable
                 return CreateResult(establishedClosure);
             }
 
-            // Start the timeout budget with the first actual wait. In
-            // particular, a timeout equal to QuietPeriod must still permit
-            // one complete quiet-period observation; bookkeeping performed
-            // before the delay must not make that documented minimum
-            // impossible to satisfy.
-            var remaining = stopwatch == null ? timeout : timeout - stopwatch.Elapsed;
-            if (remaining <= TimeSpan.Zero)
-            {
-                break;
-            }
-
-            // Never sleep past the remaining timeout budget: cap the delay to
-            // whatever time is left instead of always waiting the full quiet
-            // period, so CompleteAsync returns promptly once the deadline is
-            // reached instead of intentionally oversleeping by up to QuietPeriod.
-            var isFullQuietPeriodDelay = remaining >= QuietPeriod;
-            var delay = isFullQuietPeriodDelay ? QuietPeriod : remaining;
-
+            ObserveNormalizedCompletedActivities();
             var version = Interlocked.Read(ref eligibleChangeVersion);
-
-            stopwatch ??= Stopwatch.StartNew();
-            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+            var lastChange = Interlocked.Read(ref lastEligibleChangeTimestamp);
+            var quietDue = QuietPeriod + TimeSpan.FromSeconds(
+                Math.Max(0, lastChange - waitStartedAt) / (double)Stopwatch.Frequency);
+            var elapsed = stopwatch.Elapsed;
 
             // Unsynchronized *candidate* check. It is deliberately performed
             // without the gate because it evaluates the span filter (customer
@@ -204,29 +191,29 @@ internal sealed class A365ActivityCaptureSession : IDisposable
             // warms the at-most-once filter-decision cache for everything
             // currently active. It can never decide the outcome on its own:
             // only the gated re-check below is authoritative.
-            var isCandidateQuiet = version == Interlocked.Read(ref eligibleChangeVersion) &&
+            var isCandidateQuiet = elapsed >= quietDue && quietDue <= timeout &&
                 !active.Keys.Any(IsEligibleForWait);
 
-            if (isCandidateQuiet && isFullQuietPeriodDelay &&
-                TryCloseOnQuietPeriod(version, out var quietResult))
+            if (isCandidateQuiet)
             {
-                return quietResult!;
+                if (TryCloseOnQuietPeriod(version, out var quietResult))
+                {
+                    return quietResult!;
+                }
+
+                continue;
             }
 
-            // A residual delay shorter than the full 250ms quiet period
-            // cannot, by itself, prove that a genuine quiet period occurred:
-            // observing no change for a few milliseconds is much weaker
-            // evidence than observing no change for the full window. Only a
-            // delay of the full QuietPeriod length can establish that
-            // guarantee, so once the remaining budget forces a shorter delay
-            // this iteration can never declare success -- the loop must fall
-            // through to the deadline boundary below. (A successful full
-            // quiet period always returns directly above, so there is no
-            // "already proven quiet" case left to consider here.)
-            if (!isFullQuietPeriodDelay)
+            var remaining = timeout - stopwatch.Elapsed;
+            if (remaining <= TimeSpan.Zero)
             {
                 break;
             }
+
+            var quietRemaining = quietDue - stopwatch.Elapsed;
+            var delay = quietRemaining > TimeSpan.Zero ? quietRemaining : QuietPeriod;
+            await Task.Delay(delay < remaining ? delay : remaining, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         return CloseAtDeadline();
@@ -274,8 +261,8 @@ internal sealed class A365ActivityCaptureSession : IDisposable
     /// Attempts to end the session on a fully observed quiet period.
     /// </summary>
     /// <param name="observedVersion">
-    /// The eligible-change version read before the completed quiet-period
-    /// delay, re-validated here under the gate.
+    /// The eligible-change version associated with the candidate quiet
+    /// period, re-validated here under the gate.
     /// </param>
     /// <param name="result">The captured result, when closure succeeded.</param>
     /// <returns>
@@ -301,6 +288,7 @@ internal sealed class A365ActivityCaptureSession : IDisposable
                 // passes and the boundary is recorded below, every later
                 // callback is by definition outside the evaluation window.
                 if (Interlocked.Read(ref eligibleChangeVersion) != observedVersion ||
+                    unclassifiedCompleted.Keys.Any(IsEligible) ||
                     HasBlockingActiveSpanUnderGate())
                 {
                     result = null;
@@ -632,6 +620,35 @@ internal sealed class A365ActivityCaptureSession : IDisposable
             routingAgentId);
     }
 
+    private void ObserveNormalizedCompletedActivities()
+    {
+        foreach (var pending in unclassifiedCompleted)
+        {
+            if (!IsEligible(pending.Key))
+            {
+                continue;
+            }
+
+            var passesFilter = TryGetFilterDecision(pending.Key, out _);
+            lock (gate)
+            {
+                if (closed)
+                {
+                    return;
+                }
+
+                if (unclassifiedCompleted.TryRemove(pending.Key, out _) && passesFilter)
+                {
+                    // Quiet time starts at the stop, not at this later classification.
+                    Interlocked.Exchange(
+                        ref lastEligibleChangeTimestamp,
+                        Math.Max(lastEligibleChangeTimestamp, pending.Value));
+                    Interlocked.Increment(ref eligibleChangeVersion);
+                }
+            }
+        }
+    }
+
     private void OnStarted(Activity activity)
     {
         // Advisory fast path only; the authoritative check is under the gate.
@@ -672,6 +689,7 @@ internal sealed class A365ActivityCaptureSession : IDisposable
 
             if (bumpsVersion)
             {
+                Interlocked.Exchange(ref lastEligibleChangeTimestamp, Stopwatch.GetTimestamp());
                 Interlocked.Increment(ref eligibleChangeVersion);
             }
         }
@@ -714,19 +732,24 @@ internal sealed class A365ActivityCaptureSession : IDisposable
             // both at once (which produced a misleading completed-and-timed-out
             // duplicate). The enqueue-before-remove ordering is retained so
             // that lock-free diagnostics still see it continuously.
-            if (isEligible)
-            {
-                completed.Enqueue(activity);
-            }
-
-            if (bumpsVersion)
-            {
-                Interlocked.Increment(ref eligibleChangeVersion);
-            }
+            // A later listener may normalize an operation (for example
+            // Semantic Kernel's chat.completions) after this callback returns.
+            completed.Enqueue(activity);
 
             OnStoppedTransitionHookForTests?.Invoke(activity);
 
             active.TryRemove(activity, out _);
+
+            if (!isEligible)
+            {
+                unclassifiedCompleted[activity] = Stopwatch.GetTimestamp();
+            }
+
+            if (bumpsVersion)
+            {
+                Interlocked.Exchange(ref lastEligibleChangeTimestamp, Stopwatch.GetTimestamp());
+                Interlocked.Increment(ref eligibleChangeVersion);
+            }
         }
     }
 
@@ -744,9 +767,7 @@ internal sealed class A365ActivityCaptureSession : IDisposable
         var filtered = new List<A365SpanSnapshot>();
         foreach (var activity in state.Completed)
         {
-            // Only eligible activities are ever enqueued (see OnStopped), so
-            // no need to re-check IsEligible here.
-            if (TryGetFilterDecision(activity, out var snapshot))
+            if (IsEligible(activity) && TryGetFilterDecision(activity, out var snapshot))
             {
                 filtered.Add(snapshot ?? CreateSnapshot(activity));
             }
@@ -791,7 +812,7 @@ internal sealed class A365ActivityCaptureSession : IDisposable
         }
 
         /// <summary>
-        /// Gets the eligible activities that had stopped before the boundary.
+        /// Gets the activities that had stopped before the boundary.
         /// </summary>
         internal IReadOnlyList<Activity> Completed { get; }
 

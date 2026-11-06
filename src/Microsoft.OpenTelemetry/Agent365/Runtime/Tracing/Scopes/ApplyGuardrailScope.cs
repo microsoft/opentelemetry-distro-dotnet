@@ -58,6 +58,7 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
                 operationName: OpenTelemetryConstants.ApplyGuardrailOperationName,
                 activityName: BuildActivityName(details),
                 agentDetails: agentDetails,
+                request: request,
                 spanDetails: new SpanDetails(spanDetails?.SpanKind ?? ActivityKind.Internal, spanDetails?.ParentContext, spanDetails?.StartTime, spanDetails?.EndTime, spanDetails?.SpanLinks),
                 userDetails: userDetails)
         {
@@ -95,12 +96,6 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
 
             // Request context
             SetTagMaybe(OpenTelemetryConstants.GenAiSecurityContentInputValueKey, request?.Content);
-            SetTagMaybe(OpenTelemetryConstants.GenAiConversationIdKey, request?.ConversationId);
-            if (request?.Channel != null)
-            {
-                SetTagMaybe(OpenTelemetryConstants.ChannelNameKey, request.Channel.Name);
-                SetTagMaybe(OpenTelemetryConstants.ChannelLinkKey, request.Channel.Link);
-            }
         }
 
         /// <summary>

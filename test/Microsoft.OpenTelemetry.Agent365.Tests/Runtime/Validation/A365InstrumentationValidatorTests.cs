@@ -6,6 +6,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Microsoft.Agents.A365.Observability.Extensions.SemanticKernel;
 using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Contracts;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Processors;
@@ -38,8 +39,33 @@ public sealed class A365InstrumentationValidatorTests
         report.IsValid.Should().BeTrue(report.ToString());
     }
 
+    [DataTestMethod]
+    [DataRow(OpenTelemetryConstants.TextCompletionOperationName)]
+    [DataRow(OpenTelemetryConstants.GenerateContentOperationName)]
+    [DataRow("TEXT_COMPLETION")]
+    public async Task EvaluateAsync_NonChatInference_MissingProviderFailsCertification(
+        string operationName)
+    {
+        var report = await A365InstrumentationValidator.EvaluateAsync(() =>
+        {
+            using var source = new ActivitySource("Customer.Agent.Inference");
+            using var activity = source.StartActivity($"{operationName} model");
+            activity.Should().NotBeNull();
+            SetValidChatAttributes(activity!);
+            activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, operationName);
+            activity.SetTag(OpenTelemetryConstants.GenAiProviderNameKey, null);
+            return Task.CompletedTask;
+        });
+
+        var spanResult = report.Spans.Should().ContainSingle().Which;
+        spanResult.Span.OperationName.Should().Be(operationName);
+        spanResult.Findings.Should().ContainSingle()
+            .Which.RuleId.Should().Be(A365ValidationRuleIds.InferenceProviderRequired);
+        report.IsValid.Should().BeFalse();
+    }
+
     [TestMethod]
-    public async Task EvaluateAsync_ExportIdentityOnlyInActivityBaggage_SatisfiesNonSuppressibleRules()
+    public async Task EvaluateAsync_ExportIdentityOnlyInActivityBaggage_FailsRequiredPayloadRules()
     {
         var report = await A365InstrumentationValidator.EvaluateAsync(() =>
         {
@@ -49,10 +75,8 @@ public sealed class A365InstrumentationValidatorTests
 
             SetValidChatAttributes(activity!, includeExportIdentity: false);
 
-            // Tenant and agent identity are carried only in Activity baggage --
-            // exactly what Agent365ExporterCore reads through
-            // GetAttributeOrBaggage when it partitions spans for export. The
-            // two non-suppressible identity rules must therefore pass.
+            // Routing succeeds with baggage, but the required payload tags
+            // are still absent without baggage-to-tag enrichment.
             activity!.AddBaggage(OpenTelemetryConstants.TenantIdKey, "tenant");
             activity.AddBaggage(OpenTelemetryConstants.GenAiAgentIdKey, "agent");
             activity.GetTagItem(OpenTelemetryConstants.TenantIdKey).Should().BeNull();
@@ -62,11 +86,9 @@ public sealed class A365InstrumentationValidatorTests
         });
 
         var spanResult = report.Spans.Should().ContainSingle().Which;
-        spanResult.Findings.Should().NotContain(f =>
-            f.RuleId == A365ValidationRuleIds.TenantIdRequired ||
-            f.RuleId == A365ValidationRuleIds.AgentIdentityRequired);
-        spanResult.Findings.Should().ContainSingle(f =>
-            f.RuleId == A365ValidationRuleIds.AgentIdRequired);
+        spanResult.Findings.Select(f => f.RuleId).Should().BeEquivalentTo(
+            A365ValidationRuleIds.TenantIdRequired,
+            A365ValidationRuleIds.AgentIdRequired);
 
         // The public attribute set reflects what the exporter serializes --
         // activity tags only -- so the baggage-only routing identity must not
@@ -87,7 +109,7 @@ public sealed class A365InstrumentationValidatorTests
             activity.Should().NotBeNull();
 
             SetValidChatAttributes(activity!, includeExportIdentity: false);
-            activity!.AddBaggage(OpenTelemetryConstants.TenantIdKey, "tenant");
+            activity!.SetTag(OpenTelemetryConstants.TenantIdKey, "tenant");
             activity.AddBaggage(
                 OpenTelemetryConstants.AgentPlatformIdKey,
                 "platform-agent");
@@ -141,9 +163,8 @@ public sealed class A365InstrumentationValidatorTests
             .Select(f => f.RuleId)
             .ToList();
 
-        // Baggage-only routing identity still routes the export, so only the
-        // routing rules pass.
-        activeRuleIds.Should().NotContain(A365ValidationRuleIds.TenantIdRequired);
+        // Agent routing succeeds, but baggage cannot satisfy payload rules.
+        activeRuleIds.Should().Contain(A365ValidationRuleIds.TenantIdRequired);
         activeRuleIds.Should().NotContain(A365ValidationRuleIds.AgentIdentityRequired);
 
         activeRuleIds.Should().Contain(new[]
@@ -208,8 +229,9 @@ public sealed class A365InstrumentationValidatorTests
             // Baggage-only operation name still classifies the span, and
             // baggage-only tenant/agent identity still routes it.
             spanResult.Span.OperationName.Should().NotBeNullOrEmpty();
+            spanResult.Findings.Should().Contain(f =>
+                f.RuleId == A365ValidationRuleIds.TenantIdRequired);
             spanResult.Findings.Should().NotContain(f =>
-                f.RuleId == A365ValidationRuleIds.TenantIdRequired ||
                 f.RuleId == A365ValidationRuleIds.AgentIdentityRequired);
 
             // Nothing from baggage is reported as an exported attribute.
@@ -275,8 +297,11 @@ public sealed class A365InstrumentationValidatorTests
             finding => finding.RuleId == A365ValidationRuleIds.SpanCompletionTimeout);
     }
 
-    [TestMethod]
-    public async Task EvaluateAsync_OperationNameOnlyInActivityBaggage_IsValidated()
+    [DataTestMethod]
+    [DataRow(OpenTelemetryConstants.GenAiOperationNameKey)]
+    [DataRow(OpenTelemetryConstants.TenantIdKey)]
+    public async Task EvaluateAsync_RequiredPayloadAttributeOnlyInBaggage_FailsCertification(
+        string attributeName)
     {
         var report = await A365InstrumentationValidator.EvaluateAsync(() =>
         {
@@ -285,19 +310,18 @@ public sealed class A365InstrumentationValidatorTests
             activity.Should().NotBeNull();
 
             SetValidChatAttributes(activity!);
-            activity!.SetTag(OpenTelemetryConstants.GenAiOperationNameKey, null);
-            activity.AddBaggage(OpenTelemetryConstants.GenAiOperationNameKey, "chat");
-            activity.GetTagItem(OpenTelemetryConstants.GenAiOperationNameKey)
-                .Should().BeNull();
+            activity!.AddBaggage(attributeName, activity.GetTagItem(attributeName)!.ToString());
+            activity.SetTag(attributeName, null);
 
             return Task.CompletedTask;
         });
 
         var spanResult = report.Spans.Should().ContainSingle().Which;
         spanResult.Span.OperationName.Should().Be("chat");
-        spanResult.Span.Attributes.Should().NotContainKey(
-            OpenTelemetryConstants.GenAiOperationNameKey);
-        report.EnsureValid();
+        spanResult.Span.Attributes.Should().NotContainKey(attributeName);
+        spanResult.Findings.Should().ContainSingle()
+            .Which.AttributeName.Should().Be(attributeName);
+        report.IsValid.Should().BeFalse();
     }
 
     [TestMethod]
@@ -575,8 +599,12 @@ public sealed class A365InstrumentationValidatorTests
             f.SpanId == timedOutSpan.SpanId);
     }
 
-    [TestMethod]
-    public async Task EvaluateAsync_ValidManualScopes_PassCertification()
+    [DataTestMethod]
+    [DataRow(InferenceOperationType.Chat)]
+    [DataRow(InferenceOperationType.TextCompletion)]
+    [DataRow(InferenceOperationType.GenerateContent)]
+    public async Task EvaluateAsync_ValidManualScopes_PassCertification(
+        InferenceOperationType inferenceOperation)
     {
         using var provider = Sdk.CreateTracerProviderBuilder()
             .AddSource(OpenTelemetryConstants.SourceName)
@@ -626,7 +654,7 @@ public sealed class A365InstrumentationValidatorTests
                 using (var inferenceScope = InferenceScope.Start(
                     request,
                     new InferenceCallDetails(
-                        InferenceOperationType.Chat,
+                        inferenceOperation,
                         "gpt-4.1",
                         "openai"),
                     agent,
@@ -861,6 +889,58 @@ public sealed class A365InstrumentationValidatorTests
         report.Spans.Single().Findings.Should().OnlyContain(
             finding => finding.Status == A365ValidationFindingStatus.Suppressed);
         report.ToString().Should().Contain("Anonymous entry point");
+    }
+
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task EvaluateAsync_SemanticKernelNormalization_CapturesRegardlessOfProviderOrder(
+        bool initializeProviderInsideAction)
+    {
+        TracerProvider? provider = null;
+        try
+        {
+            if (!initializeProviderInsideAction)
+            {
+                InitializeProvider();
+            }
+
+            var report = await A365InstrumentationValidator.EvaluateAsync(() =>
+            {
+                if (initializeProviderInsideAction)
+                {
+                    InitializeProvider();
+                }
+
+                using var source = new ActivitySource(SemanticKernelTelemetryConstants.SemanticKernelSource);
+                using var activity = source.StartActivity("chat.completions model");
+                activity.Should().NotBeNull();
+                SetValidChatAttributes(activity!);
+                activity!.SetTag(
+                    OpenTelemetryConstants.GenAiOperationNameKey,
+                    SemanticKernelTelemetryConstants.ChatCompletionsOperation);
+                activity.SetTag(OpenTelemetryConstants.GenAiProviderNameKey, null);
+                return Task.CompletedTask;
+            });
+
+            var spanResult = report.Spans.Should().ContainSingle().Which;
+            spanResult.Span.OperationName.Should().Be(OpenTelemetryConstants.ChatOperationName);
+            spanResult.Findings.Should().ContainSingle()
+                .Which.RuleId.Should().Be(A365ValidationRuleIds.InferenceProviderRequired);
+            report.IsValid.Should().BeFalse();
+        }
+        finally
+        {
+            provider?.Dispose();
+        }
+
+        void InitializeProvider()
+        {
+            provider = Sdk.CreateTracerProviderBuilder()
+                .AddSource(SemanticKernelTelemetryConstants.SemanticKernelSource)
+                .AddProcessor(new SemanticKernelSpanProcessor())
+                .Build();
+        }
     }
 
     private static AgentDetails CreateCertificationAgentDetails()

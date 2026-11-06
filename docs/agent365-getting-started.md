@@ -143,6 +143,42 @@ Customize the Agent365 exporter behavior via `o.Agent365`:
 | `MaxExportBatchSize` | Maximum batch size for export operations. | `512` |
 | `ScheduledDelayMilliseconds` | Delay in milliseconds between export batches. | `5000` |
 | `ExporterTimeoutMilliseconds` | Timeout in milliseconds for the export operation. | `30000` |
+| `DisableOfflineStorage` | Disables on-disk buffering and replay. On Unix, leaving this `false` also requires a provisioned `StorageDirectory`. | `false` |
+| `StorageDirectory` | Storage root. Unix requires an existing, absolute, private directory provisioned by the deployment. Windows can resolve a default location. | `null` |
+
+### Offline buffering and filesystem permissions
+
+Agent365 can buffer undeliverable telemetry on disk for later replay. **On Unix, including Linux and macOS, this requires an explicitly configured, pre-existing private storage root.** The SDK does not select a shared temporary directory automatically. If the root is missing, relative, or not configured, initialization logs an error and disables offline buffering and its replay loop; online export continues. To intentionally run without disk buffering, set `o.Agent365.DisableOfflineStorage = true`.
+
+The deployment owns filesystem security, as with Azure Monitor's customer-configured storage. Provision a dedicated root owned by the application's service account, with access restricted to that account (normally Unix mode `0700`). Review extended ACLs, including inherited allow grants, and ensure untrusted users cannot replace the root or its ancestors. The SDK does not inspect or change ownership, permission bits, ACLs, or symbolic links. A configured path is trusted; pointing it at `/tmp` or another shared directory is not a secure configuration.
+
+For example, run the following **as the application's service account during deployment**, using a new application-specific location:
+
+```sh
+install -d -m 700 "$HOME/.local/state/my-agent/telemetry"
+```
+
+If the path already exists, review its ownership, permissions, and ACLs before reuse. Do not change permissions on shared system directories.
+
+Configure that same root when initializing the distro:
+
+```csharp
+using System;
+using System.IO;
+using Microsoft.OpenTelemetry;
+
+builder.UseMicrosoftOpenTelemetry(o =>
+{
+    o.Exporters = ExportTarget.Agent365;
+    o.Agent365.StorageDirectory = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".local", "state", "my-agent", "telemetry");
+});
+```
+
+The SDK creates its cache subdirectories beneath this root using normal filesystem inheritance. It does not change the customer's access controls. Windows retains the existing `LOCALAPPDATA`, `TEMP`, and current-directory fallback behavior and inherited ACLs.
+
+**Migration:** Unix applications that previously relied on automatic temporary storage must provision and configure a private root to retain offline buffering. Keeping the same explicitly configured root preserves the existing hashed cache location and replay. Records in a previous default temporary location are not automatically moved or replayed after switching roots; review and migrate any backlog during a controlled, stopped-application maintenance window.
 
 ### Azure Monitor options
 
@@ -602,13 +638,25 @@ scope.RecordOutputMessages(new[] { "Here is the response." });
 Track tool execution with telemetry for monitoring and auditing.
 
 ```csharp
+var targetAgentDetails = new AgentDetails(
+    agentId: "weather-agent-id",
+    agentName: "Weather Agent",
+    agentBlueprintId: "weather-blueprint",
+    agentPlatformId: "weather-platform",
+    agentVersion: "2026.09.10");
+
 var toolCallDetails = new ToolCallDetails(
-    toolName: "summarize",
-    arguments: "{\"text\": \"...\"}",
+    toolName: "handoff",
+    arguments: "{\"city\":\"Seattle\",\"units\":\"metric\"}",
     toolCallId: "tc-001",
-    description: "Summarize provided text",
+    description: "Delegate weather lookup to the weather specialist agent",
     toolType: "function",
-    endpoint: new Uri("https://tools.contoso.com:8080"));
+    endpoint: new Uri("https://weather-agent.contoso.com"))
+{
+    TransferDetails = new TransferDetails(
+        mode: TransferMode.ReturnToCaller,
+        targetAgentDetails: targetAgentDetails),
+};
 
 using var scope = ExecuteToolScope.Start(
     request: request,
@@ -617,8 +665,129 @@ using var scope = ExecuteToolScope.Start(
 
 // ... your tool logic here ...
 
-scope.RecordResponse("{\"summary\": \"The text was summarized.\"}");
+scope.RecordResponse("{\"status\": \"returned_to_caller\", \"target\": \"weather-agent\"}");
 ```
+
+Typed execute-tool arguments and results support provider-specific metadata
+through `AdditionalProperties`. The SDK serializes the dictionary under a nested
+`metadata` object:
+
+```csharp
+var arguments = new ExecuteToolCallArguments
+{
+    Action = ToolCallAction.Read,
+    AdditionalProperties =
+    {
+        ["provider_option"] = true,
+        ["action"] = "provider-specific-action",
+    },
+};
+```
+
+```json
+{
+  "schema_version": "1.0",
+  "action": "read",
+  "metadata": {
+    "provider_option": true,
+    "action": "provider-specific-action"
+  }
+}
+```
+
+Metadata keys remain isolated from declared schema fields, including on nested
+resources, identifiers, containers, outcomes, sensitivity, policy, security,
+and pagination models.
+
+`agentDetails` identifies the source agent executing the tool. `TransferDetails`
+describes the explicit transfer exposed by this tool call. The ergonomic
+constructor (`new TransferDetails(mode, targetAgentDetails)`) defaults
+`TransferDetails.TargetType` to `TransferTargetType.Agent`, so both mode-only
+and target-agent transfers emit `microsoft.a365.transfer.target.type=agent`.
+Use `TransferDetails.TargetAgentDetails` only when your application already
+knows the target agent identity. The SDK emits
+`microsoft.a365.transfer.mode`, `microsoft.a365.transfer.target.type`, and only
+the five supported target-agent fields from `TargetAgentDetails` (`AgentId`,
+`AgentName`, `AgentBlueprintId`, `AgentPlatformId`, and `AgentVersion`); other
+`AgentDetails` properties are not emitted for this transfer model. For future
+non-agent handoffs, use the explicit overload such as
+`new TransferDetails(TransferMode.PassControl, TransferTargetType.Human)` or
+`new TransferDetails(TransferMode.PassControl, TransferTargetType.Workflow)`.
+Those transfers emit the transfer mode and target type, but no target-agent
+identity attributes, and reject `TargetAgentDetails` to avoid contradictory
+telemetry. The SDK never infers target attributes for ordinary tool calls. Keep
+the required tool metadata
+(`arguments`, `toolCallId`, `description`, `toolType`, and `endpoint`) on
+`ToolCallDetails`, then attach `TransferDetails` with an object initializer for
+the explicit handoff metadata.
+
+#### Skill and command tool refinements
+
+When the tool API or runtime state explicitly identifies a skill operation,
+attach `SkillRefinementDetails` or `ExecuteCommandRefinementDetails` to the
+existing `ToolCallDetails.RefinementDetails` property. This follows
+the [OpenTelemetry execute-tool refinements](https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-agent-spans.md#agent-skills);
+it does not create another span or infer behavior from tool names or arguments.
+
+```csharp
+var loadDetails = new ToolCallDetails("load_skill", arguments: "{}")
+{
+    RefinementDetails = new SkillRefinementDetails(
+        SkillRefinementKind.LoadSkill,
+        skillName: "code-review",
+        sourceUri: "file:///opt/skills/code-review"),
+};
+```
+
+Commands can optionally carry skill metadata when executing a bundled script:
+
+```csharp
+var toolDetails = new ToolCallDetails("run_skill_script", arguments: "{}")
+{
+    RefinementDetails = new ExecuteCommandRefinementDetails(
+        skillName: "code-review",
+        sourceUri: "file:///opt/skills/code-review",
+        resourceName: "scripts/check.py",
+        executableName: "python",
+        executablePath: "/usr/bin/python"),
+};
+
+using var scope = ExecuteToolScope.Start(request, toolDetails, agentDetails);
+// Execute the command, then record its reported exit code (including zero).
+scope.RecordProcessExitCode(exitCode);
+// Report failures separately through scope.RecordError(exception), as appropriate.
+```
+
+Use `SkillRefinementKind.LoadSkill` for a dedicated skill loader or
+`SkillRefinementKind.ReadSkillResource` for a dedicated resource reader.
+`SkillRefinementDetails` accepts only skill metadata.
+Use `ExecuteCommandRefinementDetails` for commands, including scripts bundled
+with a skill. Commands need not belong to a skill. The two sealed types implement
+`IExecuteToolRefinementDetails` without a shared base class.
+Supply executable name/path only
+when the tool directly executes a single process, and an exit code only when the
+tool reports a single command or process status.
+
+The optional attributes are `gen_ai.skill.name`, `gen_ai.skill.description`,
+`gen_ai.skill.source.uri`, `gen_ai.skill.resource.name`, `process.executable.name`,
+`process.executable.path`, and numeric `process.exit.code`. Empty strings are
+omitted. Supply names known at the start of execution even when the operation
+later fails. Descriptions and source URIs may contain sensitive information:
+remove credentials and access tokens before supplying a source URI, and use the
+skill's original source rather than its temporary materialization path. These
+explicitly supplied values are not automatically scrubbed.
+
+Activity names use `execute_tool {toolName} {skillName}` for loading a named
+skill. Resource readers and commands append `{skillName} {resourceName}` when
+both names are available, or just `{resourceName}` when only that name is known.
+Without a resource name, commands append the executable name if available;
+resource readers append nothing. Neither appends a skill name by itself.
+Missing metadata falls back to `execute_tool {toolName}`.
+
+Direct ETW logging accepts the same `ToolCallDetails` and emits the same
+attributes; pass a known exit code to the refinement constructor when logging a
+completed command. Its existing `ExecuteTool` event envelope name is unchanged.
+Exit codes do not automatically set an error status on either path.
 
 **Available methods:**
 
@@ -626,6 +795,7 @@ scope.RecordResponse("{\"summary\": \"The text was summarized.\"}");
 |---|---|
 | `RecordResponse(string)` | Record a string result. |
 | `RecordResponse(IDictionary<string, object>)` | Record a structured result. |
+| `RecordProcessExitCode(int)` | Record the exit code reported by a single command or process. |
 | `RecordThreatDiagnosticsSummary(ThreatDiagnosticsSummary)` | Record threat diagnostics. |
 
 ### Inference (`InferenceScope`)
@@ -798,14 +968,14 @@ this profile because its purpose is publishing readiness.
 
 | Applies to | Required attributes validated |
 |---|---|
-| All publishing operations | `microsoft.tenant.id`, `gen_ai.agent.id`, `gen_ai.agent.name`, `microsoft.a365.agent.blueprint.id`, `microsoft.agent.user.id`, `microsoft.agent.user.email`, `microsoft.channel.name`, `gen_ai.conversation.id`, `client.address`, `user.id`, `user.email` |
+| All publishing operations | `gen_ai.operation.name`, `microsoft.tenant.id`, `gen_ai.agent.id`, `gen_ai.agent.name`, `microsoft.a365.agent.blueprint.id`, `microsoft.agent.user.id`, `microsoft.agent.user.email`, `microsoft.channel.name`, `gen_ai.conversation.id`, `client.address`, `user.id`, `user.email` |
 | `invoke_agent` | `server.address`, `gen_ai.input.messages`, `gen_ai.output.messages` |
-| `chat` | `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.request.model`, `gen_ai.provider.name` |
+| `chat`, `text_completion`, `generate_content` | `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.request.model`, `gen_ai.provider.name` |
 | `execute_tool` | `gen_ai.tool.name`, `gen_ai.tool.type`, `gen_ai.tool.call.id`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result` |
 | `output_messages` | `gen_ai.output.messages` |
 
-Every payload value must be a nonempty string, matching the Agent 365 OTLP
-contract. `gen_ai.agent.description` and `user.name` are optional and do not
+The required attributes listed above must be nonempty strings.
+`gen_ai.agent.description` and `user.name` are optional and do not
 produce certification findings. `server.port` is emitted only for nonstandard
 ports; the default HTTPS port 443 is omitted and inferred according to
 OpenTelemetry network semantic conventions. `gen_ai.operation.name` is the capture
@@ -817,7 +987,8 @@ Tenant identity and agent export identity are non-suppressible. If
 `A365ValidationRuleIds.TenantIdRequired` or
 `A365ValidationRuleIds.AgentIdentityRequired` fails, fix the instrumentation by
 setting `AgentDetails.TenantId` and either `AgentDetails.AgentId` or
-`AgentDetails.AgentPlatformId` (or supplying the equivalent A365 baggage).
+`AgentDetails.AgentPlatformId` (or supplying the equivalent A365 baggage
+with baggage-to-tag enrichment enabled).
 Store publishing additionally requires `gen_ai.agent.id`; a platform identity
 can satisfy exporter routing but does not replace the calling application's
 Entra appId in the span payload.
@@ -831,21 +1002,22 @@ treats routing metadata and payload attributes differently:
   from the span tag first and then the activity's baggage. A span whose
   operation name, `microsoft.tenant.id`, `gen_ai.agent.id`, or
   `microsoft.a365.agent.platform.id` is carried only in baggage is still
-  recognized, and still satisfies `A365ValidationRuleIds.TenantIdRequired` and
-  `A365ValidationRuleIds.AgentIdentityRequired`. A tag always wins over a
-  same-key baggage entry.
-- **Every other required attribute must be an activity tag.** Baggage is not
+  recognized and routable. This can satisfy
+  `A365ValidationRuleIds.AgentIdentityRequired`, but does not establish that
+  required payload tags were exported. A tag always wins over a same-key
+  baggage entry.
+- **Every required payload attribute must be an activity tag.** Baggage is not
   serialized into OTLP span attributes, so a value that exists only in baggage
   never reaches the Agent 365 service. Rules such as
-  `A365ValidationRuleIds.AgentNameRequired`,
-  `A365ValidationRuleIds.UserIdRequired`,
+  `A365ValidationRuleIds.TenantIdRequired`,
+  `A365ValidationRuleIds.OperationNameRequired`,
   `A365ValidationRuleIds.InferenceModelRequired`, and
   `A365ValidationRuleIds.ToolNameRequired` are therefore satisfied only by a
   span tag. `A365SpanSnapshot.Attributes` reflects this: it exposes the
   activity's tags only — exactly the attributes the exporter serializes — so a
   suppression predicate or `SpanFilter` cannot match a baggage-only attribute
-  either. `OperationName` is the exception because exporter classification
-  resolves it from either a tag or baggage.
+  either. The separate `OperationName` snapshot property models exporter
+  classification, so it can resolve from either a tag or baggage.
 
 In practice this distinction rarely requires extra work: the distro's
 `ActivityProcessor` copies nonempty baggage entries onto spans as tags when
@@ -1016,8 +1188,16 @@ Received HTTP response headers after *ms - 200
     "gen_ai.tool.description": "Optional",
     "gen_ai.tool.name": "Required",
     "gen_ai.tool.type": "Required",
+    "microsoft.a365.transfer.mode": "Optional",
+    "microsoft.a365.transfer.target.type": "Optional",
+    "microsoft.a365.transfer.target.agent.id": "Optional",
+    "microsoft.a365.transfer.target.agent.name": "Optional",
+    "microsoft.a365.transfer.target.agent.blueprint.id": "Optional",
+    "microsoft.a365.transfer.target.agent.platform.id": "Optional",
+    "microsoft.a365.transfer.target.agent.version": "Optional",
     "server.address": "Optional",
     "server.port": "Optional",
+    "url.full": "Optional",
     "microsoft.session.id": "Optional",
     "microsoft.session.description": "Optional",
     "microsoft.tenant.id": "Required"

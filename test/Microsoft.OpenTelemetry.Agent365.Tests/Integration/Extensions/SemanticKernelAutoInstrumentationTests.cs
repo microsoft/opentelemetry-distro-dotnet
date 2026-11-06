@@ -197,11 +197,11 @@ public class SemanticKernelAutoInstrumentationTests
 
     private List<Activity> SpansWithOperation(string operation) =>
         _exportedActivities
-            .Where(a => string.Equals(a.GetTagItem("gen_ai.operation.name") as string, operation, StringComparison.OrdinalIgnoreCase))
+            .Where(a => string.Equals(a.GetTagItem("gen_ai.operation.name") as string, operation, StringComparison.Ordinal))
             .ToList();
 
     // The SemanticKernelSpanProcessor normalizes the SK "chat.completions"/"chat" operation to
-    // InferenceOperationType.Chat.ToString() ("Chat"), so match case-insensitively.
+    // the canonical OpenTelemetry operation name "chat".
     private List<Activity> ChatSpans() => SpansWithOperation("chat");
 
     private void ForceFlush()

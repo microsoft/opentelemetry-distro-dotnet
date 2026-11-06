@@ -19,8 +19,7 @@ public sealed class OutputScopeTest : ActivityTest
         var response = new Response(initialMessages);
         var agentDetails = new AgentDetails(
             agentId: "agent-output-123",
-            agentName: "OutputAgent",
-            agentType: AgentType.MicrosoftCopilot);
+            agentName: "OutputAgent");
 
         // Act
         var activity = ListenForActivity(() =>
@@ -42,6 +41,27 @@ public sealed class OutputScopeTest : ActivityTest
         tagValue.Should().Contain("\"role\":\"assistant\"");
         tagValue.Should().Contain("Hello");
         tagValue.Should().Contain("World");
+    }
+
+    [TestMethod]
+    public void Start_SetsRequestContextTags()
+    {
+        var sessionId = "session-output-123";
+        var operationSource = OperationSource.SDK.ToString();
+        var request = new Request(
+            sessionId: sessionId,
+            operationSource: operationSource);
+
+        var activity = ListenForActivity(() =>
+        {
+            using var scope = OutputScope.Start(
+                request,
+                new Response(new[] { "Test message" }),
+                Util.GetAgentDetails());
+        });
+
+        activity.ShouldHaveTag(OpenTelemetryConstants.SessionIdKey, sessionId);
+        activity.ShouldHaveTag(OpenTelemetryConstants.ServiceNameKey, operationSource);
     }
 
     [TestMethod]

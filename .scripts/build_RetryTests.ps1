@@ -22,6 +22,32 @@ if (-not (Test-Path $TestResultsDirectory)) {
 
 $logDirectoryRetries = Join-Path -Path $WorkingDirectory -ChildPath "RetryResults";
 
+# TRX contents are treated as untrusted input: only test assemblies inside the working directory
+# and identifier-shaped test names are ever passed to `dotnet test`.
+$allowedRoot = [System.IO.Path]::GetFullPath($WorkingDirectory).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+$pathComparison = if ($IsWindows -or $env:OS -eq 'Windows_NT') { [System.StringComparison]::OrdinalIgnoreCase } else { [System.StringComparison]::Ordinal }
+$identifierPattern = '^[A-Za-z_][A-Za-z0-9_`+]*(\.[A-Za-z_][A-Za-z0-9_`+]*)*$'
+
+function Get-ValidatedTestAssemblyPath([string]$codeBase) {
+    if ([string]::IsNullOrWhiteSpace($codeBase) -or -not [System.IO.Path]::IsPathRooted($codeBase)) {
+        return $null
+    }
+
+    $fullPath = [System.IO.Path]::GetFullPath($codeBase)
+    if (-not $fullPath.StartsWith($allowedRoot, $pathComparison) -or
+        -not $fullPath.EndsWith('.dll', [System.StringComparison]::OrdinalIgnoreCase) -or
+        -not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+        return $null
+    }
+
+    $item = Get-Item -LiteralPath $fullPath -Force
+    if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+        return $null
+    }
+
+    return $fullPath
+}
+
 $trxFiles = Get-ChildItem -Path $TestResultsDirectory\*.trx -Recurse -Force
 Write-Host "TRX files found: "
 foreach ($trx in $trxFiles) {
@@ -53,26 +79,37 @@ foreach ($trx in $trxFiles) {
                     Write-Error -Message "TEST DEFINITION NOT FOUND" -ErrorAction Stop
                 }
 
-                $RetrySummary += "$($definition.TestMethod.className).$($definition.TestMethod.name)"
+                $className = [string]$definition.TestMethod.className
+                $testName = [string]$definition.TestMethod.name
+                $RetrySummary += "$className.$testName"
 
                 Write-Host ""
-                Write-Host "$($definition.TestMethod.codeBase) $($definition.TestMethod.className).$($definition.TestMethod.name) $($result.outcome)"
+                Write-Host "$($definition.TestMethod.codeBase) $className.$testName $($result.outcome)"
+
+                $testAssembly = Get-ValidatedTestAssemblyPath ([string]$definition.TestMethod.codeBase)
+                if ($null -eq $testAssembly -or $className -notmatch $identifierPattern -or $testName -notmatch $identifierPattern) {
+                    Write-Host "Skipping retry: test definition failed validation (assembly must be an existing .dll under '$allowedRoot'; class and method names must be identifiers)."
+                    $FailedAfterRetrySummary += "$className.$testName"
+                    $scriptResult = $false
+                    continue
+                }
 
                 [bool]$retryResult = $false;
                 for ($i = 0; $i -lt $maxRetries -and $retryResult -eq $false; $i++) {
                     Start-Sleep -Seconds ([int]$secondsBetweenRetries * $i)
 
-                    $logPath = "$logDirectoryRetries/$($definition.TestMethod.className).$($definition.TestMethod.name)_$i.trx";
-                    dotnet test $($definition.TestMethod.codeBase) --logger "trx;LogFileName=$logPath" --filter "ClassName=$($definition.TestMethod.className)&Name=$($definition.TestMethod.name)" | Out-Null
+                    $logPath = Join-Path -Path $logDirectoryRetries -ChildPath "$className.$($testName)_$i.trx";
+                    $dotnetArgs = @('test', $testAssembly, '--logger', "trx;LogFileName=$logPath", '--filter', "ClassName=$className&Name=$testName")
+                    & dotnet @dotnetArgs | Out-Null
 
-                    [xml]$retryXml = Get-Content -Path $logPath -ErrorAction Stop
+                    [xml]$retryXml = Get-Content -LiteralPath $logPath -ErrorAction Stop
                     $retryOutcome = $retryXml.TestRun.ResultSummary.outcome;
                     $retryResult = ($retryOutcome -ne "Failed");
                     Write-Host "Retry #$i Outcome: '$retryOutcome' Passed: $retryResult"
                 }
 
                 if ($retryResult -eq $false) {
-                    $FailedAfterRetrySummary += "$($definition.TestMethod.className).$($definition.TestMethod.name)"
+                    $FailedAfterRetrySummary += "$className.$testName"
                 }
 
                 $scriptResult = $scriptResult -band $retryResult;

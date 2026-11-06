@@ -5,7 +5,11 @@ using System;
 using System.IO;
 using System.Text;
 using FluentAssertions;
+using Microsoft.Agents.A365.Observability.Runtime.Common;
 using Microsoft.Agents.A365.Observability.Runtime.Tracing.Exporters;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using OpenTelemetry.PersistentStorage.FileSystem;
 
 namespace Microsoft.OpenTelemetry.Agent365.Tests.Runtime.Tracing.Exporters;
@@ -18,7 +22,10 @@ public sealed class Agent365PersistentStorageTests
     {
         using var temp = new TemporaryDirectory();
         using var storage = Agent365PersistentStorage.Create(temp.Path);
-        storage.DirectoryPath.Should().StartWith(temp.Path);
+
+        storage.TryStore(CreateRecord()).Should().BeTrue();
+
+        Directory.GetFiles(Path.Combine(temp.Path, "Microsoft", "Agent365")).Should().NotBeEmpty();
     }
 
     [TestMethod]
@@ -30,6 +37,71 @@ public sealed class Agent365PersistentStorageTests
 
         storage.TryStore(expected).Should().BeTrue();
         storage.TryGetNext(out var stored).Should().BeTrue();
+        stored!.TryLease(TimeSpan.FromMinutes(2)).Should().BeTrue();
+        stored.Read(out var actual).Should().Be(Agent365StoredRecordReadResult.Success);
+        actual.Should().BeEquivalentTo(expected);
+    }
+
+    [TestMethod]
+    public void ReusesCustomerProvisionedStorageWithoutChangingPermissionsOnUnix()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        using var temp = new TemporaryDirectory();
+        var root = Agent365StorageDirectoryResolver.Resolve(temp.Path);
+        var applicationDirectory = Path.Combine(root, "Microsoft", "Agent365");
+        Directory.CreateDirectory(applicationDirectory);
+        const UnixFileMode existingMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+            | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute
+            | UnixFileMode.OtherRead | UnixFileMode.OtherExecute;
+        File.SetUnixFileMode(applicationDirectory, existingMode);
+        var rootMode = File.GetUnixFileMode(temp.Path);
+        var existingFile = Path.Combine(applicationDirectory, "existing-record");
+        File.WriteAllText(existingFile, "preserve");
+
+        using var storage = Agent365DurableDelivery.CreateStorage(
+            new Agent365ExporterOptions { StorageDirectory = temp.Path }, NullLogger.Instance);
+
+        storage.Should().BeOfType<Agent365PersistentStorage>();
+        storage.TryStore(CreateRecord()).Should().BeTrue();
+        Directory.GetFiles(applicationDirectory, "*.blob").Should().NotBeEmpty();
+        File.GetUnixFileMode(applicationDirectory).Should().Be(existingMode);
+        File.GetUnixFileMode(temp.Path).Should().Be(rootMode);
+        File.ReadAllText(existingFile).Should().Be("preserve");
+    }
+
+    [TestMethod]
+    public void UnprovisionedUnixStorageDisablesDurabilityAndLogsAnError()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        using var temp = new TemporaryDirectory();
+        var root = Path.Combine(temp.Path, "not-provisioned");
+        var logger = new Mock<ILogger>();
+
+        using var storage = Agent365DurableDelivery.CreateStorage(
+            new Agent365ExporterOptions { StorageDirectory = root }, logger.Object);
+
+        storage.Should().BeOfType<DisabledAgent365Storage>();
+        logger.Invocations.Should().Contain(call => call.Method.Name == "Log"
+            && (LogLevel)call.Arguments[0] == LogLevel.Error
+            && call.Arguments[3] is DirectoryNotFoundException);
+        Directory.Exists(root).Should().BeFalse();
+    }
+
+    [TestMethod]
+    public void ReopensStorageAndReplaysExistingRecord()
+    {
+        using var temp = new TemporaryDirectory();
+        var options = new Agent365ExporterOptions { StorageDirectory = temp.Path };
+        var expected = CreateRecord();
+        using (var storage = Agent365DurableDelivery.CreateStorage(options, NullLogger.Instance))
+        {
+            storage.TryStore(expected).Should().BeTrue();
+        }
+
+        using var reopened = Agent365DurableDelivery.CreateStorage(options, NullLogger.Instance);
+        reopened.TryGetNext(out var stored).Should().BeTrue();
         stored!.TryLease(TimeSpan.FromMinutes(2)).Should().BeTrue();
         stored.Read(out var actual).Should().Be(Agent365StoredRecordReadResult.Success);
         actual.Should().BeEquivalentTo(expected);
@@ -137,67 +209,90 @@ public sealed class Agent365PersistentStorageTests
         dir.Should().StartWith(Environment.CurrentDirectory);
     }
 
-    [TestMethod]
-    public void UsesTomDirOnUnixWhenSet()
+    [DataTestMethod]
+    [DataRow(null)]
+    [DataRow("")]
+    [DataRow(" ")]
+    public void RequiresConfiguredStorageDirectoryOnUnix(string? configuredRoot)
     {
-        var dir = Agent365StorageDirectoryResolver.Resolve(
-            configuredRoot: null,
+        var resolve = () => Agent365StorageDirectoryResolver.Resolve(
+            configuredRoot: configuredRoot,
             isWindows: () => false,
-            getEnvVar: v => v == "TMPDIR" ? "/custom/tmp" : null,
+            getEnvVar: _ => Path.GetTempPath(),
             hashIdentity: () => "abcd1234");
 
-        dir.Should().StartWith("/custom/tmp");
+        resolve.Should().Throw<InvalidOperationException>().WithMessage("*StorageDirectory*");
     }
 
     [TestMethod]
-    public void FallsBackToVarTmpOnUnixWhenTmpdirMissing()
+    public void RequiresExistingStorageRootOnUnix()
     {
-        var dir = Agent365StorageDirectoryResolver.Resolve(
-            configuredRoot: null,
+        using var temp = new TemporaryDirectory();
+        var missingRoot = Path.Combine(temp.Path, "not-provisioned");
+        var resolve = () => Agent365StorageDirectoryResolver.Resolve(
+            configuredRoot: missingRoot,
             isWindows: () => false,
             getEnvVar: _ => null,
             hashIdentity: () => "abcd1234");
 
-        dir.Should().StartWith("/var/tmp");
+        resolve.Should().Throw<DirectoryNotFoundException>();
+        Directory.Exists(missingRoot).Should().BeFalse();
     }
 
     [TestMethod]
-    public void FallsBackToSlashTmpOnUnixWhenVarTmpNotAccessible()
+    public void RequiresAbsoluteStorageRootOnUnix()
     {
-        var dir = Agent365StorageDirectoryResolver.Resolve(
-            configuredRoot: null,
+        var resolve = () => Agent365StorageDirectoryResolver.Resolve(
+            configuredRoot: "relative-storage",
             isWindows: () => false,
             getEnvVar: _ => null,
             hashIdentity: () => "abcd1234");
 
-        if (!dir.StartsWith("/var/tmp"))
-        {
-            dir.Should().StartWith("/tmp");
-        }
+        resolve.Should().Throw<ArgumentException>().WithMessage("*absolute*");
     }
 
     [TestMethod]
-    public void UnixFallbackOrderVerifiedTmpdirFirst()
+    public void ResolvesProvisionedUnixRootWithoutConsultingTemporaryDirectories()
     {
+        using var temp = new TemporaryDirectory();
         var dir = Agent365StorageDirectoryResolver.Resolve(
-            configuredRoot: null,
+            configuredRoot: temp.Path,
             isWindows: () => false,
-            getEnvVar: v => v == "TMPDIR" ? "/explicit/tmpdir" : null,
+            getEnvVar: _ => throw new InvalidOperationException("Temporary directories must not be consulted."),
             hashIdentity: () => "abcd1234");
 
-        dir.Should().StartWith("/explicit/tmpdir");
+        dir.Should().Be(Path.Combine(temp.Path, "abcd1234"));
     }
 
     [TestMethod]
-    public void UnixFallbackOrderVerifiedVarTmpSecond()
+    public void MissingUnixStorageRootDisablesDurabilityAndLogsAnError()
     {
-        var dir = Agent365StorageDirectoryResolver.Resolve(
-            configuredRoot: null,
-            isWindows: () => false,
-            getEnvVar: _ => null,
-            hashIdentity: () => "abcd1234");
+        if (OperatingSystem.IsWindows()) return;
 
-        (dir.StartsWith("/var/tmp") || dir.StartsWith("/tmp")).Should().BeTrue();
+        var logger = new Mock<ILogger>();
+        using var storage = Agent365DurableDelivery.CreateStorage(new Agent365ExporterOptions(), logger.Object);
+
+        storage.Should().BeOfType<DisabledAgent365Storage>();
+        logger.Invocations.Should().Contain(call => call.Method.Name == "Log"
+            && (LogLevel)call.Arguments[0] == LogLevel.Error
+            && call.Arguments[3] is InvalidOperationException
+            && ((Exception)call.Arguments[3]).Message.Contains("StorageDirectory"));
+    }
+
+    [TestMethod]
+    public void CoreWithoutInjectedStorageDisablesDurabilityAndLogsAnErrorOnUnix()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        var logger = new Mock<ILogger<Agent365ExporterCore>>();
+        var core = new Agent365ExporterCore(
+            new ExportFormatter(NullLogger<ExportFormatter>.Instance),
+            logger.Object, utcNow: null, storage: null);
+
+        core.Storage.Should().BeOfType<DisabledAgent365Storage>();
+        logger.Invocations.Should().Contain(call => call.Method.Name == "Log"
+            && (LogLevel)call.Arguments[0] == LogLevel.Error
+            && call.Arguments[3] is InvalidOperationException);
     }
 
     private static Agent365DurableRecord CreateRecord() =>
@@ -223,7 +318,14 @@ internal sealed class TemporaryDirectory : IDisposable
     public TemporaryDirectory()
     {
         Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(Path);
+        if (OperatingSystem.IsWindows())
+        {
+            Directory.CreateDirectory(Path);
+        }
+        else
+        {
+            Directory.CreateDirectory(Path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
     }
 
     public string Path { get; }

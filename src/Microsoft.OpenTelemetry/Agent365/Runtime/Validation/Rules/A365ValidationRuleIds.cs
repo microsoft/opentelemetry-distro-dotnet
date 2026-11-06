@@ -47,6 +47,9 @@ public static class A365ValidationRuleIds
     /// <summary>Requires the server address to be present.</summary>
     public const string ServerAddressRequired = "A365-COMMON-013";
 
+    /// <summary>Requires the operation name span attribute to be present.</summary>
+    public const string OperationNameRequired = "A365-COMMON-014";
+
     /// <summary>Requires input messages to be present.</summary>
     public const string InputMessagesRequired = "A365-CONTENT-001";
 

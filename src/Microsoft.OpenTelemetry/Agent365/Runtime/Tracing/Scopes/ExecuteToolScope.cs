@@ -46,8 +46,10 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
         private ExecuteToolScope(Request request, ToolCallDetails details, AgentDetails agentDetails, UserDetails? userDetails, SpanDetails? spanDetails, ThreatDiagnosticsSummary? threatDiagnosticsSummary)
             : base(
                 operationName: OpenTelemetryConstants.ExecuteToolOperationName,
-                activityName: $"{OpenTelemetryConstants.ExecuteToolOperationName} {details.ToolName}",
+                activityName: details.RefinementDetails?.GetSpanName(details.ToolName)
+                    ?? $"{OpenTelemetryConstants.ExecuteToolOperationName} {details.ToolName}",
                 agentDetails: agentDetails,
+                request: request,
                 spanDetails: new SpanDetails(spanDetails?.SpanKind ?? ActivityKind.Internal, spanDetails?.ParentContext, spanDetails?.StartTime, spanDetails?.EndTime, spanDetails?.SpanLinks),
                 userDetails: userDetails)
         {
@@ -84,24 +86,54 @@ namespace Microsoft.Agents.A365.Observability.Runtime.Tracing.Scopes
             SetTagMaybe(OpenTelemetryConstants.GenAiToolTypeKey, toolType);
             SetTagMaybe(OpenTelemetryConstants.GenAiToolCallIdKey, toolCallId);
             SetTagMaybe(OpenTelemetryConstants.GenAiToolDescriptionKey, description);
+
+            if (details.RefinementDetails != null)
+            {
+                foreach (var attribute in details.RefinementDetails.GetAttributes())
+                {
+                    SetTagMaybe(attribute.Key, attribute.Value);
+                }
+            }
+
+            var transferDetails = details.TransferDetails;
+            if (transferDetails != null)
+            {
+                SetTagMaybe(OpenTelemetryConstants.TransferModeKey, transferDetails.ModeValue);
+                SetTagMaybe(OpenTelemetryConstants.TransferTargetTypeKey, transferDetails.TargetTypeValue);
+
+                var targetAgentDetails = transferDetails.TargetAgentDetails;
+                if (targetAgentDetails != null)
+                {
+                    SetTagMaybe(OpenTelemetryConstants.TransferTargetAgentIdKey, targetAgentDetails.AgentId);
+                    SetTagMaybe(OpenTelemetryConstants.TransferTargetAgentNameKey, targetAgentDetails.AgentName);
+                    SetTagMaybe(OpenTelemetryConstants.TransferTargetAgentBlueprintIdKey, targetAgentDetails.AgentBlueprintId);
+                    SetTagMaybe(OpenTelemetryConstants.TransferTargetAgentPlatformIdKey, targetAgentDetails.AgentPlatformId);
+                    SetTagMaybe(OpenTelemetryConstants.TransferTargetAgentVersionKey, targetAgentDetails.AgentVersion);
+                }
+            }
+
             SetTagMaybe(OpenTelemetryConstants.ThreatDiagnosticsSummaryKey, threatDiagnosticsSummary?.ToJson());
-            SetTagMaybe(OpenTelemetryConstants.GenAiConversationIdKey, request?.ConversationId);
-            SetTagMaybe(OpenTelemetryConstants.SessionIdKey, request?.SessionId);
 
             if (endpoint != null)
             {
                 SetTagMaybe(OpenTelemetryConstants.ServerAddressKey, endpoint.Host);
+                SetTagMaybe(OpenTelemetryConstants.UrlFullKey, endpoint.AbsoluteUri);
                 if (endpoint.Port != 443)
                 {
                     SetTagMaybe(OpenTelemetryConstants.ServerPortKey, endpoint.Port.ToString());
                 }
             }
 
-            if (request?.Channel != null)
-            {
-                SetTagMaybe(OpenTelemetryConstants.ChannelNameKey, request.Channel.Name);
-                SetTagMaybe(OpenTelemetryConstants.ChannelLinkKey, request.Channel.Link);
-            }
+        }
+
+        /// <summary>
+        /// Records the exit code reported by a single command or process after execution.
+        /// </summary>
+        /// <param name="exitCode">The reported exit code, including zero for success.</param>
+        /// <remarks>Use for command tool executions. This does not infer or change the span's error status.</remarks>
+        public void RecordProcessExitCode(int exitCode)
+        {
+            SetTagMaybe(OpenTelemetryConstants.ProcessExitCodeKey, exitCode);
         }
 
         /// <summary>
