@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.3.0-beta.1 - 2026-11-10
 - Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.11.0-beta.1.
 - Update OpenTelemetry ASP.NET Core, HTTP, and SQL Client instrumentation packages to 1.20.1.
 - Update `OpenTelemetry.PersistentStorage.FileSystem` to 1.1.3, required by the Azure Monitor exporter.
