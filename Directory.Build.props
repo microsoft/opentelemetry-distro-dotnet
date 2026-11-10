@@ -19,7 +19,7 @@
 
   <!-- Package versions -->
   <PropertyGroup>
-    <MicrosoftOpenTelemetryPackageVersion Condition="'$(MSBuildProjectName)' != 'Microsoft.OpenTelemetry.Package.Tests'">1.2.0</MicrosoftOpenTelemetryPackageVersion>
+    <MicrosoftOpenTelemetryPackageVersion Condition="'$(MSBuildProjectName)' != 'Microsoft.OpenTelemetry.Package.Tests'">1.3.0-beta.1</MicrosoftOpenTelemetryPackageVersion>
   </PropertyGroup>
 
   <!-- Agent365 Contracts reference mode. Set UseA365ContractsPackageReference=true to consume
