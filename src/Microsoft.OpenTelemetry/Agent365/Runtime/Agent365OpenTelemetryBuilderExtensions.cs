@@ -86,11 +86,16 @@ internal static class Agent365OpenTelemetryBuilderExtensions
             // LLM calls on async continuations with no parent Activity. Without this,
             // parent-based samplers drop those orphan root spans — including gen_ai.*
             // chat and invoke_agent spans.
-            tracing
-                .SetSampler(new global::OpenTelemetry.Trace.ParentBasedSampler(
-                    rootSampler: new global::OpenTelemetry.Trace.AlwaysOnSampler(),
-                    localParentNotSampled: new global::OpenTelemetry.Trace.AlwaysOnSampler(),
-                    remoteParentNotSampled: new global::OpenTelemetry.Trace.AlwaysOnSampler()));
+            // Only take over the sampler when spans are exported to Agent365; otherwise it
+            // would replace the sampler configured for other exporters such as Azure Monitor.
+            if (!options.SkipExporter)
+            {
+                tracing
+                    .SetSampler(new global::OpenTelemetry.Trace.ParentBasedSampler(
+                        rootSampler: new global::OpenTelemetry.Trace.AlwaysOnSampler(),
+                        localParentNotSampled: new global::OpenTelemetry.Trace.AlwaysOnSampler(),
+                        remoteParentNotSampled: new global::OpenTelemetry.Trace.AlwaysOnSampler()));
+            }
 
             // Semantic Kernel
             if (instrumentationOptions.EnableSemanticKernelInstrumentation)
