@@ -24,10 +24,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup .NET ${{ matrix.dotnet-version }}
+      # Test projects also target net11.0, so every leg needs the .NET 11 SDK and runtime.
+      - name: Setup .NET ${{ matrix.dotnet-version }} and 11.0.x
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: ${{ matrix.dotnet-version }}
+          dotnet-version: |
+            ${{ matrix.dotnet-version }}
+            11.0.x
 
       - name: Restore dependencies
         run: dotnet restore Microsoft.OpenTelemetry.slnx
@@ -73,7 +76,9 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "10.0.x"
+          dotnet-version: |
+            10.0.x
+            11.0.x
 
       - name: Restore
         run: dotnet restore Microsoft.OpenTelemetry.slnx

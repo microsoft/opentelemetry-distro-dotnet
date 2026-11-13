@@ -2,6 +2,7 @@
 
 ## Unreleased
 - Update test-only dependency `coverlet.collector` to 6.0.4, which bundles a patched System.Text.Json ([GHSA-8g4q-xg66-9fp4](https://github.com/advisories/GHSA-8g4q-xg66-9fp4)). Published packages are not affected.
+- Run tests on .NET 11 by adding `net11.0` to the test projects and installing the .NET 11 SDK in CI. Published package target frameworks are unchanged.
 
 ## 1.3.0-beta.1 - 2026-11-10
 - Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.11.0-beta.1.
