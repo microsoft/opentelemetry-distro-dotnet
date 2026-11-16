@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- Update test-only dependency `coverlet.collector` to 6.0.4, which bundles a patched System.Text.Json ([GHSA-8g4q-xg66-9fp4](https://github.com/advisories/GHSA-8g4q-xg66-9fp4)). Published packages are not affected.
+
 ## 1.3.0-beta.1 - 2026-11-10
 - Update Microsoft.SourceLink.GitHub to 10.0.404 to address CVE-2026-62900 in the transitive Microsoft.Build.Tasks.Git dependency.
 - Update `Azure.Monitor.OpenTelemetry.Exporter` to 1.11.0-beta.1.
