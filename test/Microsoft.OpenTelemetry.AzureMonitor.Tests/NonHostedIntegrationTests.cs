@@ -127,6 +127,8 @@ namespace Microsoft.OpenTelemetry.AzureMonitor.Tests
                     o.AzureMonitor.ConnectionString = TestConnectionString;
                     o.AzureMonitor.DisableOfflineStorage = true;
                     o.AzureMonitor.EnableLiveMetrics = false;
+                    // Sampling is not under test; keep every span (rate limiting drops spans right after startup).
+                    o.AzureMonitor.TracesPerSecond = null;
                 })
                 .WithTracing(t => t.AddInMemoryExporter(exportedActivities));
             });
