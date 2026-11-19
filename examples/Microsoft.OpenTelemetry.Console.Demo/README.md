@@ -11,7 +11,7 @@ A minimal console application demonstrating `Microsoft.OpenTelemetry` distro usa
 
 ## Prerequisites
 
-- .NET 8.0+
+- .NET 11 SDK and .NET 8 runtime (the demo targets `net8.0` and builds the distro from source)
 - (Optional) Azure OpenAI API key for LLM spans
 - (Optional) Application Insights connection string for Azure Monitor
 
