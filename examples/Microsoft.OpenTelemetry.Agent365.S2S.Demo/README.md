@@ -12,7 +12,7 @@ It does not use Agents Framework, an LLM, or a real tool endpoint.
 
 ## Prerequisites
 
-- .NET 8 SDK
+- .NET 11 SDK and .NET 8 runtime (the demo targets `net8.0` and builds the distro from source)
 - Blueprint application client ID and secret
 - Microsoft Entra tenant ID
 - An onboarded Agent365 agent app instance ID

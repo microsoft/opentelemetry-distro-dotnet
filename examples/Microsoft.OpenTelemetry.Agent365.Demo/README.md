@@ -15,7 +15,7 @@ For comprehensive documentation and guidance on building agents with the Microso
 
 ## Prerequisites
 
-- .NET 8.0 or higher
+- .NET 11 SDK, plus the .NET 8 and ASP.NET Core 8 runtimes (the demo targets `net8.0` and builds the distro from source)
 - Microsoft Agent 365 SDK
 - Azure/OpenAI API credentials
 - OpenWeather Credentials (if using the OpenWeather Tool) 

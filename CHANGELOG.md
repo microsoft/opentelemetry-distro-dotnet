@@ -2,6 +2,7 @@
 
 ## Unreleased
 - Update test-only dependency `coverlet.collector` to 6.0.4, which bundles a patched System.Text.Json ([GHSA-8g4q-xg66-9fp4](https://github.com/advisories/GHSA-8g4q-xg66-9fp4)). Published packages are not affected.
+- Add the `net11.0` target framework to `Microsoft.OpenTelemetry`, `Microsoft.OpenTelemetry.A365.Contracts`, and `Microsoft.OpenTelemetry.A365.Etw`, and run tests on .NET 11. Building from source now requires the .NET 11 SDK.
 - Fix Azure Monitor sampling (`SamplingRatio` and `TracesPerSecond`) having no effect. The Agent365 AlwaysOn sampler is now installed only when Agent365 export is enabled; previously it replaced the Azure Monitor sampler in every configuration. **Behavior change:** apps that export only to Azure Monitor now sample traces as configured, at 5 traces per second by default, instead of sending every trace. When both Agent365 and Azure Monitor export are enabled, Agent365 still receives every span and Azure Monitor sampling settings are not applied ([#187](https://github.com/microsoft/opentelemetry-distro-dotnet/issues/187)).
 
 ## 1.3.0-beta.1 - 2026-11-10

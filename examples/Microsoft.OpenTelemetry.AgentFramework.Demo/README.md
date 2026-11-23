@@ -11,7 +11,7 @@ This demo shows how the **Microsoft OpenTelemetry Distro** captures telemetry fr
 
 ## Prerequisites
 
-- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
+- [.NET 11 SDK](https://dotnet.microsoft.com/download/dotnet/11.0), plus the [.NET 8 and ASP.NET Core 8 runtimes](https://dotnet.microsoft.com/download/dotnet/8.0) (the demo targets `net8.0` and builds the distro from source)
 - An [Azure OpenAI](https://learn.microsoft.com/azure/ai-services/openai/) resource with a deployed model (e.g., `gpt-5.4-mini`)
 - An [Application Insights](https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview) resource (optional — for Azure Monitor export)
 

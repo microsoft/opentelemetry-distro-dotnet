@@ -25,6 +25,7 @@ public sealed class PackageContentsTests
     [DataTestMethod]
     [DataRow("netstandard2.0")]
     [DataRow("net8.0")]
+    [DataRow("net11.0")]
     public void DistroNupkgEmbedsDistroAndEtwButNotContracts(string targetFramework)
     {
         using var archive = PackageArchive.Open(DistroPackageId, PackageValidation.Version, "nupkg");
@@ -47,6 +48,7 @@ public sealed class PackageContentsTests
     [DataTestMethod]
     [DataRow("netstandard2.0")]
     [DataRow("net8.0")]
+    [DataRow("net11.0")]
     public void DistroSnupkgEmbedsDistroAndEtwButNotContracts(string targetFramework)
     {
         using var archive = PackageArchive.Open(DistroPackageId, PackageValidation.Version, "snupkg");
@@ -78,6 +80,7 @@ public sealed class PackageContentsTests
     [DataTestMethod]
     [DataRow("netstandard2.0")]
     [DataRow("net8.0")]
+    [DataRow("net11.0")]
     public void StandaloneEtwNupkgContainsEtwButNotContracts(string targetFramework)
     {
         using var archive = PackageArchive.Open(EtwPackageId, PackageValidation.Version, "nupkg");
@@ -99,6 +102,7 @@ public sealed class PackageContentsTests
     [DataTestMethod]
     [DataRow("netstandard2.0")]
     [DataRow("net8.0")]
+    [DataRow("net11.0")]
     public void StandaloneEtwSnupkgContainsEtwButNotContracts(string targetFramework)
     {
         using var archive = PackageArchive.Open(EtwPackageId, PackageValidation.Version, "snupkg");
